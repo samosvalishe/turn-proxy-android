@@ -111,11 +111,11 @@ private class TofuHostKeyRepository(
     }
 
     override fun getHostKey(): Array<HostKey> = emptyArray()
-    override fun getHostKey(host: String, type: String): Array<HostKey> = emptyArray()
+    override fun getHostKey(host: String?, type: String?): Array<HostKey> = emptyArray()
     override fun getKnownHostsRepositoryID(): String = "TOFU"
-    override fun add(hostkey: HostKey, ui: UserInfo) {}
-    override fun remove(host: String, type: String) {}
-    override fun remove(host: String, type: String, key: ByteArray) {}
+    override fun add(hostkey: HostKey, ui: UserInfo?) {}
+    override fun remove(host: String?, type: String?) {}
+    override fun remove(host: String?, type: String?, key: ByteArray?) {}
 
     private fun sha256Fingerprint(key: ByteArray): String {
         val hash = MessageDigest.getInstance("SHA-256").digest(key)
