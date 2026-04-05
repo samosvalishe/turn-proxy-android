@@ -148,8 +148,7 @@ fun ClientSetupScreen(
                 label = { Text(stringResource(R.string.vk_link_label)) },
                 placeholder = { Text(stringResource(R.string.vk_link_placeholder)) },
                 modifier = Modifier.fillMaxWidth(),
-                minLines = 2,
-                maxLines = 4,
+                singleLine = true,
                 supportingText = { Text(stringResource(R.string.vk_link_support)) }
             )
 
