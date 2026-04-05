@@ -55,6 +55,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.data.ClientConfig
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.viewmodel.MainViewModel
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
 /**
@@ -104,7 +105,7 @@ fun ClientSetupScreen(
             ClientConfig(
                 serverAddress = serverAddress.trim(),
                 vkLink        = vkLink.trim(),
-                threads       = threads.toInt(),
+                threads       = threads.roundToInt(),
                 useUdp        = useUdp,
                 noDtls        = noDtls,
                 localPort     = localPort.trim()
@@ -175,7 +176,7 @@ fun ClientSetupScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.threads_format, threads.toInt()), style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.threads_format, threads.roundToInt()), style = MaterialTheme.typography.bodyMedium)
                         Text(
                             stringResource(R.string.threads_recommendation),
                             style = MaterialTheme.typography.labelSmall,
@@ -186,7 +187,7 @@ fun ClientSetupScreen(
                 Slider(
                     value = threads,
                     onValueChange = {
-                        val newInt = it.toInt()
+                        val newInt = it.roundToInt()
                         if (newInt != lastSliderInt) {
                             HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
                             lastSliderInt = newInt
