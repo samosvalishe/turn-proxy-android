@@ -29,12 +29,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.freeturn.app.ui.HapticUtil
+import com.freeturn.app.ui.screens.CaptchaWebViewDialog
 import com.freeturn.app.ui.screens.ClientSetupScreen
 import com.freeturn.app.ui.screens.HomeScreen
 import com.freeturn.app.ui.screens.LogsScreen
 import com.freeturn.app.ui.screens.OnboardingScreen
 import com.freeturn.app.ui.screens.ServerManagementScreen
 import com.freeturn.app.ui.screens.SshSetupScreen
+import com.freeturn.app.viewmodel.ProxyState
 import com.freeturn.app.viewmodel.MainViewModel
 
 object Routes {
@@ -61,6 +63,7 @@ fun AppNavigation(viewModel: MainViewModel) {
     // захватит дефолтный onboardingDone=false и всегда покажет онбординг
     if (!isInitialized) return
 
+    val proxyState by viewModel.proxyState.collectAsStateWithLifecycle()
     val startDestination = remember { if (onboardingDone) Routes.HOME else Routes.ONBOARDING }
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -202,6 +205,14 @@ fun AppNavigation(viewModel: MainViewModel) {
                 }
             }
         }
+    }
+
+    // Диалог капчи поверх любого экрана
+    if (proxyState is ProxyState.CaptchaRequired) {
+        CaptchaWebViewDialog(
+            captchaUrl = (proxyState as ProxyState.CaptchaRequired).url,
+            onDismiss = { viewModel.dismissCaptcha() }
+        )
     }
 }
 

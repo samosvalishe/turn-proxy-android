@@ -71,6 +71,8 @@ class AppPreferences(context: Context) {
     }
 
     // Шифрованное хранилище для SSH-пароля и ключа (Android Keystore + AES-256)
+    // Подавляем предупреждения: стабильной замены EncryptedSharedPreferences пока нет
+    @Suppress("DEPRECATION")
     private val encryptedPrefs: SharedPreferences by lazy {
         val masterKey = MasterKey.Builder(context)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)

@@ -303,12 +303,6 @@ fun HomeScreen(
 
     UpdateDialogs(viewModel)
 
-    if (proxyState is ProxyState.CaptchaRequired) {
-        CaptchaWebViewDialog(
-            captchaUrl = (proxyState as ProxyState.CaptchaRequired).url,
-            onDismiss = { viewModel.dismissCaptcha() }
-        )
-    }
 }
 
 // ── Диалоги обновления ────────────────────────────────────────────────────
