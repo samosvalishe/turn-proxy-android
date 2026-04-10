@@ -531,8 +531,8 @@ private fun InfoBottomSheet(
         item {
             RepoLinkItem(
                 title = stringResource(R.string.android_client),
-                subtitle = "antongospod/turn-proxy-android",
-                url = "https://github.com/antongospod/turn-proxy-android",
+                subtitle = "samosvalishe/turn-proxy-android",
+                url = "https://github.com/samosvalishe/turn-proxy-android",
                 containerColor = containerColor,
                 onHaptic = { HapticUtil.perform(context, HapticUtil.Pattern.SELECTION) },
                 onOpen = { uriHandler.openUri(it) }

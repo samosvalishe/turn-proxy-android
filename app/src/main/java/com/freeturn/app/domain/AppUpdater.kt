@@ -154,7 +154,7 @@ class AppUpdater(private val context: Context) {
 
     companion object {
         private const val RELEASES_URL =
-            "https://api.github.com/repos/antongospod/turn-proxy-android/releases/latest"
+            "https://api.github.com/repos/samosvalishe/turn-proxy-android/releases/latest"
 
         fun isNewer(remote: String, current: String): Boolean {
             val r = remote.split(".").map { it.toIntOrNull() ?: 0 }
