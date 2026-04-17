@@ -39,8 +39,18 @@ data class ClientConfig(
     val isRawMode: Boolean = false,
     val rawCommand: String = "",
     val vlessMode: Boolean = false,
-    val forceTurnPort443: Boolean = false
+    // "auto" | "udp" | "doh" — соответствует флагу -dns ядра.
+    val dnsMode: String = DnsMode.AUTO,
+    // Если true — в argv ядра добавляется -port 443, переопределяя порт TURN-сервера VK.
+    val forcePort443: Boolean = false
 )
+
+object DnsMode {
+    const val AUTO = "auto"
+    const val UDP = "udp"
+    const val DOH = "doh"
+    val ALL = listOf(AUTO, UDP, DOH)
+}
 
 // P2-3 / P3-6: всегда используем applicationContext, чтобы lazy-init encryptedPrefs
 // не мог сработать на уничтоженном контексте (например Service после onDestroy)
@@ -64,7 +74,13 @@ class AppPreferences(context: Context) {
         val CLIENT_IS_RAW = booleanPreferencesKey("client_is_raw")
         val CLIENT_RAW_CMD = stringPreferencesKey("client_raw_cmd")
         val CLIENT_VLESS = booleanPreferencesKey("client_vless")
-        val CLIENT_FORCE_PORT_443 = booleanPreferencesKey("client_force_port_443")
+        val CLIENT_DNS_MODE = stringPreferencesKey("client_dns_mode")
+        val CLIENT_FORCE_PORT_443 = booleanPreferencesKey("client_turn_port_443")
+
+        // Устаревший ключ — читается только для миграции (true → "doh").
+        // Ключ "client_force_port_443" не переиспользуется под новую семантику, чтобы
+        // у старых пользователей не включился неожиданно -port 443.
+        private val CLIENT_FORCE_PORT_443_LEGACY = booleanPreferencesKey("client_force_port_443")
         val PROXY_LISTEN = stringPreferencesKey("proxy_listen")
         val PROXY_CONNECT = stringPreferencesKey("proxy_connect")
         val DYNAMIC_THEME = booleanPreferencesKey("dynamic_theme")
@@ -121,7 +137,9 @@ class AppPreferences(context: Context) {
                 isRawMode = prefs[CLIENT_IS_RAW] ?: false,
                 rawCommand = prefs[CLIENT_RAW_CMD] ?: "",
                 vlessMode = prefs[CLIENT_VLESS] ?: false,
-                forceTurnPort443 = prefs[CLIENT_FORCE_PORT_443] ?: false
+                dnsMode = prefs[CLIENT_DNS_MODE]
+                    ?: if (prefs[CLIENT_FORCE_PORT_443_LEGACY] == true) DnsMode.DOH else DnsMode.AUTO,
+                forcePort443 = prefs[CLIENT_FORCE_PORT_443] ?: false
             )
         }
 
@@ -177,7 +195,11 @@ class AppPreferences(context: Context) {
             prefs[CLIENT_IS_RAW] = config.isRawMode
             prefs[CLIENT_RAW_CMD] = config.rawCommand
             prefs[CLIENT_VLESS] = config.vlessMode
-            prefs[CLIENT_FORCE_PORT_443] = config.forceTurnPort443
+            prefs[CLIENT_DNS_MODE] = if (config.dnsMode in DnsMode.ALL) config.dnsMode else DnsMode.AUTO
+            prefs[CLIENT_FORCE_PORT_443] = config.forcePort443
+            // Зачищаем устаревший ключ после успешной миграции, чтобы он не всплывал
+            // при следующей загрузке, если пользователь переключит режим обратно.
+            prefs.remove(CLIENT_FORCE_PORT_443_LEGACY)
         }
     }
 

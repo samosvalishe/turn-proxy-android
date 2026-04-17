@@ -57,8 +57,13 @@
     <string name="no_dtls_desc">Может ускорить соединение, повышает риск блокировки</string>
     <string name="manual_captcha">Ручной ввод капчи</string>
     <string name="manual_captcha_desc">Решать капчу вручную вместо автоматического распознавания</string>
-    <string name="force_turn_port_443">TURN-порт 443</string>
-    <string name="force_turn_port_443_desc">Использовать порт 443 вместо стандартного. Помогает в сетях, где порт 19302 заблокирован</string>
+    <string name="force_port_443">TURN на порту 443</string>
+    <string name="force_port_443_desc">Подменяет порт VK TURN на 443 (-port 443). Помогает, если оператор режет нестандартные порты</string>
+    <string name="dns_mode_title">DNS-резолвер</string>
+    <string name="dns_mode_desc">Авто — пробует системный DNS, переключается на DNS-over-HTTPS при блокировке</string>
+    <string name="dns_mode_auto">Авто</string>
+    <string name="dns_mode_udp">UDP/53</string>
+    <string name="dns_mode_doh">DoH</string>
     <string name="core_title">Ядро</string>
     <string name="custom_core">Кастомное ядро</string>
     <string name="builtin_core">Встроенное ядро</string>

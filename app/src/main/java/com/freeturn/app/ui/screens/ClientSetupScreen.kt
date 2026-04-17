@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.data.ClientConfig
+import com.freeturn.app.data.DnsMode
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.viewmodel.MainViewModel
 import kotlin.math.roundToInt
@@ -88,7 +89,8 @@ fun ClientSetupScreen(
     var noDtls       by rememberSaveable(saved.noDtls)         { mutableStateOf(saved.noDtls) }
     var manualCaptcha by rememberSaveable(saved.manualCaptcha) { mutableStateOf(saved.manualCaptcha) }
     var localPort    by rememberSaveable(saved.localPort)      { mutableStateOf(saved.localPort) }
-    var forcePort443 by rememberSaveable(saved.forceTurnPort443) { mutableStateOf(saved.forceTurnPort443) }
+    var dnsMode by rememberSaveable(saved.dnsMode) { mutableStateOf(saved.dnsMode) }
+    var forcePort443 by rememberSaveable(saved.forcePort443) { mutableStateOf(saved.forcePort443) }
     var lastSliderInt by rememberSaveable { mutableIntStateOf(saved.threads) }
 
     // Автозаполнение адреса сервера из SSH-конфига если поле пустое
@@ -101,19 +103,20 @@ fun ClientSetupScreen(
 
     // Авто-сохранение с дебаунсом 600 мс на каждое изменение поля.
     // vlessMode исключён — сохраняется через setVlessMode с автоперезапуском сервера.
-    LaunchedEffect(serverAddress, vkLink, threads, useUdp, noDtls, manualCaptcha, localPort, forcePort443) {
+    LaunchedEffect(serverAddress, vkLink, threads, useUdp, noDtls, manualCaptcha, localPort, dnsMode, forcePort443) {
         delay(600)
         viewModel.saveClientConfig(
             ClientConfig(
-                serverAddress    = serverAddress.trim(),
-                vkLink           = vkLink.trim(),
-                threads          = threads.roundToInt(),
-                useUdp           = useUdp,
-                noDtls           = noDtls,
-                manualCaptcha    = manualCaptcha,
-                localPort        = localPort.trim(),
-                vlessMode        = saved.vlessMode,
-                forceTurnPort443 = forcePort443
+                serverAddress = serverAddress.trim(),
+                vkLink        = vkLink.trim(),
+                threads       = threads.roundToInt(),
+                useUdp        = useUdp,
+                noDtls        = noDtls,
+                manualCaptcha = manualCaptcha,
+                localPort     = localPort.trim(),
+                vlessMode     = saved.vlessMode,
+                dnsMode       = dnsMode,
+                forcePort443  = forcePort443
             )
         )
     }
@@ -270,9 +273,37 @@ fun ClientSetupScreen(
                 }
             )
 
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column {
+                    Text(stringResource(R.string.dns_mode_title), style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        stringResource(R.string.dns_mode_desc),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    )
+                }
+                val dnsOptions = listOf(
+                    DnsMode.AUTO to stringResource(R.string.dns_mode_auto),
+                    DnsMode.UDP to stringResource(R.string.dns_mode_udp),
+                    DnsMode.DOH to stringResource(R.string.dns_mode_doh)
+                )
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    dnsOptions.forEachIndexed { idx, (value, label) ->
+                        SegmentedButton(
+                            selected = dnsMode == value,
+                            onClick = {
+                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                                dnsMode = value
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(index = idx, count = dnsOptions.size)
+                        ) { Text(label) }
+                    }
+                }
+            }
+
             SwitchRow(
-                label = stringResource(R.string.force_turn_port_443),
-                description = stringResource(R.string.force_turn_port_443_desc),
+                label = stringResource(R.string.force_port_443),
+                description = stringResource(R.string.force_port_443_desc),
                 checked = forcePort443,
                 onCheckedChange = {
                     HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)

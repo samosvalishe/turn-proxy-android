@@ -14,6 +14,7 @@ import android.os.Looper
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import com.freeturn.app.data.AppPreferences
+import com.freeturn.app.data.DnsMode
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
@@ -132,7 +133,12 @@ class ProxyService : Service() {
             else if (cfg.useUdp) cmdArgs.add("-udp")
             if (cfg.noDtls) cmdArgs.add("-no-dtls")
             if (cfg.manualCaptcha) cmdArgs.add("--manual-captcha")
-            if (cfg.forceTurnPort443) { cmdArgs.add("-port"); cmdArgs.add("443") }
+            // -dns передаём только если пользователь выбрал не-дефолт: ядро по
+            // умолчанию уже использует auto (UDP/53 с sticky-fallback на DoH).
+            if (cfg.dnsMode in DnsMode.ALL && cfg.dnsMode != DnsMode.AUTO) {
+                cmdArgs.add("-dns"); cmdArgs.add(cfg.dnsMode)
+            }
+            if (cfg.forcePort443) { cmdArgs.add("-port"); cmdArgs.add("443") }
         }
 
         // Кастомное ядро лежит в filesDir, откуда SELinux (untrusted_app) запрещает execve.
