@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.freeturn.app.data
 
 import android.content.Context
@@ -52,8 +54,6 @@ object DnsMode {
     val ALL = listOf(AUTO, UDP, DOH)
 }
 
-// P2-3 / P3-6: всегда используем applicationContext, чтобы lazy-init encryptedPrefs
-// не мог сработать на уничтоженном контексте (например Service после onDestroy)
 class AppPreferences(context: Context) {
     private val context = context.applicationContext
 

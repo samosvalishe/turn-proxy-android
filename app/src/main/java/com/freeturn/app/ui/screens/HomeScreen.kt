@@ -309,6 +309,7 @@ fun HomeScreen(
 
 // Диалоги обновления
 
+@Suppress("AssignedValueIsNeverRead")
 @Composable
 private fun UpdateDialogs(viewModel: MainViewModel) {
     val context = LocalContext.current
@@ -462,6 +463,7 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
 
 // Bottom sheet
 
+@Suppress("AssignedValueIsNeverRead")
 @Composable
 private fun InfoBottomSheet(
     viewModel: MainViewModel,

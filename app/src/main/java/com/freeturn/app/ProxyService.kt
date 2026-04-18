@@ -7,6 +7,8 @@ import android.app.Service
 import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -65,8 +67,10 @@ class ProxyService : Service() {
     override fun onCreate() {
         super.onCreate()
         serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-        val channel = NotificationChannel("ProxyChannel", "Proxy", NotificationManager.IMPORTANCE_LOW)
-        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel("ProxyChannel", "Proxy", NotificationManager.IMPORTANCE_LOW)
+            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -212,11 +216,11 @@ class ProxyService : Service() {
                         if (lower.contains("panic") || lower.contains("fatal") ||
                             lower.contains("rate limit")) {
                             ProxyServiceState.setStartupResult(StartupResult.Failed(l))
-                            updateNotification("VK TURN Proxy", "Ошибка подключения")
+                            updateNotification("Ошибка подключения")
                             startupFailed = true
                         } else {
                             ProxyServiceState.setStartupResult(StartupResult.Success)
-                            updateNotification("VK TURN Proxy", "Прокси активен")
+                            updateNotification("Прокси активен")
                         }
                         startupEmitted = true
                     }
@@ -228,7 +232,7 @@ class ProxyService : Service() {
                             sessionKillScheduled.set(false)
                             if (!userStopped.get()) {
                                 restartCount = 0
-                                process.get()?.destroyForcibly()
+                                process.get()?.destroyCompat()
                             }
                         }, 2_000)
                     }
@@ -236,7 +240,7 @@ class ProxyService : Service() {
             }
 
             exitCode = if (withContext(Dispatchers.IO) {
-                    proc.waitFor(5, TimeUnit.MINUTES)
+                    proc.waitForCompat(5, TimeUnit.MINUTES)
                 }) proc.exitValue() else -1
             ProxyServiceState.addLog("=== ПРОЦЕСС ОСТАНОВЛЕН (Код: $exitCode) ===")
             if (!startupEmitted) {
@@ -297,7 +301,7 @@ class ProxyService : Service() {
         val jitter = Random.nextLong(0, 500)
         val delay = baseDelay + jitter
         ProxyServiceState.addLog("=== WATCHDOG: перезапуск через ${delay}мс (попытка $restartCount/$MAX_RESTARTS) ===")
-        updateNotification("VK TURN Proxy", "Переподключение ($restartCount/$MAX_RESTARTS)...")
+        updateNotification("Переподключение ($restartCount/$MAX_RESTARTS)...")
         handler.postDelayed({
             if (!userStopped.get()) serviceScope.launch { startBinaryProcess() }
         }, delay)
@@ -323,16 +327,23 @@ class ProxyService : Service() {
                     kotlinx.coroutines.delay(2000)
                     if (!userStopped.get() && process.get() != null) {
                         ProxyServiceState.addLog("=== СМЕНА СЕТИ — ПЕРЕЗАПУСК ===")
-                        updateNotification("VK TURN Proxy", "Смена сети, переподключение...")
+                        updateNotification("Смена сети, переподключение...")
                         restartCount = 0
                         val p = process.get()
-                        p?.destroyForcibly()
+                        p?.destroyCompat()
                     }
                 }
             }
         }
         networkCallback = cb
-        cm.registerDefaultNetworkCallback(cb)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            cm.registerDefaultNetworkCallback(cb)
+        } else {
+            val request = NetworkRequest.Builder()
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build()
+            cm.registerNetworkCallback(request, cb)
+        }
     }
 
     private fun unregisterNetworkCallback() {
@@ -347,9 +358,9 @@ class ProxyService : Service() {
 
     // Notification
 
-    private fun updateNotification(title: String, text: String) {
+    private fun updateNotification(text: String) {
         val notification = NotificationCompat.Builder(this, "ProxyChannel")
-            .setContentTitle(title)
+            .setContentTitle("VK TURN Proxy")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_menu_preferences)
             .setOngoing(true)
@@ -372,8 +383,21 @@ class ProxyService : Service() {
         handler.removeCallbacksAndMessages(null)
         unregisterNetworkCallback()
         ProxyServiceState.addLog("=== ОСТАНОВКА ИЗ ИНТЕРФЕЙСА ===")
-        process.get()?.destroyForcibly()
+        process.get()?.destroyCompat()
         serviceScope.cancel()
         if (wakeLock?.isHeld == true) wakeLock?.release()
     }
+}
+
+private fun Process.destroyCompat() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) destroyForcibly() else destroy()
+}
+
+private fun Process.waitForCompat(timeout: Long, unit: TimeUnit): Boolean {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) return waitFor(timeout, unit)
+    val deadline = System.currentTimeMillis() + unit.toMillis(timeout)
+    while (System.currentTimeMillis() < deadline) {
+        try { exitValue(); return true } catch (_: IllegalThreadStateException) { Thread.sleep(100) }
+    }
+    return try { exitValue(); true } catch (_: IllegalThreadStateException) { false }
 }
