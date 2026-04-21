@@ -22,6 +22,7 @@ import java.io.File
 import java.io.InputStreamReader
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import java.util.regex.Pattern
 import kotlin.random.Random
@@ -58,14 +59,17 @@ class ProxyService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     @Volatile private var networkInitialized = false
-    private var restartCount = 0
+    @Volatile private var networkDebounceJob: kotlinx.coroutines.Job? = null
+    private val restartCount = AtomicInteger(0)
 
+    private lateinit var prefs: AppPreferences
     private lateinit var serviceScope: CoroutineScope
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
         super.onCreate()
+        prefs = AppPreferences(applicationContext)
         serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel("ProxyChannel", "Proxy", NotificationManager.IMPORTANCE_LOW)
@@ -90,7 +94,7 @@ class ProxyService : Service() {
 
         ProxyServiceState.setRunning(true)
         userStopped.set(false)
-        restartCount = 0
+        restartCount.set(0)
 
         val powerManager = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "VkTurn::BgLock")
@@ -107,7 +111,7 @@ class ProxyService : Service() {
     private suspend fun startBinaryProcess() {
         if (userStopped.get()) return
 
-        val cfg = AppPreferences(applicationContext).clientConfigFlow.first()
+        val cfg = prefs.clientConfigFlow.first()
 
         val customBin = File(filesDir, "custom_vkturn")
         val useCustom = customBin.exists()
@@ -122,9 +126,9 @@ class ProxyService : Service() {
         val cmdArgs = mutableListOf<String>()
 
         if (cfg.isRawMode) {
-            val parts = cfg.rawCommand.trim().split("\\s+".toRegex())
+            val parts = cfg.rawCommand.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }
             cmdArgs.add(executable)
-            if (parts.size > 1) cmdArgs.addAll(parts.subList(1, parts.size))
+            cmdArgs.addAll(parts.drop(1))
         } else {
             cmdArgs.add(executable)
             cmdArgs.add("-peer"); cmdArgs.add(cfg.serverAddress)
@@ -162,7 +166,6 @@ class ProxyService : Service() {
         val startedAt = System.currentTimeMillis()
         var startupEmitted = false
         var startupFailed = false
-        var captchaActive = false
         var captchaSessionCounter = 0L
         try {
             ProxyServiceState.addLog("Команда: ${cmdArgs.joinToString(" ")}")
@@ -180,12 +183,6 @@ class ProxyService : Service() {
                     val l = line ?: continue
                     ProxyServiceState.addLog(l)
 
-                    // Старт новой капча-сессии: бинарник логирует это перед открытием
-                    // локального HTTP-сервера капчи. Сам URL прилетает следующей строкой.
-                    if (l.contains("Triggering manual captcha fallback")) {
-                        captchaActive = true
-                    }
-
                     // Детекция URL ручной капчи. Каждый раз выдаём новый sessionId,
                     // чтобы диалог пересоздавал WebView, даже если URL не поменялся
                     // (бинарник всегда использует http://localhost:8765).
@@ -196,19 +193,17 @@ class ProxyService : Service() {
                         ProxyServiceState.setCaptchaSession(
                             CaptchaSession(url, captchaSessionCounter)
                         )
-                        captchaActive = true
                     }
 
                     // Капча-сессия закончилась: бинарник либо завершил auth-чейн
                     // (Failed/Success), либо сама капча провалилась (timeout). Закрываем
                     // диалог — следующая капча-сессия откроет его заново через новый sessionId.
-                    if (captchaActive && (
+                    if (ProxyServiceState.captchaSession.value != null && (
                             l.contains("[VK Auth] Failed") ||
                             l.contains("[VK Auth] Success") ||
                             (l.contains("[Captcha]") && l.contains("failed"))
                         )) {
                         ProxyServiceState.setCaptchaSession(null)
-                        captchaActive = false
                     }
 
                     if (!startupEmitted) {
@@ -231,7 +226,7 @@ class ProxyService : Service() {
                         handler.postDelayed({
                             sessionKillScheduled.set(false)
                             if (!userStopped.get()) {
-                                restartCount = 0
+                                restartCount.set(0)
                                 process.get()?.destroyCompat()
                             }
                         }, 2_000)
@@ -289,27 +284,25 @@ class ProxyService : Service() {
     // Watchdog
 
     private fun scheduleWatchdogRestart() {
-        restartCount++
-        if (restartCount > MAX_RESTARTS) {
+        val count = restartCount.incrementAndGet()
+        if (count > MAX_RESTARTS) {
             ProxyServiceState.addLog("=== WATCHDOG: превышен лимит попыток ($MAX_RESTARTS), остановка ===")
             ProxyServiceState.setRunning(false)
             ProxyServiceState.emitFailed()
             stopSelf()
             return
         }
-        val baseDelay = minOf(1_000L * restartCount, 30_000L)
+        val baseDelay = minOf(1_000L * count, 30_000L)
         val jitter = Random.nextLong(0, 500)
         val delay = baseDelay + jitter
-        ProxyServiceState.addLog("=== WATCHDOG: перезапуск через ${delay}мс (попытка $restartCount/$MAX_RESTARTS) ===")
-        updateNotification("Переподключение ($restartCount/$MAX_RESTARTS)...")
+        ProxyServiceState.addLog("=== WATCHDOG: перезапуск через ${delay}мс (попытка $count/$MAX_RESTARTS) ===")
+        updateNotification("Переподключение ($count/$MAX_RESTARTS)...")
         handler.postDelayed({
             if (!userStopped.get()) serviceScope.launch { startBinaryProcess() }
         }, delay)
     }
 
     // Network handover
-
-    private var networkDebounceJob: kotlinx.coroutines.Job? = null
 
     private fun registerNetworkCallback() {
         networkInitialized = false
@@ -328,7 +321,7 @@ class ProxyService : Service() {
                     if (!userStopped.get() && process.get() != null) {
                         ProxyServiceState.addLog("=== СМЕНА СЕТИ — ПЕРЕЗАПУСК ===")
                         updateNotification("Смена сети, переподключение...")
-                        restartCount = 0
+                        restartCount.set(0)
                         val p = process.get()
                         p?.destroyCompat()
                     }
@@ -371,10 +364,8 @@ class ProxyService : Service() {
 
     // Helpers
 
-    private fun isQuotaError(line: String): Boolean {
-        val l = line.lowercase()
-        return l.contains("486") || l.contains("quota") || l.contains("allocation quota")
-    }
+    private fun isQuotaError(line: String): Boolean =
+        line.lowercase().contains("quota")
 
     override fun onDestroy() {
         super.onDestroy()

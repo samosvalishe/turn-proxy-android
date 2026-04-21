@@ -154,10 +154,6 @@ class SshRepository(private val sshManager: SSHManager = SSHManager()) {
         _serverState.value = state
     }
 
-    fun clearSshLog() {
-        _sshLog.value = emptyList()
-    }
-
     fun resetAll() {
         disconnect()
         _serverLogs.value = null

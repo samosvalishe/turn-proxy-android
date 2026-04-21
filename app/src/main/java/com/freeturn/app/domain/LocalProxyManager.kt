@@ -136,32 +136,37 @@ class LocalProxyManager(private val context: Context) {
         try {
             val MAX_SIZE = 100L * 1024 * 1024 // 100 MB
             val ELF_MAGIC = byteArrayOf(0x7F, 0x45, 0x4C, 0x46) // \x7FELF
-
+            val dest = File(context.filesDir, "custom_vkturn")
             val inputStream = context.contentResolver.openInputStream(uri)
                 ?: return@withContext "Не удалось открыть файл"
 
-            // Читаем первые 4 байта для проверки ELF-магии
-            val header = ByteArray(4)
-            val headerRead = inputStream.read(header)
-            inputStream.close()
+            val error: String? = inputStream.use { input ->
+                val header = ByteArray(4)
+                if (input.read(header) < 4 || !header.contentEquals(ELF_MAGIC)) {
+                    return@use "Файл не является ELF-бинарником. Убедитесь, что загружаете правильное ядро"
+                }
 
-            if (headerRead < 4 || !header.contentEquals(ELF_MAGIC)) {
-                return@withContext "Файл не является ELF-бинарником. Убедитесь, что загружаете правильное ядро"
+                var totalBytes = header.size.toLong()
+                dest.outputStream().use { output ->
+                    output.write(header)
+                    val buf = ByteArray(65_536)
+                    var n: Int
+                    while (input.read(buf).also { n = it } != -1) {
+                        totalBytes += n
+                        if (totalBytes > MAX_SIZE) {
+                            return@use "Файл слишком большой (максимум 100 МБ)"
+                        }
+                        output.write(buf, 0, n)
+                    }
+                }
+
+                if (totalBytes <= 4L) return@use "Файл пустой"
+                null
             }
 
-            // Копируем файл
-            val dest = File(context.filesDir, "custom_vkturn")
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                dest.outputStream().use { output -> input.copyTo(output) }
-            }
-
-            if (dest.length() == 0L) {
+            if (error != null) {
                 dest.delete()
-                return@withContext "Файл пустой"
-            }
-            if (dest.length() > MAX_SIZE) {
-                dest.delete()
-                return@withContext "Файл слишком большой (максимум 100 МБ)"
+                return@withContext error
             }
 
             dest.setExecutable(true, false)
