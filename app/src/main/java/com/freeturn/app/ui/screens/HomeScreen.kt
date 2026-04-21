@@ -551,6 +551,17 @@ private fun InfoBottomSheet(
             )
         }
 
+        item {
+            RepoLinkItem(
+                title = stringResource(R.string.tg_channel),
+                subtitle = stringResource(R.string.tg_channel_subtitle),
+                url = "https://t.me/+53nh4UNiSv5lNTgy",
+                containerColor = containerColor,
+                onHaptic = { HapticUtil.perform(context, HapticUtil.Pattern.SELECTION) },
+                onOpen = { uriHandler.openUri(it) }
+            )
+        }
+
         item { HorizontalDivider() }
 
         // Настройки интерфейса

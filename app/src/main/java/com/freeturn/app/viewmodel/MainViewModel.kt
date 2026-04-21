@@ -87,8 +87,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val dynamicTheme: StateFlow<Boolean> = prefs.dynamicThemeFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
+    val tgSubscribeShown: StateFlow<Boolean> = prefs.tgSubscribeShownFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     fun setDynamicTheme(enabled: Boolean) {
         viewModelScope.launch { prefs.setDynamicTheme(enabled) }
+    }
+
+    fun setTgSubscribeShown() {
+        viewModelScope.launch { prefs.setTgSubscribeShown() }
     }
 
     private val _privacyMode = MutableStateFlow(false)

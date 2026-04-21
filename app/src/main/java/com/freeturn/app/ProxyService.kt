@@ -147,6 +147,7 @@ class ProxyService : Service() {
                 cmdArgs.add("-dns"); cmdArgs.add(cfg.dnsMode)
             }
             if (cfg.forcePort443) { cmdArgs.add("-port"); cmdArgs.add("443") }
+            if (cfg.debugMode) cmdArgs.add("-debug")
         }
 
         // Кастомное ядро лежит в filesDir, откуда SELinux (untrusted_app) запрещает execve.

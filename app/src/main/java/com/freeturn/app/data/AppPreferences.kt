@@ -44,7 +44,9 @@ data class ClientConfig(
     // "auto" | "udp" | "doh" — соответствует флагу -dns ядра.
     val dnsMode: String = DnsMode.AUTO,
     // Если true — в argv ядра добавляется -port 443, переопределяя порт TURN-сервера VK.
-    val forcePort443: Boolean = false
+    val forcePort443: Boolean = false,
+    // Если true — добавляется флаг -debug для расширенного вывода в логах.
+    val debugMode: Boolean = false
 )
 
 object DnsMode {
@@ -76,6 +78,7 @@ class AppPreferences(context: Context) {
         val CLIENT_VLESS = booleanPreferencesKey("client_vless")
         val CLIENT_DNS_MODE = stringPreferencesKey("client_dns_mode")
         val CLIENT_FORCE_PORT_443 = booleanPreferencesKey("client_turn_port_443")
+        val CLIENT_DEBUG = booleanPreferencesKey("client_debug")
 
         // Устаревший ключ — читается только для миграции (true → "doh").
         // Ключ "client_force_port_443" не переиспользуется под новую семантику, чтобы
@@ -84,6 +87,7 @@ class AppPreferences(context: Context) {
         val PROXY_LISTEN = stringPreferencesKey("proxy_listen")
         val PROXY_CONNECT = stringPreferencesKey("proxy_connect")
         val DYNAMIC_THEME = booleanPreferencesKey("dynamic_theme")
+        val TG_SUBSCRIBE_SHOWN = booleanPreferencesKey("tg_subscribe_shown")
 
         // Устаревшие ключи — используются только для миграции
         private val SSH_PASS_LEGACY = stringPreferencesKey("ssh_pass")
@@ -139,7 +143,8 @@ class AppPreferences(context: Context) {
                 vlessMode = prefs[CLIENT_VLESS] ?: false,
                 dnsMode = prefs[CLIENT_DNS_MODE]
                     ?: if (prefs[CLIENT_FORCE_PORT_443_LEGACY] == true) DnsMode.DOH else DnsMode.AUTO,
-                forcePort443 = prefs[CLIENT_FORCE_PORT_443] ?: false
+                forcePort443 = prefs[CLIENT_FORCE_PORT_443] ?: false,
+                debugMode = prefs[CLIENT_DEBUG] ?: false
             )
         }
 
@@ -158,6 +163,10 @@ class AppPreferences(context: Context) {
     val dynamicThemeFlow: Flow<Boolean> = context.dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { prefs -> prefs[DYNAMIC_THEME] ?: true }
+
+    val tgSubscribeShownFlow: Flow<Boolean> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { prefs -> prefs[TG_SUBSCRIBE_SHOWN] ?: false }
 
     suspend fun saveSshConfig(config: SshConfig) {
         // Чувствительные данные — в зашифрованное хранилище
@@ -197,6 +206,7 @@ class AppPreferences(context: Context) {
             prefs[CLIENT_VLESS] = config.vlessMode
             prefs[CLIENT_DNS_MODE] = if (config.dnsMode in DnsMode.ALL) config.dnsMode else DnsMode.AUTO
             prefs[CLIENT_FORCE_PORT_443] = config.forcePort443
+            prefs[CLIENT_DEBUG] = config.debugMode
             // Зачищаем устаревший ключ после успешной миграции, чтобы он не всплывал
             // при следующей загрузке, если пользователь переключит режим обратно.
             prefs.remove(CLIENT_FORCE_PORT_443_LEGACY)
@@ -209,6 +219,10 @@ class AppPreferences(context: Context) {
 
     suspend fun setDynamicTheme(enabled: Boolean) {
         context.dataStore.edit { prefs -> prefs[DYNAMIC_THEME] = enabled }
+    }
+
+    suspend fun setTgSubscribeShown() {
+        context.dataStore.edit { prefs -> prefs[TG_SUBSCRIBE_SHOWN] = true }
     }
 
     suspend fun saveProxyConfig(listen: String, connect: String) {

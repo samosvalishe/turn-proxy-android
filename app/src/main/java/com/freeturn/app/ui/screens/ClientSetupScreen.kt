@@ -92,6 +92,7 @@ fun ClientSetupScreen(
     var localPort    by rememberSaveable(saved.localPort)      { mutableStateOf(saved.localPort) }
     var dnsMode by rememberSaveable(saved.dnsMode) { mutableStateOf(saved.dnsMode) }
     var forcePort443 by rememberSaveable(saved.forcePort443) { mutableStateOf(saved.forcePort443) }
+    var debugMode by rememberSaveable(saved.debugMode) { mutableStateOf(saved.debugMode) }
     var lastSliderInt by rememberSaveable { mutableIntStateOf(saved.threads) }
 
     // Автозаполнение адреса сервера из SSH-конфига если поле пустое
@@ -104,7 +105,7 @@ fun ClientSetupScreen(
 
     // Авто-сохранение с дебаунсом 600 мс на каждое изменение поля.
     // vlessMode исключён — сохраняется через setVlessMode с автоперезапуском сервера.
-    LaunchedEffect(serverAddress, vkLink, threads, useUdp, noDtls, manualCaptcha, localPort, dnsMode, forcePort443) {
+    LaunchedEffect(serverAddress, vkLink, threads, useUdp, noDtls, manualCaptcha, localPort, dnsMode, forcePort443, debugMode) {
         delay(600)
         viewModel.saveClientConfig(
             ClientConfig(
@@ -117,7 +118,8 @@ fun ClientSetupScreen(
                 localPort     = localPort.trim(),
                 vlessMode     = saved.vlessMode,
                 dnsMode       = dnsMode,
-                forcePort443  = forcePort443
+                forcePort443  = forcePort443,
+                debugMode     = debugMode
             )
         )
     }
@@ -315,6 +317,16 @@ fun ClientSetupScreen(
                     onCheckedChange = {
                         HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
                         forcePort443 = it
+                    }
+                )
+
+                SwitchRow(
+                    label = stringResource(R.string.debug_mode),
+                    description = stringResource(R.string.debug_mode_desc),
+                    checked = debugMode,
+                    onCheckedChange = {
+                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                        debugMode = it
                     }
                 )
 

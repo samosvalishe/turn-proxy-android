@@ -3,17 +3,26 @@ package com.freeturn.app.ui.navigation
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.freeturn.app.R
@@ -59,11 +68,17 @@ fun AppNavigation(viewModel: MainViewModel) {
     if (!isInitialized) return
 
     val proxyState by viewModel.proxyState.collectAsStateWithLifecycle()
+    val tgSubscribeShown by viewModel.tgSubscribeShown.collectAsStateWithLifecycle()
     val startDestination = remember { if (onboardingDone) Routes.HOME else Routes.ONBOARDING }
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val showNavSuite = currentRoute in BOTTOM_NAV_ROUTES
+
+    var showTgDialog by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(onboardingDone, tgSubscribeShown) {
+        if (onboardingDone && !tgSubscribeShown) showTgDialog = true
+    }
 
     // Адаптивно: bar на телефоне, rail на ширинах ≥600dp, drawer — при расширенном классе.
     // На экранах онбординга и SSH-setup навигация скрыта через NavigationSuiteType.None.
@@ -121,6 +136,21 @@ fun AppNavigation(viewModel: MainViewModel) {
                 onDismiss = { viewModel.dismissCaptcha() }
             )
         }
+    }
+
+    if (showTgDialog) {
+        val uriHandler = LocalUriHandler.current
+        TelegramSubscribeDialog(
+            onSubscribe = {
+                uriHandler.openUri("https://t.me/+53nh4UNiSv5lNTgy")
+                viewModel.setTgSubscribeShown()
+                showTgDialog = false
+            },
+            onDismiss = {
+                viewModel.setTgSubscribeShown()
+                showTgDialog = false
+            }
+        )
     }
 }
 
@@ -243,6 +273,26 @@ private data class NavItem(
     val selectedIconRes: Int,
     val unselectedIconRes: Int
 )
+
+@Composable
+private fun TelegramSubscribeDialog(onSubscribe: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.tg_subscribe_title)) },
+        text = { Text(stringResource(R.string.tg_subscribe_desc)) },
+        confirmButton = {
+            TextButton(
+                onClick = onSubscribe,
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = MaterialTheme.colorScheme.primary
+                )
+            ) { Text(stringResource(R.string.tg_subscribe_btn)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.tg_not_now)) }
+        }
+    )
+}
 
 private val navItems = listOf(
     NavItem(Routes.HOME, R.string.nav_home, R.drawable.home_24px, R.drawable.home_outlined_24px),
