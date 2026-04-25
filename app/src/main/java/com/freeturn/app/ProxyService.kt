@@ -231,15 +231,41 @@ class ProxyService : Service() {
             ProxyServiceState.addLog("Команда: ${cmdArgs.joinToString(" ")}")
 
             val proc = withContext(Dispatchers.IO) {
-                ProcessBuilder(cmdArgs)
-                    .redirectErrorStream(true)
-                    .start()
+                val pb = ProcessBuilder(cmdArgs).redirectErrorStream(true)
+                // Ядро по умолчанию пишет vk_profile.json в CWD (= /data/app/.../lib/<abi>/),
+                // а это read-only mount на Android. Перенаправляем в filesDir, где записать
+                // можно. См. client/profiles.go: profileFilePath() читает $VK_PROFILE_PATH
+                // в первую очередь.
+                pb.environment()["VK_PROFILE_PATH"] =
+                    File(filesDir, "vk_profile.json").absolutePath
+                // CWD тоже подменяем на writeable dir — на случай если Go-код или его
+                // зависимости пишут что-то относительными путями (логи кеша tls-client и т.п.).
+                pb.directory(filesDir)
+                pb.start()
             }
             process.set(proc)
 
             BufferedReader(InputStreamReader(proc.inputStream)).use { reader ->
                 var line: String?
-                while (reader.readLine().also { line = it } != null) {
+                while (true) {
+                    line = try {
+                        reader.readLine()
+                    } catch (e: java.io.IOException) {
+                        // При destroyCompat()/Process.destroy() с другого треда
+                        // нативный pipe закрывается, и блокирующий readLine() бросает
+                        // IOException("Stream closed" / "read interrupted by close()").
+                        // Это нормальный путь остановки — выходим из цикла молча.
+                        val msg = e.message.orEmpty()
+                        val benign = userStopped.get() ||
+                            msg.contains("interrupted by close", ignoreCase = true) ||
+                            msg.contains("Stream closed", ignoreCase = true) ||
+                            msg.contains("Bad file descriptor", ignoreCase = true)
+                        if (!benign) {
+                            ProxyServiceState.addLog("Чтение лога ядра прервано: ${e.message}")
+                        }
+                        null
+                    }
+                    if (line == null) break
                     val l = line ?: continue
                     ProxyServiceState.addLog(l)
 
