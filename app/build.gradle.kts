@@ -54,6 +54,7 @@ kotlin {
 dependencies {
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.jsch)
+    implementation(libs.eddsa)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.security.crypto)
 
