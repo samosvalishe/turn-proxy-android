@@ -117,8 +117,8 @@ class ProxyService : Service() {
             PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_IMMUTABLE)
         }
         val notification = NotificationCompat.Builder(this, CHANNEL_PROXY)
-            .setContentTitle("VK TURN Proxy")
-            .setContentText("Подключение...")
+            .setContentTitle(getString(R.string.notif_proxy_title))
+            .setContentText(getString(R.string.notif_proxy_connecting))
             .setSmallIcon(android.R.drawable.ic_menu_preferences)
             .setOngoing(true)
             .setContentIntent(openAppIntent)
@@ -492,7 +492,7 @@ class ProxyService : Service() {
 
     private fun updateNotification(text: String) {
         val notification = NotificationCompat.Builder(this, CHANNEL_PROXY)
-            .setContentTitle("VK TURN Proxy")
+            .setContentTitle(getString(R.string.notif_proxy_title))
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_menu_preferences)
             .setOngoing(true)

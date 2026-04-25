@@ -154,6 +154,8 @@
     <string name="privacy_mode_desc">Скрывает IP и порты</string>
 
     <!-- Notifications -->
+    <string name="notif_proxy_title">FreeTurn</string>
+    <string name="notif_proxy_connecting">Подключение…</string>
     <string name="notif_channel_proxy">Прокси</string>
     <string name="notif_channel_captcha">Капча</string>
     <string name="notif_captcha_title">Требуется прохождение капчи</string>
