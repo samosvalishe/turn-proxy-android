@@ -16,6 +16,7 @@ import android.os.Looper
 import android.os.PowerManager
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.DnsMode
 import java.io.BufferedReader
@@ -44,6 +45,10 @@ class ProxyService : Service() {
 
     companion object {
         const val MAX_RESTARTS = 8
+        private const val CHANNEL_PROXY = "ProxyChannel"
+        private const val CHANNEL_CAPTCHA = "CaptchaChannel"
+        private const val NOTIF_ID_FG = 1
+        private const val NOTIF_ID_CAPTCHA = 2
         // Жёстко привязываемся к строке-объявлению капчи в бинарнике, чтобы
         // случайные localhost-URL в других логах не открывали диалог.
         private val CAPTCHA_URL_REGEX =
@@ -75,6 +80,7 @@ class ProxyService : Service() {
     @Volatile private var networkInitialized = false
     @Volatile private var networkDebounceJob: kotlinx.coroutines.Job? = null
     private val restartCount = AtomicInteger(0)
+    @Volatile private var captchaNotificationActive = false
 
     private lateinit var prefs: AppPreferences
     private lateinit var serviceScope: CoroutineScope
@@ -86,8 +92,21 @@ class ProxyService : Service() {
         prefs = AppPreferences(applicationContext)
         serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel("ProxyChannel", "Proxy", NotificationManager.IMPORTANCE_LOW)
-            getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+            val nm = getSystemService(NotificationManager::class.java)
+            nm.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_PROXY,
+                    getString(R.string.notif_channel_proxy),
+                    NotificationManager.IMPORTANCE_LOW
+                )
+            )
+            nm.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_CAPTCHA,
+                    getString(R.string.notif_channel_captcha),
+                    NotificationManager.IMPORTANCE_HIGH
+                )
+            )
         }
     }
 
@@ -97,14 +116,14 @@ class ProxyService : Service() {
         openAppIntent = packageManager.getLaunchIntentForPackage(packageName)?.let {
             PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_IMMUTABLE)
         }
-        val notification = NotificationCompat.Builder(this, "ProxyChannel")
+        val notification = NotificationCompat.Builder(this, CHANNEL_PROXY)
             .setContentTitle("VK TURN Proxy")
             .setContentText("Подключение...")
             .setSmallIcon(android.R.drawable.ic_menu_preferences)
             .setOngoing(true)
             .setContentIntent(openAppIntent)
             .build()
-        startForeground(1, notification)
+        startForeground(NOTIF_ID_FG, notification)
 
         ProxyServiceState.setRunning(true)
         userStopped.set(false)
@@ -234,6 +253,13 @@ class ProxyService : Service() {
                         ProxyServiceState.setCaptchaSession(
                             CaptchaSession(url, captchaSessionCounter)
                         )
+                        // Показываем нотификацию только если предыдущая капча уже закрыта.
+                        // Бинарник может выдать несколько URL подряд за одну авторизацию —
+                        // не плодим спам.
+                        if (!captchaNotificationActive) {
+                            showCaptchaNotification()
+                            captchaNotificationActive = true
+                        }
                     }
 
                     // Капча-сессия закончилась: бинарник либо завершил auth-чейн
@@ -245,6 +271,7 @@ class ProxyService : Service() {
                             (l.contains("[Captcha]") && l.contains("failed"))
                         )) {
                         ProxyServiceState.setCaptchaSession(null)
+                        cancelCaptchaNotification()
                     }
 
                     // Парсинг событий жизненного цикла соединений. Обновляем stats
@@ -339,6 +366,7 @@ class ProxyService : Service() {
             }
         } finally {
             ProxyServiceState.setCaptchaSession(null)
+            cancelCaptchaNotification()
             // Процесс мёртв — активных соединений нет. При watchdog-рестарте
             // publishStats на новом старте снова выставит правильный target.
             ProxyServiceState.setConnectionStats(ConnectionStats.IDLE)
@@ -439,15 +467,40 @@ class ProxyService : Service() {
 
     // Notification
 
+    private fun showCaptchaNotification() {
+        val notification = NotificationCompat.Builder(this, CHANNEL_CAPTCHA)
+            .setContentTitle(getString(R.string.notif_captcha_title))
+            .setContentText(getString(R.string.notif_captcha_text))
+            .setSmallIcon(R.drawable.ic_notification_captcha)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setAutoCancel(true)
+            .setContentIntent(openAppIntent)
+            .build()
+        try {
+            NotificationManagerCompat.from(this).notify(NOTIF_ID_CAPTCHA, notification)
+        } catch (_: SecurityException) {
+            // POST_NOTIFICATIONS отозван юзером на API 33+ — молча игнорируем,
+            // диалог в UI всё равно откроется через captchaSession StateFlow.
+        }
+    }
+
+    private fun cancelCaptchaNotification() {
+        NotificationManagerCompat.from(this).cancel(NOTIF_ID_CAPTCHA)
+        captchaNotificationActive = false
+    }
+
     private fun updateNotification(text: String) {
-        val notification = NotificationCompat.Builder(this, "ProxyChannel")
+        val notification = NotificationCompat.Builder(this, CHANNEL_PROXY)
             .setContentTitle("VK TURN Proxy")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_menu_preferences)
             .setOngoing(true)
             .setContentIntent(openAppIntent)
             .build()
-        getSystemService(NotificationManager::class.java).notify(1, notification)
+        try {
+            NotificationManagerCompat.from(this).notify(NOTIF_ID_FG, notification)
+        } catch (_: SecurityException) {}
     }
 
     // Helpers
@@ -463,6 +516,7 @@ class ProxyService : Service() {
         ProxyServiceState.clearConnectedSince()
         handler.removeCallbacksAndMessages(null)
         unregisterNetworkCallback()
+        cancelCaptchaNotification()
         ProxyServiceState.addLog("=== ОСТАНОВКА ИЗ ИНТЕРФЕЙСА ===")
         process.get()?.destroyCompat()
         serviceScope.cancel()

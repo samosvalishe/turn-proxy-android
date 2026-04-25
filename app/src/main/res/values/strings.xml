@@ -153,6 +153,12 @@
     <string name="privacy_mode_title">Приватный режим</string>
     <string name="privacy_mode_desc">Скрывает IP и порты</string>
 
+    <!-- Notifications -->
+    <string name="notif_channel_proxy">Прокси</string>
+    <string name="notif_channel_captcha">Капча</string>
+    <string name="notif_captcha_title">Требуется прохождение капчи</string>
+    <string name="notif_captcha_text">Откройте приложение для проверки</string>
+
     <!-- CaptchaWebViewDialog -->
     <string name="captcha_title">Проверка VK</string>
     <string name="captcha_subtitle">Пройдите проверку для продолжения</string>
