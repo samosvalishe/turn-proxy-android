@@ -42,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -58,6 +59,8 @@ import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.viewmodel.MainViewModel
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
+
+private const val MAX_VK_LINKS = 5
 
 /**
  * @param showFinishButton  true — онбординг-флоу, показываем кнопку «Завершить».
@@ -84,8 +87,17 @@ fun ClientSetupScreen(
     ) { uri -> uri?.let { viewModel.setCustomKernel(it) } }
 
     var serverAddress by rememberSaveable(saved.serverAddress) { mutableStateOf(saved.serverAddress) }
-    var vkLink       by rememberSaveable(saved.vkLink)         { mutableStateOf(saved.vkLink) }
+    // Список звонковых ссылок. Хотя бы один (возможно пустой) элемент всегда
+    // присутствует, чтобы UI рендерил входное поле.
+    val vkLinksStateSaver = listSaver<List<String>, String>(
+        save = { it.toList() },
+        restore = { it.toList() }
+    )
+    var vkLinks by rememberSaveable(saved.vkLinks, stateSaver = vkLinksStateSaver) {
+        mutableStateOf(saved.vkLinks.ifEmpty { listOf("") })
+    }
     var threads      by rememberSaveable(saved.threads)        { mutableFloatStateOf(saved.threads.toFloat()) }
+    var allocsPerStream by rememberSaveable(saved.allocsPerStream) { mutableFloatStateOf(saved.allocsPerStream.toFloat()) }
     var useUdp       by rememberSaveable(saved.useUdp)         { mutableStateOf(saved.useUdp) }
     var manualCaptcha by rememberSaveable(saved.manualCaptcha) { mutableStateOf(saved.manualCaptcha) }
     var localPort    by rememberSaveable(saved.localPort)      { mutableStateOf(saved.localPort) }
@@ -93,6 +105,7 @@ fun ClientSetupScreen(
     var forcePort443 by rememberSaveable(saved.forcePort443) { mutableStateOf(saved.forcePort443) }
     var debugMode by rememberSaveable(saved.debugMode) { mutableStateOf(saved.debugMode) }
     var lastSliderInt by rememberSaveable { mutableIntStateOf(saved.threads) }
+    var lastAllocsSliderInt by rememberSaveable { mutableIntStateOf(saved.allocsPerStream) }
 
     // Автозаполнение адреса сервера из SSH-конфига если поле пустое
     LaunchedEffect(sshConfig.ip, proxyListen) {
@@ -104,13 +117,14 @@ fun ClientSetupScreen(
 
     // Авто-сохранение с дебаунсом 600 мс на каждое изменение поля.
     // vlessMode исключён — сохраняется через setVlessMode с автоперезапуском сервера.
-    LaunchedEffect(serverAddress, vkLink, threads, useUdp, manualCaptcha, localPort, dnsMode, forcePort443, debugMode) {
+    LaunchedEffect(serverAddress, vkLinks, threads, allocsPerStream, useUdp, manualCaptcha, localPort, dnsMode, forcePort443, debugMode) {
         delay(600)
         viewModel.saveClientConfig(
             ClientConfig(
                 serverAddress = serverAddress.trim(),
-                vkLink        = vkLink.trim(),
+                vkLinks       = vkLinks.map { it.trim() }.filter { it.isNotEmpty() },
                 threads       = threads.roundToInt(),
+                allocsPerStream = allocsPerStream.roundToInt(),
                 useUdp        = useUdp,
                 manualCaptcha = manualCaptcha,
                 localPort     = localPort.trim(),
@@ -159,16 +173,75 @@ fun ClientSetupScreen(
                     supportingText = { Text(stringResource(R.string.server_address_support)) }
                 )
 
-                OutlinedTextField(
-                    value = vkLink.redact(privacyMode),
-                    onValueChange = { if (!privacyMode) vkLink = it },
-                    label = { Text(stringResource(R.string.call_link_label)) },
-                    placeholder = { Text(stringResource(R.string.call_link_placeholder)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    readOnly = privacyMode,
-                    supportingText = { Text(stringResource(R.string.call_link_support)) }
-                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (vkLinks.size > 1) {
+                        Text(
+                            stringResource(R.string.call_links_section),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    vkLinks.forEachIndexed { idx, link ->
+                            OutlinedTextField(
+                                value = link.redact(privacyMode),
+                                onValueChange = { newValue ->
+                                    if (!privacyMode) {
+                                        vkLinks = vkLinks.toMutableList().also { it[idx] = newValue }
+                                    }
+                                },
+                                label = {
+                                    Text(
+                                        if (vkLinks.size > 1)
+                                            stringResource(R.string.call_link_label_n, idx + 1)
+                                        else
+                                            stringResource(R.string.call_link_label)
+                                    )
+                                },
+                                placeholder = { Text(stringResource(R.string.call_link_placeholder)) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                readOnly = privacyMode,
+                                trailingIcon = if (vkLinks.size > 1 && !privacyMode) {
+                                    {
+                                        IconButton(
+                                            onClick = {
+                                                HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                                                vkLinks = vkLinks.toMutableList().also { it.removeAt(idx) }
+                                            }
+                                        ) {
+                                            Icon(
+                                                painter = painterResource(R.drawable.delete_24px),
+                                                contentDescription = stringResource(R.string.remove_link)
+                                            )
+                                        }
+                                    }
+                                } else null,
+                                supportingText = {
+                                    if (idx == vkLinks.lastIndex) {
+                                        Text(stringResource(R.string.call_link_support))
+                                    }
+                                }
+                            )
+                    }
+
+                    if (!privacyMode && vkLinks.size < MAX_VK_LINKS) {
+                        FilledTonalButton(
+                            onClick = {
+                                HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                                vkLinks = vkLinks + ""
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.add_24px),
+                                contentDescription = null
+                            )
+                            Spacer(Modifier.size(8.dp))
+                            Text(stringResource(R.string.add_link))
+                        }
+                    }
+
+                }
 
                 OutlinedTextField(
                     value = localPort.redact(privacyMode),
@@ -210,8 +283,41 @@ fun ClientSetupScreen(
                             }
                             threads = it
                         },
-                        valueRange = 1f..16f,
-                        steps = 14,
+                        valueRange = 1f..64f,
+                        steps = 62,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                Column {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                stringResource(R.string.allocs_per_stream_format, allocsPerStream.roundToInt()),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                            Text(
+                                stringResource(R.string.allocs_per_stream_recommendation),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Slider(
+                        value = allocsPerStream,
+                        onValueChange = {
+                            val newInt = it.roundToInt()
+                            if (newInt != lastAllocsSliderInt) {
+                                HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
+                                lastAllocsSliderInt = newInt
+                            }
+                            allocsPerStream = it
+                        },
+                        valueRange = 1f..2f,
+                        steps = 0,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -415,7 +521,7 @@ fun ClientSetupScreen(
                     Button(
                         onClick = onFinish,
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = serverAddress.isNotBlank() && vkLink.isNotBlank(),
+                        enabled = serverAddress.isNotBlank() && vkLinks.any { it.isNotBlank() },
                         shape = MaterialTheme.shapes.large
                     ) {
                         Text(stringResource(R.string.finish_setup), style = MaterialTheme.typography.labelLarge)
