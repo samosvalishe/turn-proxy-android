@@ -21,7 +21,7 @@ object ServerScripts {
         if [ -f /opt/vk-turn/proxy.pid ]; then kill -9 ${'$'}(cat /opt/vk-turn/proxy.pid) 2>/dev/null; rm -f /opt/vk-turn/proxy.pid; fi
         ARCH=${'$'}(uname -m)
         if [ "${'$'}ARCH" = "x86_64" ]; then BIN="server-linux-amd64"; else BIN="server-linux-arm64"; fi
-        BASE_URL="https://github.com/cacggghp/vk-turn-proxy/releases/latest/download"
+        BASE_URL="https://github.com/samosvalishe/vk-turn-proxy/releases/latest/download"
         echo "Arch: ${'$'}ARCH | Binary: ${'$'}BIN"
         _dl() { URL=${'$'}1; OUT=${'$'}2
             if command -v curl >/dev/null 2>&1; then

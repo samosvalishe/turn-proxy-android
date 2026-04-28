@@ -82,6 +82,14 @@ fun ServerManagementScreen(
     var proxyListenPort by rememberSaveable(savedListen) { mutableStateOf(savedListen.substringAfterLast(":", "56000")) }
     var proxyConnect by rememberSaveable(savedConnect) { mutableStateOf(savedConnect) }
 
+    LaunchedEffect(proxyListenPort, proxyConnect) {
+        kotlinx.coroutines.delay(400)
+        val listen = "0.0.0.0:$proxyListenPort"
+        if (listen != savedListen || proxyConnect != savedConnect) {
+            viewModel.saveProxyServerConfig(listen, proxyConnect)
+        }
+    }
+
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     val isConnected = sshState is SshConnectionState.Connected
