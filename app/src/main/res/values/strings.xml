@@ -8,9 +8,11 @@
     <string name="proxy_active">Прокси активен</string>
     <string name="proxy_connecting">Подключение…</string>
     <string name="proxy_press_to_start">Нажмите для запуска</string>
+    <string name="proxy_captcha_required">Требуется прохождение капчи</string>
     <string name="current_settings">Текущие настройки</string>
     <string name="server">Сервер</string>
     <string name="threads">Потоки</string>
+    <string name="allocs_per_stream_label">TURN-аллокаций на поток</string>
     <string name="tcp">TCP</string>
     <string name="udp">UDP</string>
     <string name="local_port">Локальный порт</string>
@@ -43,14 +45,20 @@
     <string name="server_address_placeholder">1.2.3.4:56000</string>
     <string name="server_address_support">IP и порт turn-proxy на вашем VPS</string>
     <string name="call_link_label">Ссылка на звонок</string>
+    <string name="call_link_label_n">Ссылка на звонок #%1$d</string>
     <string name="call_link_placeholder">https://site.ru/call/…</string>
     <string name="call_link_support">Звонки → Создать → Скопировать ссылку (не нажимайте «Завершить»)</string>
+    <string name="call_links_section">Несколько ссылок увеличивают пропускную способность пропорционально их числу. Каждая = отдельный звонок.</string>
+    <string name="add_link">Добавить ссылку</string>
+    <string name="remove_link">Удалить ссылку</string>
     <string name="local_listen_address">Локальный адрес прослушивания</string>
     <string name="local_listen_placeholder">127.0.0.1:9000</string>
     <string name="local_listen_support">Адрес, на котором клиент принимает трафик от WireGuard/Hysteria</string>
     <string name="parameters_title">Параметры</string>
     <string name="threads_format">Потоки: %1$d</string>
     <string name="threads_recommendation">Рекомендуется 4–8</string>
+    <string name="allocs_per_stream_format">TURN-аллокаций на поток: %1$d</string>
+    <string name="allocs_per_stream_recommendation">Открывает несколько TURN-аллокаций под одной парой кредов. Максимум 2 (ВК отбивает 3-ю).</string>
     <string name="transport_protocol">Транспорт</string>
     <string name="transport_protocol_desc">UDP снижает задержки, TCP — стабильнее</string>
     <string name="manual_captcha">Ручной ввод капчи</string>
@@ -168,9 +176,39 @@
 
     <!-- Telegram -->
     <string name="tg_channel">Telegram-канал</string>
-    <string name="tg_channel_subtitle">@vkturnproxy</string>
     <string name="tg_subscribe_title">Следите за обновлениями</string>
     <string name="tg_subscribe_desc">Подпишитесь на Telegram-канал, чтобы узнавать о новых версиях и изменениях первыми.</string>
     <string name="tg_subscribe_btn">Подписаться</string>
     <string name="tg_not_now">Не сейчас</string>
+
+    <!-- Profiles -->
+    <string name="profiles_title">Профили</string>
+    <string name="profiles_empty_title">Пока нет сохранённых профилей</string>
+    <string name="profiles_empty_desc">Сохраните текущие настройки как профиль или импортируйте ссылку, чтобы переключаться между разными профилями.</string>
+    <string name="profile_save_current">Сохранить текущие настройки</string>
+    <string name="profile_save_dialog_title">Новый профиль</string>
+    <string name="profile_name_label">Название профиля</string>
+    <string name="profile_name_placeholder">Например, «Мой VPS»</string>
+    <string name="profile_save">Сохранить</string>
+    <string name="profile_active">Активен</string>
+    <string name="profile_rename">Переименовать</string>
+    <string name="profile_delete">Удалить</string>
+    <string name="profile_delete_title">Удалить профиль?</string>
+    <string name="profile_delete_desc">Профиль «%1$s» будет удалён. Это действие нельзя отменить.</string>
+    <string name="profile_switcher_title">Профиль</string>
+    <string name="profile_manage">Управлять профилями</string>
+    <string name="nav_profiles">Профили</string>
+    <string name="profile_actions_title">Профили</string>
+    <string name="profile_active_label">Активный профиль</string>
+    <string name="profile_switch_action">Сменить</string>
+    <string name="profile_save_current_hint">Создаст новый профиль с текущими SSH и клиентскими настройками</string>
+    <string name="profile_more">Ещё</string>
+    <string name="profile_default_name">Новый профиль</string>
+    <string name="profile_section_saved">Сохранённые профили</string>
+    <string name="profile_close">Закрыть</string>
+    <string name="profile_name_taken">Профиль с таким именем уже существует</string>
+    <string name="profile_unsaved_label">Несохранённая конфигурация</string>
+    <string name="profile_update_current">Обновить активный профиль</string>
+    <string name="profile_update_current_hint">Перезаписать текущими настройками</string>
+    <string name="profile_updated_toast">Профиль обновлён</string>
 </resources>

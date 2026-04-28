@@ -26,7 +26,6 @@ class MainActivity : ComponentActivity() {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
 
-        // Удерживаем системный splash пока ViewModel не инициализируется
         splashScreen.setKeepOnScreenCondition { !viewModel.isInitialized.value }
 
         HapticUtil.perform(this, HapticUtil.Pattern.LAUNCH)

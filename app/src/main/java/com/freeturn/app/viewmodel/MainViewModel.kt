@@ -10,7 +10,10 @@ import com.freeturn.app.ProxyService
 import com.freeturn.app.ProxyServiceState
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.ClientConfig
+import com.freeturn.app.data.Profile
+import com.freeturn.app.data.ProfilesSnapshot
 import com.freeturn.app.data.SshConfig
+import java.util.UUID
 import com.freeturn.app.domain.AppUpdater
 import com.freeturn.app.domain.LocalProxyManager
 import com.freeturn.app.domain.SshRepository
@@ -22,6 +25,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -102,6 +106,138 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val tgSubscribeShown: StateFlow<Boolean> = prefs.tgSubscribeShownFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    val profilesSnapshot: StateFlow<ProfilesSnapshot> = prefs.profilesSnapshot
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProfilesSnapshot())
+
+    /** Сохранить текущие настройки как новый профиль и сделать активным. */
+    fun saveCurrentAsProfile(name: String) {
+        viewModelScope.launch {
+            val current = prefs.profilesSnapshot.first()
+            val ssh = prefs.sshConfigFlow.first()
+            val client = prefs.clientConfigFlow.first()
+            val listen = prefs.proxyListenFlow.first()
+            val connect = prefs.proxyConnectFlow.first()
+            val base = name.trim().ifBlank { defaultProfileName(client.serverAddress) }
+            val profile = Profile(
+                id = UUID.randomUUID().toString(),
+                name = uniqueProfileName(base, current.list, excludingId = null),
+                ssh = ssh,
+                client = client,
+                proxyListen = listen,
+                proxyConnect = connect
+            )
+            prefs.saveProfiles(current.list + profile)
+            prefs.setActiveProfileId(profile.id)
+        }
+    }
+
+    /**
+     * Гарантирует уникальность имени профиля. Защита от deep-link / автоматических
+     * сценариев, где UI-диалог не валидирует ввод. Дубль превращается в
+     * "имя (2)", "имя (3)" и т.д.
+     */
+    private fun uniqueProfileName(
+        base: String,
+        existing: List<Profile>,
+        excludingId: String?
+    ): String {
+        val taken = existing
+            .filter { it.id != excludingId }
+            .map { it.name.trim().lowercase() }
+            .toSet()
+        val trimmed = base.trim()
+        if (trimmed.lowercase() !in taken) return trimmed
+        var i = 2
+        while ("$trimmed ($i)".lowercase() in taken) i++
+        return "$trimmed ($i)"
+    }
+
+    /** Публичный триггер пересохранения активного профиля текущими настройками. */
+    fun updateActiveProfileFromCurrent() {
+        viewModelScope.launch { mirrorActiveProfile() }
+    }
+
+    /**
+     * Зеркалирует текущие prefs (ssh+client) в активный профиль. Источник истины —
+     * профиль, но legacy-ключи остаются «scratch»-областью для случая «нет профилей».
+     * Вызывается автоматически после каждой записи ssh/client конфига, чтобы
+     * пользовательские правки не терялись при переключении профилей.
+     */
+    private suspend fun mirrorActiveProfile() {
+        val current = prefs.profilesSnapshot.first()
+        val activeId = current.activeId ?: return
+        val ssh = prefs.sshConfigFlow.first()
+        val client = prefs.clientConfigFlow.first()
+        val listen = prefs.proxyListenFlow.first()
+        val connect = prefs.proxyConnectFlow.first()
+        val updated = current.list.map {
+            if (it.id == activeId)
+                it.copy(ssh = ssh, client = client, proxyListen = listen, proxyConnect = connect)
+            else it
+        }
+        if (updated != current.list) prefs.saveProfiles(updated)
+    }
+
+    fun renameProfile(id: String, name: String) {
+        viewModelScope.launch {
+            val current = prefs.profilesSnapshot.first()
+            val target = current.list.firstOrNull { it.id == id } ?: return@launch
+            val base = name.trim().ifBlank { target.name }
+            val unique = uniqueProfileName(base, current.list, excludingId = id)
+            val updated = current.list.map {
+                if (it.id == id) it.copy(name = unique) else it
+            }
+            prefs.saveProfiles(updated)
+        }
+    }
+
+    /**
+     * Применяет профиль: загружает его ssh/client в legacy-ключи (которые читают
+     * существующие экраны) и помечает активным. Если прокси запущен — перезапускает,
+     * иначе логика клиента продолжит использовать старые настройки.
+     */
+    fun applyProfile(id: String) {
+        viewModelScope.launch {
+            val current = prefs.profilesSnapshot.first()
+            val target = current.list.firstOrNull { it.id == id } ?: return@launch
+            prefs.saveSshConfig(target.ssh)
+            prefs.saveClientConfig(target.client)
+            prefs.saveProxyConfig(target.proxyListen, target.proxyConnect)
+            prefs.setActiveProfileId(target.id)
+
+            if (ProxyServiceState.isRunning.value) {
+                proxyManager.stopProxy()
+                // Ждём фактической остановки сервиса вместо магического delay,
+                // иначе onStartCommand может стартовать со старыми аргументами.
+                withTimeoutOrNull(2_000) {
+                    ProxyServiceState.isRunning.first { !it }
+                }
+                proxyManager.startProxy(target.client)
+            }
+        }
+    }
+
+    fun deleteProfile(id: String) {
+        viewModelScope.launch {
+            val current = prefs.profilesSnapshot.first()
+            val remaining = current.list.filterNot { it.id == id }
+            prefs.saveProfiles(remaining)
+            if (current.activeId == id) {
+                val next = remaining.firstOrNull()
+                prefs.setActiveProfileId(next?.id)
+                if (next != null) {
+                    prefs.saveSshConfig(next.ssh)
+                    prefs.saveClientConfig(next.client)
+                    prefs.saveProxyConfig(next.proxyListen, next.proxyConnect)
+                }
+            }
+        }
+    }
+
+    private fun defaultProfileName(serverAddr: String): String =
+        serverAddr.substringBefore(':').takeIf { it.isNotBlank() }
+            ?: getApplication<Application>().getString(com.freeturn.app.R.string.profile_default_name)
+
     fun setDynamicTheme(enabled: Boolean) {
         viewModelScope.launch { prefs.setDynamicTheme(enabled) }
     }
@@ -119,10 +255,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun connectSsh(config: SshConfig) {
         viewModelScope.launch {
             prefs.saveSshConfig(config)
+            mirrorActiveProfile()
             val (success, fp) = sshRepository.connectSsh(config)
             if (success) {
                 if (config.hostFingerprint.isEmpty() && fp != null) {
                     prefs.saveSshFingerprint(fp)
+                    mirrorActiveProfile()
                 }
                 HapticUtil.perform(getApplication(), HapticUtil.Pattern.SUCCESS)
             } else {
@@ -166,6 +304,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (current.vlessMode == enabled) return
         viewModelScope.launch {
             prefs.saveClientConfig(current.copy(vlessMode = enabled))
+            mirrorActiveProfile()
             val serverRunning = (serverState.value as? ServerState.Known)?.running == true
             if (serverRunning) {
                 sshRepository.stopServer()
@@ -195,11 +334,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     // Preferences
     fun saveClientConfig(config: ClientConfig) {
-        viewModelScope.launch { prefs.saveClientConfig(config) }
+        viewModelScope.launch {
+            prefs.saveClientConfig(config)
+            mirrorActiveProfile()
+        }
     }
 
     fun saveProxyServerConfig(listen: String, connect: String) {
-        viewModelScope.launch { prefs.saveProxyConfig(listen, connect) }
+        viewModelScope.launch {
+            prefs.saveProxyConfig(listen, connect)
+            mirrorActiveProfile()
+        }
     }
 
     fun setOnboardingDone() {

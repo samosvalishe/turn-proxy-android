@@ -32,8 +32,9 @@ data class SshConfig(
 
 data class ClientConfig(
     val serverAddress: String = "",
-    val vkLink: String = "",
+    val vkLinks: List<String> = emptyList(),
     val threads: Int = 4,
+    val allocsPerStream: Int = 1,
     val useUdp: Boolean = true,
     val manualCaptcha: Boolean = false,
     val localPort: String = "127.0.0.1:9000",
@@ -47,6 +48,21 @@ data class ClientConfig(
     // Если true — добавляется флаг -debug для расширенного вывода в логах.
     val debugMode: Boolean = false
 )
+
+/**
+ * Парсит сохранённые звонковые ссылки. Сначала пробует новый ключ
+ * (newline-joined), потом legacy (одиночная ссылка). Тримит, дропает пустые.
+ */
+internal fun decodeVkLinks(joined: String?, legacy: String?): List<String> {
+    val fromNew = joined
+        ?.split('\n', '\r')
+        ?.map { it.trim() }
+        ?.filter { it.isNotEmpty() }
+        ?: emptyList()
+    if (fromNew.isNotEmpty()) return fromNew
+    val one = legacy?.trim().orEmpty()
+    return if (one.isNotEmpty()) listOf(one) else emptyList()
+}
 
 object DnsMode {
     const val AUTO = "auto"
@@ -66,8 +82,14 @@ class AppPreferences(context: Context) {
         val SSH_HOST_FP = stringPreferencesKey("ssh_host_fp")
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         val CLIENT_SERVER_ADDR = stringPreferencesKey("client_server_addr")
+        // Legacy single-link key. Читается только для миграции, перезаписывается
+        // первой ссылкой из списка для обратной совместимости со старыми билдами.
         val CLIENT_VK_LINK = stringPreferencesKey("client_vk_link")
+        // Список звонковых ссылок, разделитель — \n. URL не содержит перевод строки,
+        // поэтому простой join безопасен и не требует JSON-эскейпа.
+        val CLIENT_VK_LINKS = stringPreferencesKey("client_vk_links")
         val CLIENT_THREADS = intPreferencesKey("client_threads")
+        val CLIENT_ALLOCS_PER_STREAM = intPreferencesKey("client_allocs_per_stream")
         val CLIENT_UDP = booleanPreferencesKey("client_udp")
         val CLIENT_MANUAL_CAPTCHA = booleanPreferencesKey("client_manual_captcha")
         val CLIENT_LOCAL_PORT = stringPreferencesKey("client_local_port")
@@ -86,6 +108,8 @@ class AppPreferences(context: Context) {
         val PROXY_CONNECT = stringPreferencesKey("proxy_connect")
         val DYNAMIC_THEME = booleanPreferencesKey("dynamic_theme")
         val TG_SUBSCRIBE_SHOWN = booleanPreferencesKey("tg_subscribe_shown")
+        val PROFILES_JSON = stringPreferencesKey("profiles_json")
+        val ACTIVE_PROFILE_ID = stringPreferencesKey("active_profile_id")
 
         // Устаревшие ключи — используются только для миграции
         private val SSH_PASS_LEGACY = stringPreferencesKey("ssh_pass")
@@ -130,8 +154,9 @@ class AppPreferences(context: Context) {
         .map { prefs ->
             ClientConfig(
                 serverAddress = prefs[CLIENT_SERVER_ADDR] ?: "",
-                vkLink = prefs[CLIENT_VK_LINK] ?: "",
+                vkLinks = decodeVkLinks(prefs[CLIENT_VK_LINKS], prefs[CLIENT_VK_LINK]),
                 threads = prefs[CLIENT_THREADS] ?: 4,
+                allocsPerStream = prefs[CLIENT_ALLOCS_PER_STREAM] ?: 1,
                 useUdp = prefs[CLIENT_UDP] ?: true,
                 manualCaptcha = prefs[CLIENT_MANUAL_CAPTCHA] ?: false,
                 localPort = prefs[CLIENT_LOCAL_PORT] ?: "127.0.0.1:9000",
@@ -165,6 +190,28 @@ class AppPreferences(context: Context) {
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { prefs -> prefs[TG_SUBSCRIBE_SHOWN] ?: false }
 
+    val profilesFlow: Flow<List<Profile>> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { prefs -> ProfileJson.decodeList(prefs[PROFILES_JSON]) }
+
+    val activeProfileIdFlow: Flow<String?> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { prefs -> prefs[ACTIVE_PROFILE_ID]?.takeIf { it.isNotBlank() } }
+
+    /** Заменяет весь список профилей. */
+    suspend fun saveProfiles(list: List<Profile>) {
+        context.dataStore.edit { prefs ->
+            prefs[PROFILES_JSON] = ProfileJson.encodeList(list)
+        }
+    }
+
+    suspend fun setActiveProfileId(id: String?) {
+        context.dataStore.edit { prefs ->
+            if (id == null) prefs.remove(ACTIVE_PROFILE_ID)
+            else prefs[ACTIVE_PROFILE_ID] = id
+        }
+    }
+
     suspend fun saveSshConfig(config: SshConfig) {
         // Чувствительные данные — в зашифрованное хранилище
         withContext(Dispatchers.IO) {
@@ -192,8 +239,13 @@ class AppPreferences(context: Context) {
     suspend fun saveClientConfig(config: ClientConfig) {
         context.dataStore.edit { prefs ->
             prefs[CLIENT_SERVER_ADDR] = config.serverAddress
-            prefs[CLIENT_VK_LINK] = config.vkLink
+            val cleaned = config.vkLinks.map { it.trim() }.filter { it.isNotEmpty() }
+            prefs[CLIENT_VK_LINKS] = cleaned.joinToString("\n")
+            // Дублируем первую ссылку в legacy-ключ — чтобы откат на старый бинарь
+            // не сломал базовый сценарий с одной ссылкой.
+            prefs[CLIENT_VK_LINK] = cleaned.firstOrNull() ?: ""
             prefs[CLIENT_THREADS] = config.threads
+            prefs[CLIENT_ALLOCS_PER_STREAM] = config.allocsPerStream
             prefs[CLIENT_UDP] = config.useUdp
             prefs[CLIENT_MANUAL_CAPTCHA] = config.manualCaptcha
             // Мигрируем старый ключ: noDtls удалён из приложения.
@@ -229,6 +281,19 @@ class AppPreferences(context: Context) {
             prefs[PROXY_CONNECT] = connect
         }
     }
+
+    /**
+     * Снимок: список + id активного. Объединено в один Flow, чтобы UI получал
+     * консистентную пару (нет окна, в котором активный id указывает на удалённый).
+     */
+    val profilesSnapshot: Flow<ProfilesSnapshot> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { prefs ->
+            ProfilesSnapshot(
+                list = ProfileJson.decodeList(prefs[PROFILES_JSON]),
+                activeId = prefs[ACTIVE_PROFILE_ID]?.takeIf { it.isNotBlank() }
+            )
+        }
 
     /** Полный сброс: DataStore + EncryptedSharedPreferences + кастомный бинарник */
     suspend fun resetAll() {

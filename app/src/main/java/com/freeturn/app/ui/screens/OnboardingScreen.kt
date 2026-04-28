@@ -78,7 +78,6 @@ fun OnboardingScreen(
         ) {
             Spacer(Modifier.height(56.dp))
 
-            // Illustration + text
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(
                     modifier = Modifier
@@ -115,7 +114,6 @@ fun OnboardingScreen(
 
                 Spacer(Modifier.height(28.dp))
 
-                // Privacy notice
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant
@@ -142,7 +140,6 @@ fun OnboardingScreen(
                 }
             }
 
-            // Action buttons
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -160,7 +157,7 @@ fun OnboardingScreen(
                     Text(stringResource(R.string.setup_server), style = MaterialTheme.typography.labelLarge)
                 }
 
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(8.dp))
 
                 TextButton(onClick = {
                     HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)

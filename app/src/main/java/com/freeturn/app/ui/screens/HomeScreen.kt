@@ -34,8 +34,7 @@ import androidx.compose.ui.res.stringResource
 import com.freeturn.app.R
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -149,8 +148,11 @@ fun HomeScreen(
     }
 
     val privacyMode by viewModel.privacyMode.collectAsStateWithLifecycle()
+    val profilesSnapshot by viewModel.profilesSnapshot.collectAsStateWithLifecycle()
     val showBottomSheet = rememberSaveable { mutableStateOf(false) }
+    val showProfilesSheet = rememberSaveable { mutableStateOf(false) }
     val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val profilesSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val snackbarHostState = remember { SnackbarHostState() }
 
     Scaffold(
@@ -162,7 +164,7 @@ fun HomeScreen(
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                         onNavigateToSshSetup()
                     }) {
-                        Icon(painterResource(R.drawable.key_24px), contentDescription = stringResource(R.string.connection))
+                        Icon(painterResource(R.drawable.host_24px), contentDescription = stringResource(R.string.connection))
                     }
                     IconButton(onClick = {
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
@@ -175,10 +177,10 @@ fun HomeScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
                 .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -220,7 +222,7 @@ fun HomeScreen(
                     }
                     is ProxyState.Starting -> stringResource(R.string.proxy_connecting)
                     is ProxyState.Error -> s.message
-                    is ProxyState.CaptchaRequired -> "Требуется прохождение капчи"
+                    is ProxyState.CaptchaRequired -> stringResource(R.string.proxy_captcha_required)
                     else -> stringResource(R.string.proxy_press_to_start)
                 },
                 // "tnum" — tabular numbers: все цифры одинаковой ширины. Без него
@@ -238,17 +240,17 @@ fun HomeScreen(
             if (isConfigured) {
                 Spacer(Modifier.height(40.dp))
 
-                Card(
+                ElevatedCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp),
-                    elevation = CardDefaults.cardElevation(2.dp)
+                        .padding(horizontal = 24.dp)
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
                         Text(stringResource(R.string.current_settings), style = MaterialTheme.typography.titleSmall)
                         Spacer(Modifier.height(12.dp))
                         ConfigRow(stringResource(R.string.server), clientConfig.serverAddress.redact(privacyMode))
                         ConfigRow(stringResource(R.string.threads), "${clientConfig.threads}")
+                        ConfigRow(stringResource(R.string.allocs_per_stream_label), "${clientConfig.allocsPerStream}")
                         ConfigRow(
                             stringResource(R.string.transport_protocol),
                             if (clientConfig.vlessMode) "VLESS"
@@ -304,6 +306,23 @@ fun HomeScreen(
             }
 
             Spacer(Modifier.height(32.dp))
+            // Резерв под прилипший к низу переключатель — он виден всегда.
+            Spacer(Modifier.height(96.dp))
+        }
+
+        // Прилипший к низу переключатель — точка входа в управление профилями.
+        // Виден всегда: даже без сохранённых профилей показывает «Несохранённая
+        // конфигурация» и открывает sheet с действиями save/import.
+        ActiveProfileBar(
+            snapshot = profilesSnapshot,
+            onSwitch = {
+                HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                showProfilesSheet.value = true
+            },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        )
         }
     }
 
@@ -319,6 +338,22 @@ fun HomeScreen(
                 containerColor = sheetColor,
                 privacyMode = privacyMode,
                 onPrivacyModeChange = { viewModel.setPrivacyMode(it) }
+            )
+        }
+    }
+
+    if (showProfilesSheet.value) {
+        val sheetColor = MaterialTheme.colorScheme.surfaceContainerLow
+        ModalBottomSheet(
+            onDismissRequest = { showProfilesSheet.value = false },
+            sheetState = profilesSheetState,
+            containerColor = sheetColor
+        ) {
+            com.freeturn.app.ui.screens.ProfilesSheetContent(
+                viewModel = viewModel,
+                snapshot = profilesSnapshot,
+                containerColor = sheetColor,
+                onClose = { showProfilesSheet.value = false }
             )
         }
     }
@@ -435,7 +470,7 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
                 MaterialTheme.colorScheme.secondaryContainer
             else -> MaterialTheme.colorScheme.primaryContainer
         },
-        animationSpec = tween(600),
+        animationSpec = tween(500),
         label = "btn_bg"
     )
     val contentColor by animateColorAsState(
@@ -446,7 +481,7 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
                 MaterialTheme.colorScheme.onSecondaryContainer
             else -> MaterialTheme.colorScheme.onPrimaryContainer
         },
-        animationSpec = tween(600),
+        animationSpec = tween(500),
         label = "btn_fg"
     )
     val scale by animateFloatAsState(
@@ -464,7 +499,7 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
             .semantics { contentDescription = buttonLabel },
         shape = CircleShape,
         color = containerColor,
-        tonalElevation = if (state is ProxyState.Running) 6.dp else 1.dp
+        tonalElevation = if (state is ProxyState.Running) 3.dp else 1.dp
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
@@ -754,31 +789,100 @@ private fun RepoLinkItem(
     onHaptic: () -> Unit,
     onOpen: (String) -> Unit
 ) {
-    ListItem(
-        headlineContent = { Text(title) },
-        colors = ListItemDefaults.colors(containerColor = containerColor),
-        supportingContent = if (subtitle != null) ({
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }) else null,
-        trailingContent = {
-            Icon(
-                painterResource(R.drawable.open_in_new_24px),
-                contentDescription = stringResource(R.string.btn_open),
-                modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-        },
-        modifier = Modifier.clickable {
+    Surface(
+        onClick = {
             onHaptic()
             onOpen(url)
-        }
-    )
+        },
+        color = containerColor
+    ) {
+        ListItem(
+            headlineContent = { Text(title) },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            supportingContent = if (subtitle != null) ({
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }) else null,
+            trailingContent = {
+                Icon(
+                    painterResource(R.drawable.open_in_new_24px),
+                    contentDescription = stringResource(R.string.btn_open),
+                    modifier = Modifier.size(18.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        )
+    }
 }
 
+
+/**
+ * Прилипшая к низу M3 «карточка» — единственная точка входа в управление профилями.
+ * Виден всегда: с сохранённым активным профилем показывает его имя, без — лейбл
+ * «несохранённая конфигурация» с приглашением открыть sheet.
+ */
+@Composable
+private fun ActiveProfileBar(
+    snapshot: com.freeturn.app.data.ProfilesSnapshot,
+    onSwitch: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val active = snapshot.active
+    val title: String = active?.name ?: stringResource(R.string.profile_unsaved_label)
+    val subtitle: String? = if (active != null) stringResource(R.string.profile_active_label) else null
+
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 3.dp,
+        onClick = onSwitch
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    painterResource(R.drawable.manage_accounts_24px),
+                    contentDescription = null,
+                    tint = if (active != null) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Column {
+                    if (subtitle != null) {
+                        Text(
+                            subtitle,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        title,
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                }
+            }
+            Icon(
+                painterResource(R.drawable.arrow_forward_24px),
+                contentDescription = stringResource(R.string.profile_switch_action),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
 
 internal fun String.redact(enabled: Boolean) = if (enabled) "••••••" else this
 
