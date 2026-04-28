@@ -97,7 +97,7 @@ fun ClientSetupScreen(
         mutableStateOf(saved.vkLinks.ifEmpty { listOf("") })
     }
     var threads      by rememberSaveable(saved.threads)        { mutableFloatStateOf(saved.threads.toFloat()) }
-    var allocsPerStream by rememberSaveable(saved.allocsPerStream) { mutableFloatStateOf(saved.allocsPerStream.toFloat()) }
+    var allocsPerStream by rememberSaveable(saved.allocsPerStream) { mutableIntStateOf(saved.allocsPerStream) }
     var useUdp       by rememberSaveable(saved.useUdp)         { mutableStateOf(saved.useUdp) }
     var manualCaptcha by rememberSaveable(saved.manualCaptcha) { mutableStateOf(saved.manualCaptcha) }
     var localPort    by rememberSaveable(saved.localPort)      { mutableStateOf(saved.localPort) }
@@ -105,7 +105,6 @@ fun ClientSetupScreen(
     var forcePort443 by rememberSaveable(saved.forcePort443) { mutableStateOf(saved.forcePort443) }
     var debugMode by rememberSaveable(saved.debugMode) { mutableStateOf(saved.debugMode) }
     var lastSliderInt by rememberSaveable { mutableIntStateOf(saved.threads) }
-    var lastAllocsSliderInt by rememberSaveable { mutableIntStateOf(saved.allocsPerStream) }
 
     // Автозаполнение адреса сервера из SSH-конфига если поле пустое
     LaunchedEffect(sshConfig.ip, proxyListen) {
@@ -124,7 +123,7 @@ fun ClientSetupScreen(
                 serverAddress = serverAddress.trim(),
                 vkLinks       = vkLinks.map { it.trim() }.filter { it.isNotEmpty() },
                 threads       = threads.roundToInt(),
-                allocsPerStream = allocsPerStream.roundToInt(),
+                allocsPerStream = allocsPerStream,
                 useUdp        = useUdp,
                 manualCaptcha = manualCaptcha,
                 localPort     = localPort.trim(),
@@ -284,42 +283,34 @@ fun ClientSetupScreen(
                             threads = it
                         },
                         valueRange = 1f..64f,
-                        steps = 62,
+                        steps = 0,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
 
-                Column {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                stringResource(R.string.allocs_per_stream_format, allocsPerStream.roundToInt()),
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Text(
-                                stringResource(R.string.allocs_per_stream_recommendation),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        stringResource(R.string.allocs_per_stream_label),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        stringResource(R.string.allocs_per_stream_recommendation),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    val allocsOptions = listOf(1, 2)
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        allocsOptions.forEachIndexed { idx, value ->
+                            SegmentedButton(
+                                selected = allocsPerStream == value,
+                                onClick = {
+                                    HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                                    allocsPerStream = value
+                                },
+                                shape = SegmentedButtonDefaults.itemShape(index = idx, count = allocsOptions.size)
+                            ) { Text(value.toString()) }
                         }
                     }
-                    Slider(
-                        value = allocsPerStream,
-                        onValueChange = {
-                            val newInt = it.roundToInt()
-                            if (newInt != lastAllocsSliderInt) {
-                                HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
-                                lastAllocsSliderInt = newInt
-                            }
-                            allocsPerStream = it
-                        },
-                        valueRange = 1f..2f,
-                        steps = 0,
-                        modifier = Modifier.fillMaxWidth()
-                    )
                 }
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
