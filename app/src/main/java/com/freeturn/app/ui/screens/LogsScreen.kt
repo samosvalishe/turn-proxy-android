@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -98,14 +99,21 @@ fun LogsScreen(viewModel: MainViewModel) {
                 )
             }
         } else {
-            LazyColumn(
-                state = listState,
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding)
+                    .padding(padding),
+                contentAlignment = Alignment.TopCenter
             ) {
-                itemsIndexed(logs, key = { index, _ -> index }) { _, line ->
-                    LogLine(line = line)
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .widthIn(max = 840.dp)
+                        .fillMaxSize()
+                ) {
+                    itemsIndexed(logs, key = { index, _ -> index }) { _, line ->
+                        LogLine(line = line)
+                    }
                 }
             }
         }
