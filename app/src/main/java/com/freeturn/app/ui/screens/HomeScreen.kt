@@ -152,6 +152,7 @@ fun HomeScreen(
     val profilesSnapshot by viewModel.profilesSnapshot.collectAsStateWithLifecycle()
     val showBottomSheet = rememberSaveable { mutableStateOf(false) }
     val showProfilesSheet = rememberSaveable { mutableStateOf(false) }
+    var showEasterEgg by rememberSaveable { mutableStateOf(false) }
     val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val profilesSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val snackbarHostState = remember { SnackbarHostState() }
@@ -340,7 +341,11 @@ fun HomeScreen(
                 viewModel = viewModel,
                 containerColor = sheetColor,
                 privacyMode = privacyMode,
-                onPrivacyModeChange = { viewModel.setPrivacyMode(it) }
+                onPrivacyModeChange = { viewModel.setPrivacyMode(it) },
+                onEasterEgg = {
+                    showBottomSheet.value = false
+                    showEasterEgg = true
+                }
             )
         }
     }
@@ -363,6 +368,11 @@ fun HomeScreen(
 
     UpdateDialogs(viewModel)
 
+    if (showEasterEgg) {
+        com.freeturn.app.ui.screens.easteregg.EasterEggDialog(
+            onDismiss = { showEasterEgg = false }
+        )
+    }
 }
 
 // Диалоги обновления
@@ -537,7 +547,8 @@ private fun InfoBottomSheet(
     viewModel: MainViewModel,
     containerColor: Color,
     privacyMode: Boolean,
-    onPrivacyModeChange: (Boolean) -> Unit
+    onPrivacyModeChange: (Boolean) -> Unit,
+    onEasterEgg: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
@@ -684,12 +695,26 @@ private fun InfoBottomSheet(
             )
         }
 
-        // Версия
+        // Версия — 7 быстрых тапов открывают пасхалку
         item {
+            val tapTimes = remember { mutableStateOf<List<Long>>(emptyList()) }
             Text(
                 text = "v$appVersion",
                 modifier = Modifier
                     .fillMaxWidth()
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                    ) {
+                        val now = android.os.SystemClock.uptimeMillis()
+                        val recent = (tapTimes.value + now).filter { now - it <= 2500 }
+                        tapTimes.value = recent
+                        if (recent.size >= 7) {
+                            tapTimes.value = emptyList()
+                            HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                            onEasterEgg()
+                        }
+                    }
                     .padding(vertical = 16.dp),
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.labelSmall,
