@@ -45,20 +45,15 @@
     <string name="server_address_placeholder">1.2.3.4:56000</string>
     <string name="server_address_support">IP и порт turn-proxy на вашем VPS</string>
     <string name="call_link_label">Ссылка на звонок</string>
-    <string name="call_link_label_n">Ссылка на звонок #%1$d</string>
     <string name="call_link_placeholder">https://site.ru/call/…</string>
     <string name="call_link_support">Звонки → Создать → Скопировать ссылку (не нажимайте «Завершить»)</string>
-    <string name="call_links_section">Несколько ссылок увеличивают пропускную способность пропорционально их числу. Каждая = отдельный звонок.</string>
-    <string name="add_link">Добавить ссылку</string>
-    <string name="remove_link">Удалить ссылку</string>
     <string name="local_listen_address">Локальный адрес прослушивания</string>
     <string name="local_listen_placeholder">127.0.0.1:9000</string>
     <string name="local_listen_support">Адрес, на котором клиент принимает трафик от WireGuard/Hysteria</string>
     <string name="parameters_title">Параметры</string>
     <string name="threads_format">Потоки: %1$d</string>
     <string name="threads_recommendation">Рекомендуется 4–8</string>
-    <string name="allocs_per_stream_format">TURN-аллокаций на поток: %1$d</string>
-    <string name="allocs_per_stream_recommendation">Открывает несколько TURN-аллокаций под одной парой кредов. Максимум 2 (ВК отбивает 3-ю).</string>
+    <string name="allocs_per_stream_recommendation">Открывает несколько TURN-аллокаций под одной парой кредов. Максимум 3.</string>
     <string name="transport_protocol">Транспорт</string>
     <string name="transport_protocol_desc">UDP снижает задержки, TCP — стабильнее</string>
     <string name="manual_captcha">Ручной ввод капчи</string>

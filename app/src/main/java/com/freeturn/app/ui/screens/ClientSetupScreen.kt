@@ -42,7 +42,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -59,8 +58,6 @@ import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.viewmodel.MainViewModel
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
-
-private const val MAX_VK_LINKS = 5
 
 /**
  * @param showFinishButton  true — онбординг-флоу, показываем кнопку «Завершить».
@@ -87,15 +84,7 @@ fun ClientSetupScreen(
     ) { uri -> uri?.let { viewModel.setCustomKernel(it) } }
 
     var serverAddress by rememberSaveable(saved.serverAddress) { mutableStateOf(saved.serverAddress) }
-    // Список звонковых ссылок. Хотя бы один (возможно пустой) элемент всегда
-    // присутствует, чтобы UI рендерил входное поле.
-    val vkLinksStateSaver = listSaver<List<String>, String>(
-        save = { it.toList() },
-        restore = { it.toList() }
-    )
-    var vkLinks by rememberSaveable(saved.vkLinks, stateSaver = vkLinksStateSaver) {
-        mutableStateOf(saved.vkLinks.ifEmpty { listOf("") })
-    }
+    var vkLink       by rememberSaveable(saved.vkLink)         { mutableStateOf(saved.vkLink) }
     var threads      by rememberSaveable(saved.threads)        { mutableFloatStateOf(saved.threads.toFloat()) }
     var allocsPerStream by rememberSaveable(saved.allocsPerStream) { mutableIntStateOf(saved.allocsPerStream) }
     var useUdp       by rememberSaveable(saved.useUdp)         { mutableStateOf(saved.useUdp) }
@@ -116,12 +105,12 @@ fun ClientSetupScreen(
 
     // Авто-сохранение с дебаунсом 600 мс на каждое изменение поля.
     // vlessMode исключён — сохраняется через setVlessMode с автоперезапуском сервера.
-    LaunchedEffect(serverAddress, vkLinks, threads, allocsPerStream, useUdp, manualCaptcha, localPort, dnsMode, forcePort443, debugMode) {
+    LaunchedEffect(serverAddress, vkLink, threads, allocsPerStream, useUdp, manualCaptcha, localPort, dnsMode, forcePort443, debugMode) {
         delay(600)
         viewModel.saveClientConfig(
             ClientConfig(
                 serverAddress = serverAddress.trim(),
-                vkLinks       = vkLinks.map { it.trim() }.filter { it.isNotEmpty() },
+                vkLink        = vkLink.trim(),
                 threads       = threads.roundToInt(),
                 allocsPerStream = allocsPerStream,
                 useUdp        = useUdp,
@@ -172,75 +161,16 @@ fun ClientSetupScreen(
                     supportingText = { Text(stringResource(R.string.server_address_support)) }
                 )
 
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (vkLinks.size > 1) {
-                        Text(
-                            stringResource(R.string.call_links_section),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    vkLinks.forEachIndexed { idx, link ->
-                            OutlinedTextField(
-                                value = link.redact(privacyMode),
-                                onValueChange = { newValue ->
-                                    if (!privacyMode) {
-                                        vkLinks = vkLinks.toMutableList().also { it[idx] = newValue }
-                                    }
-                                },
-                                label = {
-                                    Text(
-                                        if (vkLinks.size > 1)
-                                            stringResource(R.string.call_link_label_n, idx + 1)
-                                        else
-                                            stringResource(R.string.call_link_label)
-                                    )
-                                },
-                                placeholder = { Text(stringResource(R.string.call_link_placeholder)) },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                readOnly = privacyMode,
-                                trailingIcon = if (vkLinks.size > 1 && !privacyMode) {
-                                    {
-                                        IconButton(
-                                            onClick = {
-                                                HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                                                vkLinks = vkLinks.toMutableList().also { it.removeAt(idx) }
-                                            }
-                                        ) {
-                                            Icon(
-                                                painter = painterResource(R.drawable.delete_24px),
-                                                contentDescription = stringResource(R.string.remove_link)
-                                            )
-                                        }
-                                    }
-                                } else null,
-                                supportingText = {
-                                    if (idx == vkLinks.lastIndex) {
-                                        Text(stringResource(R.string.call_link_support))
-                                    }
-                                }
-                            )
-                    }
-
-                    if (!privacyMode && vkLinks.size < MAX_VK_LINKS) {
-                        FilledTonalButton(
-                            onClick = {
-                                HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                                vkLinks = vkLinks + ""
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(
-                                painter = painterResource(R.drawable.add_24px),
-                                contentDescription = null
-                            )
-                            Spacer(Modifier.size(8.dp))
-                            Text(stringResource(R.string.add_link))
-                        }
-                    }
-
-                }
+                OutlinedTextField(
+                    value = vkLink.redact(privacyMode),
+                    onValueChange = { if (!privacyMode) vkLink = it },
+                    label = { Text(stringResource(R.string.call_link_label)) },
+                    placeholder = { Text(stringResource(R.string.call_link_placeholder)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    readOnly = privacyMode,
+                    supportingText = { Text(stringResource(R.string.call_link_support)) }
+                )
 
                 OutlinedTextField(
                     value = localPort.redact(privacyMode),
@@ -282,8 +212,8 @@ fun ClientSetupScreen(
                             }
                             threads = it
                         },
-                        valueRange = 1f..64f,
-                        steps = 0,
+                        valueRange = 1f..32f,
+                        steps = 30,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -298,7 +228,7 @@ fun ClientSetupScreen(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    val allocsOptions = listOf(1, 2)
+                    val allocsOptions = listOf(1, 2, 3)
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                         allocsOptions.forEachIndexed { idx, value ->
                             SegmentedButton(
@@ -512,7 +442,7 @@ fun ClientSetupScreen(
                     Button(
                         onClick = onFinish,
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = serverAddress.isNotBlank() && vkLinks.any { it.isNotBlank() },
+                        enabled = serverAddress.isNotBlank() && vkLink.isNotBlank(),
                         shape = MaterialTheme.shapes.large
                     ) {
                         Text(stringResource(R.string.finish_setup), style = MaterialTheme.typography.labelLarge)

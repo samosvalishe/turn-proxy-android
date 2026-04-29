@@ -121,7 +121,7 @@ class LocalProxyManager(private val context: Context) {
         if (ProxyServiceState.isRunning.value) return
         if (_proxyState.value is ProxyState.Error) _proxyState.value = ProxyState.Idle
 
-        if (!cfg.isRawMode && (cfg.serverAddress.isBlank() || cfg.vkLinks.none { it.isNotBlank() })) {
+        if (!cfg.isRawMode && (cfg.serverAddress.isBlank() || cfg.vkLink.isBlank())) {
             setErrorWithAutoReset("Не заполнены настройки клиента")
             return
         }

@@ -166,12 +166,8 @@ class ProxyService : Service() {
             cmdArgs.add(executable)
             cmdArgs.add("-peer"); cmdArgs.add(cfg.serverAddress)
 
-            val linksJoined = cfg.vkLinks.joinToString(",") { it.trim() }
-            // Yandex-link одиночный — определяем по первой ссылке. Multi-link для
-            // VK-звонков шардится по streamID на стороне ядра.
-            val isYandex = cfg.vkLinks.firstOrNull()?.contains("yandex") == true
-            cmdArgs.add(if (isYandex) "-yandex-link" else "-vk-link")
-            cmdArgs.add(linksJoined)
+            cmdArgs.add(if (cfg.vkLink.contains("yandex")) "-yandex-link" else "-vk-link")
+            cmdArgs.add(cfg.vkLink)
             cmdArgs.add("-listen"); cmdArgs.add(cfg.localPort)
             if (cfg.threads > 0) { cmdArgs.add("-n"); cmdArgs.add(cfg.threads.toString()) }
             if (cfg.allocsPerStream > 1) { cmdArgs.add("-allocs-per-stream"); cmdArgs.add(cfg.allocsPerStream.toString()) }

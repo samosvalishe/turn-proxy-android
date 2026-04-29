@@ -32,7 +32,7 @@ data class SshConfig(
 
 data class ClientConfig(
     val serverAddress: String = "",
-    val vkLinks: List<String> = emptyList(),
+    val vkLink: String = "",
     val threads: Int = 4,
     val allocsPerStream: Int = 1,
     val useUdp: Boolean = true,
@@ -48,21 +48,6 @@ data class ClientConfig(
     // Если true — добавляется флаг -debug для расширенного вывода в логах.
     val debugMode: Boolean = false
 )
-
-/**
- * Парсит сохранённые звонковые ссылки. Сначала пробует новый ключ
- * (newline-joined), потом legacy (одиночная ссылка). Тримит, дропает пустые.
- */
-internal fun decodeVkLinks(joined: String?, legacy: String?): List<String> {
-    val fromNew = joined
-        ?.split('\n', '\r')
-        ?.map { it.trim() }
-        ?.filter { it.isNotEmpty() }
-        ?: emptyList()
-    if (fromNew.isNotEmpty()) return fromNew
-    val one = legacy?.trim().orEmpty()
-    return if (one.isNotEmpty()) listOf(one) else emptyList()
-}
 
 object DnsMode {
     const val AUTO = "auto"
@@ -82,12 +67,9 @@ class AppPreferences(context: Context) {
         val SSH_HOST_FP = stringPreferencesKey("ssh_host_fp")
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         val CLIENT_SERVER_ADDR = stringPreferencesKey("client_server_addr")
-        // Legacy single-link key. Читается только для миграции, перезаписывается
-        // первой ссылкой из списка для обратной совместимости со старыми билдами.
         val CLIENT_VK_LINK = stringPreferencesKey("client_vk_link")
-        // Список звонковых ссылок, разделитель — \n. URL не содержит перевод строки,
-        // поэтому простой join безопасен и не требует JSON-эскейпа.
-        val CLIENT_VK_LINKS = stringPreferencesKey("client_vk_links")
+        // Устаревший ключ из мультиссылочной фичи — используется для очистки.
+        private val CLIENT_VK_LINKS_LEGACY = stringPreferencesKey("client_vk_links")
         val CLIENT_THREADS = intPreferencesKey("client_threads")
         val CLIENT_ALLOCS_PER_STREAM = intPreferencesKey("client_allocs_per_stream")
         val CLIENT_UDP = booleanPreferencesKey("client_udp")
@@ -154,7 +136,7 @@ class AppPreferences(context: Context) {
         .map { prefs ->
             ClientConfig(
                 serverAddress = prefs[CLIENT_SERVER_ADDR] ?: "",
-                vkLinks = decodeVkLinks(prefs[CLIENT_VK_LINKS], prefs[CLIENT_VK_LINK]),
+                vkLink = prefs[CLIENT_VK_LINK] ?: "",
                 threads = prefs[CLIENT_THREADS] ?: 4,
                 allocsPerStream = prefs[CLIENT_ALLOCS_PER_STREAM] ?: 1,
                 useUdp = prefs[CLIENT_UDP] ?: true,
@@ -239,11 +221,8 @@ class AppPreferences(context: Context) {
     suspend fun saveClientConfig(config: ClientConfig) {
         context.dataStore.edit { prefs ->
             prefs[CLIENT_SERVER_ADDR] = config.serverAddress
-            val cleaned = config.vkLinks.map { it.trim() }.filter { it.isNotEmpty() }
-            prefs[CLIENT_VK_LINKS] = cleaned.joinToString("\n")
-            // Дублируем первую ссылку в legacy-ключ — чтобы откат на старый бинарь
-            // не сломал базовый сценарий с одной ссылкой.
-            prefs[CLIENT_VK_LINK] = cleaned.firstOrNull() ?: ""
+            prefs[CLIENT_VK_LINK] = config.vkLink
+            prefs.remove(CLIENT_VK_LINKS_LEGACY)
             prefs[CLIENT_THREADS] = config.threads
             prefs[CLIENT_ALLOCS_PER_STREAM] = config.allocsPerStream
             prefs[CLIENT_UDP] = config.useUdp

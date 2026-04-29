@@ -4,6 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
+
 /**
  * Именованный снимок настроек: SSH-сервер + клиентские параметры.
  * Хранится сериализованным в DataStore. Активный профиль — это id из общего
@@ -24,18 +25,6 @@ data class ProfilesSnapshot(
     val activeId: String? = null
 ) {
     val active: Profile? get() = list.firstOrNull { it.id == activeId }
-}
-
-private fun decodeProfileVkLinks(o: JSONObject): List<String> {
-    val arr = o.optJSONArray("vkLinks")
-    if (arr != null) {
-        val out = (0 until arr.length()).mapNotNull {
-            arr.optString(it).trim().takeIf { s -> s.isNotEmpty() }
-        }
-        if (out.isNotEmpty()) return out
-    }
-    val legacy = o.optString("vkLink").trim()
-    return if (legacy.isNotEmpty()) listOf(legacy) else emptyList()
 }
 
 internal object ProfileJson {
@@ -69,9 +58,7 @@ internal object ProfileJson {
         })
         put("client", JSONObject().apply {
             put("serverAddress", p.client.serverAddress)
-            // Legacy single-link для обратной совместимости со старыми билдами.
-            put("vkLink", p.client.vkLinks.firstOrNull().orEmpty())
-            put("vkLinks", JSONArray().apply { p.client.vkLinks.forEach { put(it) } })
+            put("vkLink", p.client.vkLink)
             put("threads", p.client.threads)
             put("allocsPerStream", p.client.allocsPerStream)
             put("useUdp", p.client.useUdp)
@@ -105,7 +92,7 @@ internal object ProfileJson {
             ),
             client = ClientConfig(
                 serverAddress = cliO.optString("serverAddress"),
-                vkLinks = decodeProfileVkLinks(cliO),
+                vkLink = cliO.optString("vkLink"),
                 threads = cliO.optInt("threads", 4),
                 allocsPerStream = cliO.optInt("allocsPerStream", 1),
                 useUdp = cliO.optBoolean("useUdp", true),
