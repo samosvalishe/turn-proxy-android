@@ -17,11 +17,14 @@ object ServerScripts {
     """.trimIndent()
 
     val installServer: String = """
-        mkdir -p /opt/vk-turn && cd /opt/vk-turn
+        mkdir -p /opt/vk-turn || { echo "ERROR: не удалось создать /opt/vk-turn (нет прав)"; exit 1; }
+        cd /opt/vk-turn || { echo "ERROR: не удалось войти в /opt/vk-turn"; exit 1; }
+        if [ ! -w /opt/vk-turn ]; then echo "ERROR: /opt/vk-turn не доступен для записи"; exit 1; fi
         if [ -f /opt/vk-turn/proxy.pid ]; then kill -9 ${'$'}(cat /opt/vk-turn/proxy.pid) 2>/dev/null; rm -f /opt/vk-turn/proxy.pid; fi
         ARCH=${'$'}(uname -m)
         if [ "${'$'}ARCH" = "x86_64" ]; then BIN="server-linux-amd64"; else BIN="server-linux-arm64"; fi
         BASE_URL="https://github.com/cacggghp/vk-turn-proxy/releases/latest/download"
+        BINPATH="/opt/vk-turn/${'$'}BIN"
         echo "Arch: ${'$'}ARCH | Binary: ${'$'}BIN"
         _dl() { URL=${'$'}1; OUT=${'$'}2
             if command -v curl >/dev/null 2>&1; then
@@ -32,28 +35,28 @@ object ServerScripts {
                 echo "ERROR: curl и wget не найдены"; return 1
             fi
         }
-        _dl "${'$'}BASE_URL/${'$'}BIN" "${'$'}BIN" || { echo "ERROR: скачивание бинарника не удалось"; exit 1; }
-        SIZE=${'$'}(wc -c < "${'$'}BIN" 2>/dev/null || echo 0)
+        _dl "${'$'}BASE_URL/${'$'}BIN" "${'$'}BINPATH" || { echo "ERROR: скачивание бинарника не удалось"; exit 1; }
+        SIZE=${'$'}(wc -c < "${'$'}BINPATH" 2>/dev/null || echo 0)
         echo "Size: ${'$'}SIZE bytes"
-        if [ "${'$'}SIZE" -lt 100000 ]; then echo "ERROR: файл слишком мал (${'$'}SIZE байт)"; cat "${'$'}BIN" 2>/dev/null; exit 1; fi
-        if _dl "${'$'}BASE_URL/checksums.txt" checksums.txt && [ -s checksums.txt ]; then
-            EXPECTED=${'$'}(grep "${'$'}BIN" checksums.txt | awk '{print ${'$'}1}')
+        if [ "${'$'}SIZE" -lt 100000 ]; then echo "ERROR: файл слишком мал (${'$'}SIZE байт)"; cat "${'$'}BINPATH" 2>/dev/null; exit 1; fi
+        if _dl "${'$'}BASE_URL/checksums.txt" /opt/vk-turn/checksums.txt && [ -s /opt/vk-turn/checksums.txt ]; then
+            EXPECTED=${'$'}(grep "${'$'}BIN" /opt/vk-turn/checksums.txt | awk '{print ${'$'}1}')
             if [ -n "${'$'}EXPECTED" ]; then
-                ACTUAL=${'$'}(sha256sum "${'$'}BIN" | awk '{print ${'$'}1}')
+                ACTUAL=${'$'}(sha256sum "${'$'}BINPATH" | awk '{print ${'$'}1}')
                 if [ "${'$'}EXPECTED" = "${'$'}ACTUAL" ]; then
                     echo "SHA256: OK"
                 else
                     echo "ERROR: SHA256 не совпадает — ожидался ${'$'}EXPECTED, получен ${'$'}ACTUAL"
-                    rm -f "${'$'}BIN" checksums.txt; exit 1
+                    rm -f "${'$'}BINPATH" /opt/vk-turn/checksums.txt; exit 1
                 fi
             else
                 echo "WARN: ${'$'}BIN не найден в checksums.txt, SHA256 пропущен"
             fi
-            rm -f checksums.txt
+            rm -f /opt/vk-turn/checksums.txt
         else
             echo "WARN: checksums.txt недоступен, SHA256 не проверен"
         fi
-        chmod +x "${'$'}BIN" && echo "DONE"
+        chmod +x "${'$'}BINPATH" && echo "DONE"
     """.trimIndent()
 
     fun startServer(listen: String, connect: String, vlessMode: Boolean = false): String {

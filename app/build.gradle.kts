@@ -12,7 +12,7 @@ android {
         minSdk = 23
         targetSdk = 36
         versionCode = 17
-        versionName = "2.1.0"
+        versionName = "2.1.1"
     }
 
     packaging {
