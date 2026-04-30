@@ -333,14 +333,22 @@ class ProxyService : Service() {
                     }
                     if (statsChanged) publishStats()
 
-                    // Startup: ядро упало с panic/fatal/rate limit ДО того, как удалось
-                    // подключиться — считаем запуск неудачным. Первая строка без этих
-                    // маркеров больше не трактуется как Success (ядро могло написать
-                    // "Connecting..." и только потом упасть).
+                    // Startup: ядро упало с panic/fatal/окончательно не смогло
+                    // получить creds ДО того, как удалось подключиться — считаем
+                    // запуск неудачным. Первая строка без этих маркеров больше не
+                    // трактуется как Success (ядро могло написать "Connecting..."
+                    // и только потом упасть).
+                    //
+                    // ВАЖНО: не матчим подстроку "rate limit" — Go-сторона выводит
+                    // её в кулдаун-логах ("identity cooldown", "VK throttle ...
+                    // trying next") как рабочую часть retry-цикла, не как ошибку.
+                    // Финальная неудача — "all VK credentials failed".
                     if (!startupEmitted) {
                         val lower = l.lowercase()
-                        val hasFatal = lower.contains("panic") || lower.contains("fatal") ||
-                            lower.contains("rate limit")
+                        val hasFatal = lower.startsWith("panic:") ||
+                            lower.startsWith("fatal error:") ||
+                            lower.contains("all vk credentials failed") ||
+                            lower.contains("fatal_captcha")
                         val hasConnection = (isVless && vlessActive > 0) ||
                             (!isVless && nonVlessActive > 0)
                         when {

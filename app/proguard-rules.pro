@@ -9,6 +9,12 @@
 -keep class com.jcraft.jsch.** { *; }
 -dontwarn com.jcraft.jsch.**
 
+# ── EdDSA (Ed25519) ───────────────────────────────────────────────────────────
+# JSch обращается к net.i2p.crypto.eddsa через Security Provider (reflection).
+# R8 стрипает эти классы в release → Ed25519-ключи не работают.
+-keep class net.i2p.crypto.eddsa.** { *; }
+-dontwarn net.i2p.crypto.eddsa.**
+
 # ── Kotlin Coroutines ─────────────────────────────────────────────────────────
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
