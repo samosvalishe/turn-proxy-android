@@ -212,8 +212,8 @@ fun ClientSetupScreen(
                             }
                             threads = it
                         },
-                        valueRange = 1f..32f,
-                        steps = 30,
+                        valueRange = 1f..128f,
+                        steps = 0,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
