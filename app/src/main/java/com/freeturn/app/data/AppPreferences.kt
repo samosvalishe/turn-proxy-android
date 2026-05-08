@@ -34,27 +34,21 @@ data class ClientConfig(
     val serverAddress: String = "",
     val vkLink: String = "",
     val threads: Int = 4,
-    val allocsPerStream: Int = 1,
+    /** Соответствует флагу `-streams-per-cred` ядра. Дефолт ядра = 10. */
+    val streamsPerCred: Int = 10,
     val useUdp: Boolean = true,
     val manualCaptcha: Boolean = false,
     val localPort: String = "127.0.0.1:9000",
     val isRawMode: Boolean = false,
     val rawCommand: String = "",
     val vlessMode: Boolean = false,
-    // "auto" | "udp" | "doh" — соответствует флагу -dns ядра.
-    val dnsMode: String = DnsMode.AUTO,
-    // Если true — в argv ядра добавляется -port 443, переопределяя порт TURN-сервера VK.
-    val forcePort443: Boolean = false,
+    /** "v1" | "v2" — соответствует флагу -captcha-solver ядра. Дефолт = v2. */
+    val captchaSolver: String = "v2",
     // Если true — добавляется флаг -debug для расширенного вывода в логах.
-    val debugMode: Boolean = false
+    val debugMode: Boolean = false,
+    // Если true — в argv передаётся -dns-servers с DNS активной сети (оператор связи).
+    val useCarrierDns: Boolean = false
 )
-
-object DnsMode {
-    const val AUTO = "auto"
-    const val UDP = "udp"
-    const val DOH = "doh"
-    val ALL = listOf(AUTO, UDP, DOH)
-}
 
 class AppPreferences(context: Context) {
     private val context = context.applicationContext
@@ -71,23 +65,34 @@ class AppPreferences(context: Context) {
         // Устаревший ключ из мультиссылочной фичи — используется для очистки.
         private val CLIENT_VK_LINKS_LEGACY = stringPreferencesKey("client_vk_links")
         val CLIENT_THREADS = intPreferencesKey("client_threads")
-        val CLIENT_ALLOCS_PER_STREAM = intPreferencesKey("client_allocs_per_stream")
+        val CLIENT_STREAMS_PER_CRED = intPreferencesKey("client_streams_per_cred")
         val CLIENT_UDP = booleanPreferencesKey("client_udp")
         val CLIENT_MANUAL_CAPTCHA = booleanPreferencesKey("client_manual_captcha")
         val CLIENT_LOCAL_PORT = stringPreferencesKey("client_local_port")
         val CLIENT_IS_RAW = booleanPreferencesKey("client_is_raw")
         val CLIENT_RAW_CMD = stringPreferencesKey("client_raw_cmd")
         val CLIENT_VLESS = booleanPreferencesKey("client_vless")
-        val CLIENT_DNS_MODE = stringPreferencesKey("client_dns_mode")
-        val CLIENT_FORCE_PORT_443 = booleanPreferencesKey("client_turn_port_443")
+        val CLIENT_CAPTCHA_SOLVER = stringPreferencesKey("client_captcha_solver")
         val CLIENT_DEBUG = booleanPreferencesKey("client_debug")
+        val CLIENT_USE_CARRIER_DNS = booleanPreferencesKey("client_use_carrier_dns")
+        // Устаревшие ключи — не пишутся, но молча удаляются при saveClientConfig.
+        private val CLIENT_DNS_MODE_LEGACY = stringPreferencesKey("client_dns_mode")
+        private val CLIENT_ALLOCS_PER_STREAM_LEGACY = intPreferencesKey("client_allocs_per_stream")
 
-        // Устаревший ключ — читается только для миграции (true → "doh").
-        // Ключ "client_force_port_443" не переиспользуется под новую семантику, чтобы
-        // у старых пользователей не включился неожиданно -port 443.
+        // Устаревший ключ из старой -port 443 фичи (обе семантики удалены).
         private val CLIENT_FORCE_PORT_443_LEGACY = booleanPreferencesKey("client_force_port_443")
+        private val CLIENT_TURN_PORT_443_LEGACY = booleanPreferencesKey("client_turn_port_443")
         val PROXY_LISTEN = stringPreferencesKey("proxy_listen")
         val PROXY_CONNECT = stringPreferencesKey("proxy_connect")
+        // Серверные параметры (управляются на ServerManagementScreen).
+        val SERVER_VLESS_BOND = booleanPreferencesKey("server_vless_bond")
+        val SERVER_WRAP_ENABLED = booleanPreferencesKey("server_wrap_enabled")
+        // Ревизия — инкрементится при saveServerOpts. Нужна, чтобы Flow эмитил
+        // обновление, когда меняется только wrap-key в EncryptedSharedPreferences
+        // (DataStore сам по себе не видит этого изменения).
+        val SERVER_OPTS_REV = intPreferencesKey("server_opts_rev")
+        // Wrap-ключ хранится в EncryptedSharedPreferences (key: "server_wrap_key"),
+        // не в DataStore. См. encryptedPrefs ниже.
         val DYNAMIC_THEME = booleanPreferencesKey("dynamic_theme")
         val TG_SUBSCRIBE_SHOWN = booleanPreferencesKey("tg_subscribe_shown")
         val PROFILES_JSON = stringPreferencesKey("profiles_json")
@@ -138,17 +143,18 @@ class AppPreferences(context: Context) {
                 serverAddress = prefs[CLIENT_SERVER_ADDR] ?: "",
                 vkLink = prefs[CLIENT_VK_LINK] ?: "",
                 threads = prefs[CLIENT_THREADS] ?: 4,
-                allocsPerStream = prefs[CLIENT_ALLOCS_PER_STREAM] ?: 1,
+                streamsPerCred = prefs[CLIENT_STREAMS_PER_CRED] ?: 10,
                 useUdp = prefs[CLIENT_UDP] ?: true,
                 manualCaptcha = prefs[CLIENT_MANUAL_CAPTCHA] ?: false,
                 localPort = prefs[CLIENT_LOCAL_PORT] ?: "127.0.0.1:9000",
                 isRawMode = prefs[CLIENT_IS_RAW] ?: false,
                 rawCommand = prefs[CLIENT_RAW_CMD] ?: "",
                 vlessMode = prefs[CLIENT_VLESS] ?: false,
-                dnsMode = prefs[CLIENT_DNS_MODE]
-                    ?: if (prefs[CLIENT_FORCE_PORT_443_LEGACY] == true) DnsMode.DOH else DnsMode.AUTO,
-                forcePort443 = prefs[CLIENT_FORCE_PORT_443] ?: false,
-                debugMode = prefs[CLIENT_DEBUG] ?: false
+                captchaSolver = (prefs[CLIENT_CAPTCHA_SOLVER] ?: "v2").let {
+                    if (it == "v1" || it == "v2") it else "v2"
+                },
+                debugMode = prefs[CLIENT_DEBUG] ?: false,
+                useCarrierDns = prefs[CLIENT_USE_CARRIER_DNS] ?: false
             )
         }
 
@@ -163,6 +169,34 @@ class AppPreferences(context: Context) {
     val proxyConnectFlow: Flow<String> = context.dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { prefs -> prefs[PROXY_CONNECT] ?: "127.0.0.1:40537" }
+
+    /** Снимок серверных опций. wrapKey читается из шифрованного хранилища. */
+    data class ServerOpts(
+        val vlessBond: Boolean = false,
+        val wrapEnabled: Boolean = false,
+        val wrapKey: String = ""
+    )
+
+    val serverOptsFlow: Flow<ServerOpts> = context.dataStore.data
+        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+        .map { prefs ->
+            ServerOpts(
+                vlessBond = prefs[SERVER_VLESS_BOND] ?: false,
+                wrapEnabled = prefs[SERVER_WRAP_ENABLED] ?: false,
+                wrapKey = encryptedPrefs.getString("server_wrap_key", null) ?: ""
+            )
+        }
+
+    suspend fun saveServerOpts(opts: ServerOpts) {
+        withContext(Dispatchers.IO) {
+            encryptedPrefs.edit { putString("server_wrap_key", opts.wrapKey) }
+        }
+        context.dataStore.edit { prefs ->
+            prefs[SERVER_VLESS_BOND] = opts.vlessBond
+            prefs[SERVER_WRAP_ENABLED] = opts.wrapEnabled
+            prefs[SERVER_OPTS_REV] = (prefs[SERVER_OPTS_REV] ?: 0) + 1
+        }
+    }
 
     val dynamicThemeFlow: Flow<Boolean> = context.dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
@@ -224,7 +258,7 @@ class AppPreferences(context: Context) {
             prefs[CLIENT_VK_LINK] = config.vkLink
             prefs.remove(CLIENT_VK_LINKS_LEGACY)
             prefs[CLIENT_THREADS] = config.threads
-            prefs[CLIENT_ALLOCS_PER_STREAM] = config.allocsPerStream
+            prefs[CLIENT_STREAMS_PER_CRED] = config.streamsPerCred
             prefs[CLIENT_UDP] = config.useUdp
             prefs[CLIENT_MANUAL_CAPTCHA] = config.manualCaptcha
             // Мигрируем старый ключ: noDtls удалён из приложения.
@@ -233,12 +267,14 @@ class AppPreferences(context: Context) {
             prefs[CLIENT_IS_RAW] = config.isRawMode
             prefs[CLIENT_RAW_CMD] = config.rawCommand
             prefs[CLIENT_VLESS] = config.vlessMode
-            prefs[CLIENT_DNS_MODE] = if (config.dnsMode in DnsMode.ALL) config.dnsMode else DnsMode.AUTO
-            prefs[CLIENT_FORCE_PORT_443] = config.forcePort443
+            prefs[CLIENT_CAPTCHA_SOLVER] = config.captchaSolver
             prefs[CLIENT_DEBUG] = config.debugMode
-            // Зачищаем устаревший ключ после успешной миграции, чтобы он не всплывал
-            // при следующей загрузке, если пользователь переключит режим обратно.
+            prefs[CLIENT_USE_CARRIER_DNS] = config.useCarrierDns
+            // Удаляем устаревшие ключи, которые больше не использует ядро.
             prefs.remove(CLIENT_FORCE_PORT_443_LEGACY)
+            prefs.remove(CLIENT_TURN_PORT_443_LEGACY)
+            prefs.remove(CLIENT_DNS_MODE_LEGACY)
+            prefs.remove(CLIENT_ALLOCS_PER_STREAM_LEGACY)
         }
     }
 
@@ -274,11 +310,12 @@ class AppPreferences(context: Context) {
             )
         }
 
-    /** Полный сброс: DataStore + EncryptedSharedPreferences + кастомный бинарник */
+    /** Полный сброс: DataStore + EncryptedSharedPreferences. */
     suspend fun resetAll() {
         context.dataStore.edit { it.clear() }
         withContext(Dispatchers.IO) {
             encryptedPrefs.edit { clear() }
+            // Чистим следы старого кастомного ядра, если оставались.
             File(context.filesDir, "custom_vkturn").delete()
         }
     }

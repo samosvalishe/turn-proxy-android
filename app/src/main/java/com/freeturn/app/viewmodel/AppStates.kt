@@ -12,7 +12,14 @@ sealed class SshConnectionState {
 sealed class ServerState {
     object Unknown : ServerState()
     object Checking : ServerState()
-    data class Known(val installed: Boolean, val running: Boolean, val vlessMode: Boolean? = null) : ServerState()
+    data class Known(
+        val installed: Boolean,
+        val running: Boolean,
+        val vlessMode: Boolean? = null,
+        val vlessBond: Boolean? = null,
+        val wrap: Boolean? = null,
+        val version: String? = null
+    ) : ServerState()
     data class Working(val action: String) : ServerState()
     data class Error(val message: String) : ServerState()
 }

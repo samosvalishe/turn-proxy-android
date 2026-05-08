@@ -78,6 +78,7 @@ fun ServerManagementScreen(
     val savedConnect by viewModel.proxyConnect.collectAsStateWithLifecycle()
     val sshLog by viewModel.sshLog.collectAsStateWithLifecycle()
     val privacyMode by viewModel.privacyMode.collectAsStateWithLifecycle()
+    val installStage by viewModel.serverInstallStage.collectAsStateWithLifecycle()
 
     var proxyListenPort by rememberSaveable(savedListen) { mutableStateOf(savedListen.substringAfterLast(":", "56000")) }
     var proxyConnect by rememberSaveable(savedConnect) { mutableStateOf(savedConnect) }
@@ -138,6 +139,28 @@ fun ServerManagementScreen(
                         )
                         Spacer(Modifier.height(10.dp))
                         StatusRow(stringResource(R.string.vk_turn_proxy), serverKnown?.running == true)
+
+                        if (serverKnown?.installed == true && !serverKnown.version.isNullOrBlank()) {
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                stringResource(R.string.server_version_label, serverKnown.version),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        installStage?.let { stage ->
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                when (stage) {
+                                    "cached" -> stringResource(R.string.server_install_cached)
+                                    "downloaded" -> stringResource(R.string.server_install_downloaded)
+                                    else -> stage
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.extendedColorScheme.info
+                            )
+                        }
 
                         when (serverState) {
                             is ServerState.Checking -> {
@@ -200,6 +223,9 @@ fun ServerManagementScreen(
                     )
                 }
 
+                // VLESS bonding / WRAP управляются на клиентском экране — общий source.
+                // Здесь не дублируем, чтобы не путать пользователя двумя точками контроля.
+
                 // Action buttons
                 FilledTonalButton(
                     onClick = {
@@ -213,7 +239,7 @@ fun ServerManagementScreen(
                 ) {
                     Icon(painterResource(R.drawable.cloud_download_24px), null)
                     Spacer(Modifier.width(8.dp))
-                    Text(if (serverKnown?.installed == true) stringResource(R.string.update) else stringResource(R.string.install))
+                    Text(stringResource(R.string.install))
                 }
 
                 Button(

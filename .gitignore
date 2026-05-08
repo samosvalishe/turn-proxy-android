@@ -17,3 +17,6 @@ local.properties
 # Build outputs
 **/build/
 **/release/
+
+# Claude Code
+.claude/

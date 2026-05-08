@@ -2,7 +2,6 @@ package com.freeturn.app.domain
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import com.freeturn.app.ConnectionStats
 import com.freeturn.app.ProxyService
@@ -15,30 +14,21 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import java.io.File
 
 class LocalProxyManager(private val context: Context) {
 
     private val _proxyState = MutableStateFlow<ProxyState>(ProxyState.Idle)
     val proxyState: StateFlow<ProxyState> = _proxyState.asStateFlow()
 
-    private val _customKernelExists = MutableStateFlow(false)
-    val customKernelExists: StateFlow<Boolean> = _customKernelExists.asStateFlow()
-
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var resetJob: kotlinx.coroutines.Job? = null
-
-    init {
-        _customKernelExists.value = File(context.filesDir, "custom_vkturn").exists()
-    }
 
     suspend fun observeProxyLifecycle() {
         ProxyServiceState.proxyFailed.collect {
@@ -143,8 +133,21 @@ class LocalProxyManager(private val context: Context) {
             context.startService(intent)
         }
 
-        val result = withTimeoutOrNull(20_000L) {
-            ProxyServiceState.startupResult.filterNotNull().first()
+        // Умное ожидание стартапа. Watchdog внутри сервиса делает до MAX_RESTARTS
+        // попыток с backoff до 30с — фиксированный таймаут (20с) обрывал UI ещё
+        // на первой-второй ретрай-итерации. Теперь ждём пока:
+        //   • сервис не отдаст StartupResult (Success/Failed), ИЛИ
+        //   • сервис не остановится сам (watchdog исчерпал лимит → isRunning=false).
+        // Верхняя граница в 5 минут — страховка от подвисшего сервиса.
+        val result = withTimeoutOrNull(5 * 60_000L) {
+            // Дождаться, что сервис фактически поднялся (onStartCommand).
+            ProxyServiceState.isRunning.first { it }
+            combine(
+                ProxyServiceState.startupResult,
+                ProxyServiceState.isRunning
+            ) { sr, running -> sr to running }
+                .first { (sr, running) -> sr != null || !running }
+                .first
         }
 
         if (_proxyState.value is ProxyState.Error) return
@@ -195,66 +198,8 @@ class LocalProxyManager(private val context: Context) {
         }
     }
 
-    suspend fun setCustomKernel(uri: Uri): String? = withContext(Dispatchers.IO) {
-        try {
-            val MAX_SIZE = 100L * 1024 * 1024 // 100 MB
-            val ELF_MAGIC = byteArrayOf(0x7F, 0x45, 0x4C, 0x46) // \x7FELF
-            val dest = File(context.filesDir, "custom_vkturn")
-            val inputStream = context.contentResolver.openInputStream(uri)
-                ?: return@withContext "Не удалось открыть файл"
-
-            val error: String? = inputStream.use { input ->
-                val header = ByteArray(4)
-                if (input.read(header) < 4 || !header.contentEquals(ELF_MAGIC)) {
-                    return@use "Файл не является ELF-бинарником. Убедитесь, что загружаете правильное ядро"
-                }
-
-                var totalBytes = header.size.toLong()
-                dest.outputStream().use { output ->
-                    output.write(header)
-                    val buf = ByteArray(65_536)
-                    var n: Int
-                    while (input.read(buf).also { n = it } != -1) {
-                        totalBytes += n
-                        if (totalBytes > MAX_SIZE) {
-                            return@use "Файл слишком большой (максимум 100 МБ)"
-                        }
-                        output.write(buf, 0, n)
-                    }
-                }
-
-                if (totalBytes <= 4L) return@use "Файл пустой"
-                null
-            }
-
-            if (error != null) {
-                dest.delete()
-                return@withContext error
-            }
-
-            dest.setExecutable(true, false)
-            try {
-                Runtime.getRuntime().exec(arrayOf("chmod", "755", dest.absolutePath)).waitFor()
-            } catch (_: Exception) {}
-            withContext(Dispatchers.Main) { _customKernelExists.value = true }
-            ProxyServiceState.addLog("Кастомное ядро установлено: ${dest.length() / 1024} КБ")
-            null
-        } catch (e: Exception) {
-            ProxyServiceState.addLog("Ошибка установки ядра: ${e.message}")
-            "Ошибка: ${e.message}"
-        }
-    }
-
-    fun clearCustomKernel() {
-        File(context.filesDir, "custom_vkturn").delete()
-        _customKernelExists.value = false
-        ProxyServiceState.addLog("Кастомное ядро удалено, используется встроенное")
-    }
-
     fun clearState() {
         _proxyState.value = ProxyState.Idle
-        File(context.filesDir, "custom_vkturn").delete()
-        _customKernelExists.value = false
     }
 
     fun destroy() {

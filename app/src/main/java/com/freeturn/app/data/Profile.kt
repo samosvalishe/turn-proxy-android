@@ -60,16 +60,16 @@ internal object ProfileJson {
             put("serverAddress", p.client.serverAddress)
             put("vkLink", p.client.vkLink)
             put("threads", p.client.threads)
-            put("allocsPerStream", p.client.allocsPerStream)
+            put("streamsPerCred", p.client.streamsPerCred)
             put("useUdp", p.client.useUdp)
             put("manualCaptcha", p.client.manualCaptcha)
             put("localPort", p.client.localPort)
             put("isRawMode", p.client.isRawMode)
             put("rawCommand", p.client.rawCommand)
             put("vlessMode", p.client.vlessMode)
-            put("dnsMode", p.client.dnsMode)
-            put("forcePort443", p.client.forcePort443)
+            put("captchaSolver", p.client.captchaSolver)
             put("debugMode", p.client.debugMode)
+            put("useCarrierDns", p.client.useCarrierDns)
         })
         put("proxyListen", p.proxyListen)
         put("proxyConnect", p.proxyConnect)
@@ -94,18 +94,18 @@ internal object ProfileJson {
                 serverAddress = cliO.optString("serverAddress"),
                 vkLink = cliO.optString("vkLink"),
                 threads = cliO.optInt("threads", 4),
-                allocsPerStream = cliO.optInt("allocsPerStream", 1),
+                streamsPerCred = cliO.optInt("streamsPerCred", 10),
                 useUdp = cliO.optBoolean("useUdp", true),
                 manualCaptcha = cliO.optBoolean("manualCaptcha", false),
                 localPort = cliO.optString("localPort", "127.0.0.1:9000"),
                 isRawMode = cliO.optBoolean("isRawMode", false),
                 rawCommand = cliO.optString("rawCommand"),
                 vlessMode = cliO.optBoolean("vlessMode", false),
-                dnsMode = cliO.optString("dnsMode", DnsMode.AUTO).let {
-                    if (it in DnsMode.ALL) it else DnsMode.AUTO
+                captchaSolver = cliO.optString("captchaSolver", "v2").let {
+                    if (it == "v1" || it == "v2") it else "v2"
                 },
-                forcePort443 = cliO.optBoolean("forcePort443", false),
-                debugMode = cliO.optBoolean("debugMode", false)
+                debugMode = cliO.optBoolean("debugMode", false),
+                useCarrierDns = cliO.optBoolean("useCarrierDns", false)
             ),
             proxyListen = o.optString("proxyListen").ifBlank { "0.0.0.0:56000" },
             proxyConnect = o.optString("proxyConnect").ifBlank { "127.0.0.1:40537" }

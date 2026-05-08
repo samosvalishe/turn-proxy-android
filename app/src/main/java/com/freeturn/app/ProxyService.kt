@@ -18,7 +18,6 @@ import android.os.SystemClock
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.freeturn.app.data.AppPreferences
-import com.freeturn.app.data.DnsMode
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
@@ -51,8 +50,11 @@ class ProxyService : Service() {
         private const val NOTIF_ID_CAPTCHA = 2
         // Жёстко привязываемся к строке-объявлению капчи в бинарнике, чтобы
         // случайные localhost-URL в других логах не открывали диалог.
+        // Новое ядро (manual_captcha.go) пишет "manually open this URL: <url>".
+        // Старое — "Open this URL in your browser: <url>". Поддерживаем оба, чтобы
+        // приложение работало с кастомным ядром, оставшимся у пользователя.
         private val CAPTCHA_URL_REGEX =
-            Pattern.compile("""Open this URL in your browser:\s*(https?://\S+)""")
+            Pattern.compile("""(?:manually open this URL|Open this URL in your browser):\s*(https?://\S+)""")
 
         // События жизненного цикла соединений, публикуемые ядром (client/main.go).
         // Не-VLESS: несколько потоков со своим [STREAM N], у каждого свой Established/Closed.
@@ -145,16 +147,12 @@ class ProxyService : Service() {
         if (userStopped.get()) return
 
         val cfg = prefs.clientConfigFlow.first()
+        // Wrap-обфускация и VLESS bonding управляются на серверном экране, но
+        // должны передаваться и клиенту с тем же ключом, иначе DTLS-handshake
+        // не сойдётся. Источник истины — общий serverOpts.
+        val srv = prefs.serverOptsFlow.first()
 
-        val customBin = File(filesDir, "custom_vkturn")
-        val useCustom = customBin.exists()
-        val executable = if (useCustom) {
-            ProxyServiceState.addLog("Используется кастомное ядро из памяти телефона")
-            customBin.absolutePath
-        } else {
-            ProxyServiceState.addLog("Используется стандартное ядро из APK")
-            "${applicationInfo.nativeLibraryDir}/libvkturn.so"
-        }
+        val executable = "${applicationInfo.nativeLibraryDir}/libvkturn.so"
 
         val cmdArgs = mutableListOf<String>()
 
@@ -170,30 +168,34 @@ class ProxyService : Service() {
             cmdArgs.add(cfg.vkLink)
             cmdArgs.add("-listen"); cmdArgs.add(cfg.localPort)
             if (cfg.threads > 0) { cmdArgs.add("-n"); cmdArgs.add(cfg.threads.toString()) }
-            if (cfg.allocsPerStream > 1) { cmdArgs.add("-allocs-per-stream"); cmdArgs.add(cfg.allocsPerStream.toString()) }
+            // -streams-per-cred передаём только если пользователь поменял дефолт.
+            if (cfg.streamsPerCred > 0 && cfg.streamsPerCred != 10) {
+                cmdArgs.add("-streams-per-cred"); cmdArgs.add(cfg.streamsPerCred.toString())
+            }
             if (cfg.vlessMode) cmdArgs.add("-vless")
             else if (cfg.useUdp) cmdArgs.add("-udp")
+            // VLESS bonding имеет смысл только в VLESS-режиме.
+            if (cfg.vlessMode && srv.vlessBond) cmdArgs.add("-vless-bond")
+            // WRAP: тот же ключ, что и у сервера (хранится в EncryptedSharedPreferences).
+            // Без 64-hex ключа флаг не передаём — ядро упадёт.
+            if (srv.wrapEnabled &&
+                srv.wrapKey.length == 64 &&
+                srv.wrapKey.matches(Regex("^[0-9a-fA-F]+$"))
+            ) {
+                cmdArgs.add("-wrap")
+                cmdArgs.add("-wrap-key"); cmdArgs.add(srv.wrapKey)
+            }
             if (cfg.manualCaptcha) cmdArgs.add("--manual-captcha")
-            // -dns передаём только если пользователь выбрал не-дефолт: ядро по
-            // умолчанию уже использует auto (UDP/53 с sticky-fallback на DoH).
-            if (cfg.dnsMode in DnsMode.ALL && cfg.dnsMode != DnsMode.AUTO) {
-                cmdArgs.add("-dns"); cmdArgs.add(cfg.dnsMode)
+            if (cfg.captchaSolver != "v2") {
+                cmdArgs.add("-captcha-solver"); cmdArgs.add(cfg.captchaSolver)
             }
-            if (cfg.forcePort443) { cmdArgs.add("-port"); cmdArgs.add("443") }
             if (cfg.debugMode) cmdArgs.add("-debug")
-        }
-
-        // Кастомное ядро лежит в filesDir, откуда SELinux (untrusted_app) запрещает execve.
-        // Запускаем через системный линкер: /system/bin/linker* — ему execve разрешён,
-        // а целевой ELF мапится как данные. Работает для PIE-бинарников
-        // (Go-сборки android/arm64 PIE по умолчанию).
-        if (useCustom) {
-            val linker = if (Build.SUPPORTED_ABIS.firstOrNull()?.contains("64") == true) {
-                "/system/bin/linker64"
-            } else {
-                "/system/bin/linker"
+            if (cfg.useCarrierDns) {
+                val dns = activeNetworkDnsServers()
+                if (dns.isNotBlank()) {
+                    cmdArgs.add("-dns-servers"); cmdArgs.add(dns)
+                }
             }
-            cmdArgs.add(0, linker)
         }
 
         var exitCode = -1
@@ -542,6 +544,25 @@ class ProxyService : Service() {
 
     private fun isQuotaError(line: String): Boolean =
         line.lowercase().contains("quota")
+
+    /**
+     * DNS активной сети (оператор/Wi-Fi). Возвращает comma-separated список IP,
+     * пригодный для флага `-dns-servers` ядра. Пусто, если сеть недоступна или
+     * у linkProperties нет DNS (что норма на эмуляторе/некоторых VPN).
+     */
+    private fun activeNetworkDnsServers(): String {
+        return try {
+            val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
+            val net = cm.activeNetwork ?: return ""
+            val lp = cm.getLinkProperties(net) ?: return ""
+            lp.dnsServers
+                .mapNotNull { it.hostAddress }
+                .filter { it.isNotBlank() }
+                .joinToString(",")
+        } catch (_: Exception) {
+            ""
+        }
+    }
 
     override fun onDestroy() {
         super.onDestroy()

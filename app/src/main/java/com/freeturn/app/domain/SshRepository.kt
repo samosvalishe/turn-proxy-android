@@ -1,7 +1,12 @@
 package com.freeturn.app.domain
 
+import android.content.Context
 import com.freeturn.app.SSHManager
 import com.freeturn.app.data.SshConfig
+import com.freeturn.app.domain.server.CmdResult
+import com.freeturn.app.domain.server.ServerCommand
+import com.freeturn.app.domain.server.ServerControl
+import com.freeturn.app.domain.server.ServerOptions
 import com.freeturn.app.viewmodel.ServerState
 import com.freeturn.app.viewmodel.SshConnectionState
 import kotlinx.coroutines.delay
@@ -12,7 +17,11 @@ import kotlinx.coroutines.flow.update
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
-class SshRepository(private val sshManager: SSHManager = SSHManager()) {
+class SshRepository(
+    context: Context,
+    private val sshManager: SSHManager = SSHManager(),
+    private val serverControl: ServerControl = ServerControl(context, sshManager)
+) {
 
     var activeSshConfig: SshConfig? = null
         private set
@@ -40,19 +49,34 @@ class SshRepository(private val sshManager: SSHManager = SSHManager()) {
         }
     }
 
-    private fun logCommand(target: String) {
-        appendSshLog("  ssh $target")
+    private fun logHeader(label: String, target: String) {
+        appendSshLog("", "=== $label [${timestamp()}] ===", "  ssh $target")
     }
 
-    private val SshConfig.fp get() = hostFingerprint.ifEmpty { null }
-    private val SshConfig.key get() = if (authType == "SSH_KEY") sshKey else ""
+    private fun logCmdResult(result: CmdResult) {
+        result.logs.forEach { appendSshLog(it) }
+        when (result) {
+            is CmdResult.Ok ->
+                result.kv.forEach { (k, v) -> appendSshLog("  $k=$v") }
+            is CmdResult.Err ->
+                appendSshLog("ERROR: ${result.message}")
+        }
+    }
 
-    suspend fun runSshCommand(cfg: SshConfig, label: String, cmd: String): String {
-        appendSshLog("", "=== $label [${timestamp()}] ===")
-        logCommand("${cfg.username}@${cfg.ip}:${cfg.port}")
+    private suspend fun runCmd(cfg: SshConfig, label: String, cmd: ServerCommand): CmdResult {
+        logHeader(label, "${cfg.username}@${cfg.ip}:${cfg.port}")
+        val result = serverControl.run(cfg, cmd)
+        logCmdResult(result)
+        return result
+    }
+
+    /** Простая SSH-команда (используется только для healthcheck при подключении). */
+    private suspend fun runEcho(cfg: SshConfig): String {
+        logHeader("Подключение", "${cfg.username}@${cfg.ip}:${cfg.port}")
         val result = sshManager.executeSilentCommand(
-            cfg.ip, cfg.port, cfg.username, cfg.password, cmd,
-            knownFingerprint = cfg.fp, sshKey = cfg.key
+            cfg.ip, cfg.port, cfg.username, cfg.password, "echo OK",
+            knownFingerprint = cfg.hostFingerprint.ifEmpty { null },
+            sshKey = if (cfg.authType == "SSH_KEY") cfg.sshKey else ""
         )
         result.lines().filter { it.isNotBlank() }.forEach { appendSshLog(it) }
         return result
@@ -60,7 +84,7 @@ class SshRepository(private val sshManager: SSHManager = SSHManager()) {
 
     suspend fun connectSsh(config: SshConfig): Pair<Boolean, String?> {
         _sshState.value = SshConnectionState.Connecting
-        val result = runSshCommand(config, "Подключение", "echo OK")
+        val result = runEcho(config)
         return if (result.trim() == "OK") {
             val fp = sshManager.lastSeenFingerprint ?: config.hostFingerprint
             activeSshConfig = config.copy(hostFingerprint = fp)
@@ -87,47 +111,92 @@ class SshRepository(private val sshManager: SSHManager = SSHManager()) {
         }
         _serverState.value = ServerState.Checking
 
-        val result = runSshCommand(cfg, "Проверка состояния", ServerScripts.checkServerState)
-        _serverState.value = if (result.startsWith("ERROR")) {
-            ServerState.Error(result.removePrefix("ERROR: "))
-        } else {
-            val running = result.contains("RUNNING:YES")
-            val vlessMode = if (running) result.contains("VLESS:YES") else null
-            val known = ServerState.Known(
-                installed = result.contains("INSTALLED:YES"),
-                running = running,
-                vlessMode = vlessMode
-            )
-            known
+        when (val r = runCmd(cfg, "Проверка состояния", ServerCommand.Probe)) {
+            is CmdResult.Err -> _serverState.value = ServerState.Error(r.message)
+            is CmdResult.Ok -> {
+                val running = r.kv["RUNNING"] == "yes"
+                val installed = r.kv["INSTALLED"] == "yes"
+                val vlessMode = if (running) r.kv["VLESS"] == "yes" else null
+                val vlessBond = if (running) r.kv["VLESS_BOND"] == "yes" else null
+                val wrap      = if (running) r.kv["WRAP"] == "yes" else null
+                val version   = r.kv["VERSION"]
+                _serverState.value = ServerState.Known(
+                    installed = installed,
+                    running = running,
+                    vlessMode = vlessMode,
+                    vlessBond = vlessBond,
+                    wrap = wrap,
+                    version = version
+                )
+            }
         }
     }
 
-    suspend fun installServer() {
-        val cfg = activeSshConfig ?: return
-        if (cfg.ip.isEmpty()) return
+    /**
+     * Идемпотентная установка: скрипт сам решает, скачивать или нет (по sha256).
+     * После downloaded автоматически генерим wrap-ключ — он понадобится при
+     * первом start с включённым WRAP. Возвращаемое значение — true при успехе.
+     */
+    suspend fun installServer(): InstallOutcome {
+        val cfg = activeSshConfig ?: return InstallOutcome.Failed("not connected")
+        if (cfg.ip.isEmpty()) return InstallOutcome.Failed("no SSH config")
         _serverState.value = ServerState.Working("Установка vk-turn-proxy...")
 
-        val result = runSshCommand(cfg, "Установка", ServerScripts.installServer)
-        if (!result.contains("DONE")) {
-            val errorMsg = result.lines()
-                .filter { it.isNotBlank() }
-                .takeLast(4)
-                .joinToString("\n")
-                .ifBlank { "Нет вывода от команды — см. SSH-лог" }
-            _serverState.value = ServerState.Error(errorMsg)
-        } else {
-            delay(500)
-            checkServerState(cfg)
+        val result = runCmd(cfg, "Установка", ServerCommand.Install)
+        return when (result) {
+            is CmdResult.Err -> {
+                _serverState.value = ServerState.Error(result.message)
+                InstallOutcome.Failed(result.message)
+            }
+            is CmdResult.Ok -> {
+                val stage = result.kv["STAGE"] ?: "ok"
+                val version = result.kv["VERSION"]
+                val needsRestart = result.kv["NEEDS_RESTART"] == "yes"
+                // Если при update сервер был запущен, скрипт перезаписал бинарь,
+                // но процесс всё ещё крутит старую версию. Перезапускаем сами,
+                // иначе пользователь думает что обновился, а live-running старый.
+                if (needsRestart) {
+                    appendSshLog("  NEEDS_RESTART=yes → авто-рестарт сервера")
+                    runCmd(cfg, "Авто-остановка перед рестартом", ServerCommand.Stop)
+                    // start вызвать без аргументов нельзя — нужны listen/connect.
+                    // Их знает только VM. Сигнализируем через отдельный outcome,
+                    // VM решает, как стартовать (с актуальными prefs).
+                }
+                delay(300)
+                checkServerState(cfg)
+                InstallOutcome.Success(stage = stage, version = version, needsRestart = needsRestart)
+            }
         }
     }
 
-    suspend fun startServer(listen: String, connect: String, vlessMode: Boolean = false): Boolean {
+    suspend fun startServer(
+        listen: String,
+        connect: String,
+        vlessMode: Boolean = false,
+        vlessBond: Boolean = false,
+        wrapKey: String = ""
+    ): Boolean {
         val cfg = activeSshConfig ?: return false
         if (cfg.ip.isEmpty()) return false
 
         _serverState.value = ServerState.Working("Запуск сервера...")
-        runSshCommand(cfg, "Запуск", ServerScripts.startServer(listen, connect, vlessMode))
-        delay(2000)
+        val result = runCmd(
+            cfg, "Запуск",
+            ServerCommand.Start(
+                ServerOptions(
+                    listen = listen,
+                    connect = connect,
+                    vless = vlessMode,
+                    vlessBond = vlessBond && vlessMode,
+                    wrapKey = wrapKey
+                )
+            )
+        )
+        if (result is CmdResult.Err) {
+            _serverState.value = ServerState.Error(result.message)
+            return false
+        }
+        delay(1500)
         checkServerState(cfg)
         return true
     }
@@ -137,8 +206,12 @@ class SshRepository(private val sshManager: SSHManager = SSHManager()) {
         if (cfg.ip.isEmpty()) return
         _serverState.value = ServerState.Working("Остановка сервера...")
 
-        runSshCommand(cfg, "Остановка", ServerScripts.stopServer)
-        delay(2000)
+        val result = runCmd(cfg, "Остановка", ServerCommand.Stop)
+        if (result is CmdResult.Err) {
+            _serverState.value = ServerState.Error(result.message)
+            return
+        }
+        delay(1000)
         checkServerState(cfg)
     }
 
@@ -146,8 +219,23 @@ class SshRepository(private val sshManager: SSHManager = SSHManager()) {
         val cfg = activeSshConfig ?: return
         if (cfg.ip.isEmpty()) return
         _serverLogs.value = "…"
-        val out = runSshCommand(cfg, "server.log", ServerScripts.fetchServerLogs)
-        _serverLogs.value = out.trim().ifEmpty { "(лог пуст)" }
+        when (val r = runCmd(cfg, "server.log", ServerCommand.FetchLogs())) {
+            is CmdResult.Err -> _serverLogs.value = "ERROR: ${r.message}"
+            is CmdResult.Ok ->
+                _serverLogs.value = r.logs.joinToString("\n").ifEmpty { "(лог пуст)" }
+        }
+    }
+
+    /** Просит сервер сгенерировать новый wrap-key. Возвращает hex или null. */
+    suspend fun generateWrapKey(): String? {
+        val cfg = activeSshConfig ?: return null
+        if (cfg.ip.isEmpty()) return null
+        return when (val r = runCmd(cfg, "Генерация wrap-key", ServerCommand.GenWrapKey)) {
+            is CmdResult.Err -> null
+            is CmdResult.Ok -> r.kv["WRAPKEY"]?.takeIf {
+                it.matches(Regex("^[0-9a-fA-F]{64}$"))
+            }
+        }
     }
 
     fun updateServerState(state: ServerState) {
@@ -159,4 +247,18 @@ class SshRepository(private val sshManager: SSHManager = SSHManager()) {
         _serverLogs.value = null
         _sshLog.value = emptyList()
     }
+}
+
+sealed class InstallOutcome {
+    /**
+     * stage: cached | downloaded; version — только если ядро вернуло.
+     * needsRestart — true, если бинарь был переустановлен поверх работающего
+     * процесса; перед использованием новой версии нужен start.
+     */
+    data class Success(
+        val stage: String,
+        val version: String?,
+        val needsRestart: Boolean = false
+    ) : InstallOutcome()
+    data class Failed(val message: String) : InstallOutcome()
 }

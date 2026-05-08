@@ -3,7 +3,6 @@ package com.freeturn.app.viewmodel
 import android.app.Application
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.freeturn.app.ProxyService
@@ -30,7 +29,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs = AppPreferences(application)
-    private val sshRepository = SshRepository()
+    private val sshRepository = SshRepository(application)
     private val proxyManager = LocalProxyManager(application)
     private val appUpdater = AppUpdater(application)
 
@@ -41,7 +40,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val proxyState: StateFlow<ProxyState> = proxyManager.proxyState
     val connectedSince: StateFlow<Long?> = ProxyServiceState.connectedSince
     val logs: StateFlow<List<String>> = ProxyServiceState.logs
-    val customKernelExists: StateFlow<Boolean> = proxyManager.customKernelExists
     val updateState: StateFlow<UpdateState> = appUpdater.state
 
     private val _isInitialized = MutableStateFlow(false)
@@ -279,9 +277,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // Server management
+    val serverOpts: StateFlow<AppPreferences.ServerOpts> = prefs.serverOptsFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppPreferences.ServerOpts())
+
+    private val _serverInstallStage = MutableStateFlow<String?>(null)
+    /** Последний результат install: "cached" | "downloaded" | null. */
+    val serverInstallStage: StateFlow<String?> = _serverInstallStage.asStateFlow()
+
+    private val _isRegeneratingWrapKey = MutableStateFlow(false)
+    /** true — пока крутится gen-wrap-key + последующий рестарт сервера/клиента. */
+    val isRegeneratingWrapKey: StateFlow<Boolean> = _isRegeneratingWrapKey.asStateFlow()
+
     fun installServer() {
-        viewModelScope.launch { sshRepository.installServer() }
+        viewModelScope.launch {
+            _serverInstallStage.value = null
+            val outcome = sshRepository.installServer()
+            if (outcome is com.freeturn.app.domain.InstallOutcome.Success) {
+                _serverInstallStage.value = outcome.stage
+                // Авто-генерация wrap-key после первого скачивания, если ещё нет.
+                if (outcome.stage == "downloaded") {
+                    val current = prefs.serverOptsFlow.first()
+                    if (current.wrapKey.isBlank()) {
+                        val key = sshRepository.generateWrapKey()
+                        if (!key.isNullOrBlank()) {
+                            prefs.saveServerOpts(current.copy(wrapKey = key))
+                        }
+                    }
+                }
+                // Скрипт переустановил бинарь поверх работающего процесса —
+                // SshRepository уже вызвал stop, осталось стартануть с актуальными
+                // listen/connect и serverOpts (их знает только VM).
+                if (outcome.needsRestart) {
+                    startServer()
+                    restartProxyIfRunning()
+                }
+            }
+        }
     }
+
+    fun consumeInstallStage() { _serverInstallStage.value = null }
 
     fun startServer() {
         val l = proxyListen.value
@@ -291,7 +325,92 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         val vless = clientConfig.value.vlessMode
-        viewModelScope.launch { sshRepository.startServer(l, c, vless) }
+        val opts = serverOpts.value
+        val wrapKey = if (opts.wrapEnabled) opts.wrapKey else ""
+        viewModelScope.launch {
+            sshRepository.startServer(
+                listen = l, connect = c,
+                vlessMode = vless,
+                vlessBond = opts.vlessBond,
+                wrapKey = wrapKey
+            )
+        }
+    }
+
+    fun setServerVlessBond(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = prefs.serverOptsFlow.first()
+            if (current.vlessBond == enabled) return@launch
+            prefs.saveServerOpts(current.copy(vlessBond = enabled))
+            restartServerIfRunning()
+            restartProxyIfRunning()
+        }
+    }
+
+    fun setServerWrapEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = prefs.serverOptsFlow.first()
+            if (current.wrapEnabled == enabled) return@launch
+            // При первом включении wrap, если ключа ещё нет — пробуем взять с сервера.
+            var next = current.copy(wrapEnabled = enabled)
+            if (enabled && next.wrapKey.isBlank()) {
+                val key = sshRepository.generateWrapKey()
+                if (!key.isNullOrBlank()) next = next.copy(wrapKey = key)
+            }
+            prefs.saveServerOpts(next)
+            restartServerIfRunning()
+            restartProxyIfRunning()
+        }
+    }
+
+    fun regenerateWrapKey() {
+        viewModelScope.launch {
+            if (_isRegeneratingWrapKey.value) return@launch
+            _isRegeneratingWrapKey.value = true
+            try {
+                val key = sshRepository.generateWrapKey() ?: return@launch
+                val current = prefs.serverOptsFlow.first()
+                prefs.saveServerOpts(current.copy(wrapKey = key))
+                restartServerIfRunning()
+                restartProxyIfRunning()
+            } finally {
+                _isRegeneratingWrapKey.value = false
+            }
+        }
+    }
+
+    /** Перезапускает сервер с актуальными опциями, если он сейчас запущен. */
+    private suspend fun restartServerIfRunning() {
+        val running = (serverState.value as? ServerState.Known)?.running == true
+        if (!running) return
+        val l = proxyListen.value
+        val c = proxyConnect.value
+        if (!l.matches(Regex("""^[\w.\-]+:\d{1,5}$""")) ||
+            !c.matches(Regex("""^[\w.\-]+:\d{1,5}$"""))) return
+        val opts = prefs.serverOptsFlow.first()
+        val vless = clientConfig.value.vlessMode
+        sshRepository.stopServer()
+        sshRepository.startServer(
+            listen = l, connect = c,
+            vlessMode = vless,
+            vlessBond = opts.vlessBond,
+            wrapKey = if (opts.wrapEnabled) opts.wrapKey else ""
+        )
+    }
+
+    /**
+     * Перезапускает локальный клиент с актуальным ClientConfig + serverOpts,
+     * если он сейчас работает. Используется после изменения sync-флагов
+     * (vlessMode/vlessBond/wrap*), чтобы клиент и сервер не разъехались по
+     * параметрам после отдельного рестарта сервера.
+     */
+    private suspend fun restartProxyIfRunning() {
+        if (!ProxyServiceState.isRunning.value) return
+        proxyManager.stopProxy()
+        withTimeoutOrNull(2_000) {
+            ProxyServiceState.isRunning.first { !it }
+        }
+        proxyManager.startProxy(clientConfig.value)
     }
 
     fun stopServer() {
@@ -310,6 +429,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 sshRepository.stopServer()
                 startServer()
             }
+            restartProxyIfRunning()
         }
     }
 
@@ -349,24 +469,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setOnboardingDone() {
         viewModelScope.launch { prefs.setOnboardingDone(true) }
-    }
-
-    // Custom kernel
-    private val _kernelError = MutableStateFlow<String?>(null)
-    val kernelError: StateFlow<String?> = _kernelError.asStateFlow()
-
-    fun setCustomKernel(uri: Uri) {
-        viewModelScope.launch {
-            _kernelError.value = proxyManager.setCustomKernel(uri)
-        }
-    }
-
-    fun clearCustomKernel() {
-        proxyManager.clearCustomKernel()
-    }
-
-    fun clearKernelError() {
-        _kernelError.value = null
     }
 
     // App update

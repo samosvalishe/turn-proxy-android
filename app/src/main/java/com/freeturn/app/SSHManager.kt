@@ -8,6 +8,7 @@ import com.jcraft.jsch.Session
 import com.jcraft.jsch.UserInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayInputStream
 import java.security.MessageDigest
 import java.util.Base64
 import java.util.Properties
@@ -30,7 +31,12 @@ class SSHManager {
     suspend fun executeSilentCommand(
         ip: String, port: Int, user: String, pass: String, command: String,
         knownFingerprint: String? = null,
-        sshKey: String = ""
+        sshKey: String = "",
+        /**
+         * Таймаут на чтение из канала (мс). Защита от зависания, когда
+         * соединение установлено, но удалённый процесс молчит.
+         */
+        execTimeoutMs: Int = 30_000
     ): String = withContext(Dispatchers.IO) {
         val tofu = TofuHostKeyRepository(knownFingerprint)
         var tempSession: Session? = null
@@ -52,6 +58,9 @@ class SSHManager {
             config["StrictHostKeyChecking"] = "no"
             tempSession.setConfig(config)
             tempSession.connect(5000)
+            // Socket-таймаут на I/O: если за execTimeoutMs не пришло ни байта,
+            // read() бросит SocketTimeoutException вместо вечного ожидания.
+            tempSession.timeout = execTimeoutMs
 
             lastSeenFingerprint = tofu.capturedFingerprint
 
@@ -65,7 +74,7 @@ class SSHManager {
 
             // Получаем stdout-поток ДО connect() — после уже нельзя
             val inStream = channel.inputStream
-            channel.connect()
+            channel.connect(execTimeoutMs)
 
             val output = inStream.bufferedReader().use { reader ->
                 buildString {
@@ -94,6 +103,76 @@ class SSHManager {
         }
     }
 
+    /**
+     * Выполняет команду по SSH, передавая [stdin] через стандартный ввод процесса.
+     * Используется для стрима asset-скрипта (`bash -s -- args`) без записи на сервер.
+     * Возвращает stdout+stderr команды (CRLF→LF).
+     */
+    suspend fun executeWithStdin(
+        ip: String, port: Int, user: String, pass: String,
+        command: String, stdin: String,
+        knownFingerprint: String? = null,
+        sshKey: String = "",
+        /**
+         * Таймаут на чтение из канала (мс). Дефолт > чем у обычного exec,
+         * потому что серверный install качает бинарь с GitHub.
+         */
+        execTimeoutMs: Int = 180_000
+    ): String = withContext(Dispatchers.IO) {
+        val tofu = TofuHostKeyRepository(knownFingerprint)
+        var tempSession: Session? = null
+        try {
+            val jsch = JSch()
+            if (sshKey.isNotBlank()) {
+                jsch.addIdentity("identity", sshKey.toByteArray(Charsets.UTF_8), null, null)
+            }
+            tempSession = jsch.getSession(user, ip, port)
+            if (sshKey.isBlank()) tempSession.setPassword(pass)
+            tempSession.hostKeyRepository = tofu
+            val config = Properties()
+            config["StrictHostKeyChecking"] = "no"
+            tempSession.setConfig(config)
+            tempSession.connect(5000)
+            tempSession.timeout = execTimeoutMs
+
+            lastSeenFingerprint = tofu.capturedFingerprint
+
+            val channel = tempSession.openChannel("exec") as ChannelExec
+            val sanitized = command.replace("\r\n", "\n").replace("\r", "\n")
+            channel.setCommand("exec 2>&1\n$sanitized")
+            // Нормализуем переносы строк stdin: Kotlin source может содержать
+            // CRLF, что ломает bash heredoc/parser.
+            val stdinLf = stdin.replace("\r\n", "\n").replace("\r", "\n")
+            channel.setInputStream(ByteArrayInputStream(stdinLf.toByteArray(Charsets.UTF_8)))
+
+            val inStream = channel.inputStream
+            channel.connect(execTimeoutMs)
+
+            val output = inStream.bufferedReader().use { reader ->
+                buildString {
+                    var line: String?
+                    while (reader.readLine().also { line = it } != null) {
+                        append(line).append("\n")
+                    }
+                }
+            }
+            channel.disconnect()
+            output.trim()
+        } catch (e: Exception) {
+            val isMitm = tofu.capturedFingerprint != null
+                && knownFingerprint != null
+                && tofu.capturedFingerprint != knownFingerprint
+            if (isMitm) {
+                "ERROR: Отпечаток сервера изменился — возможна MITM-атака\n" +
+                "Ожидался: $knownFingerprint\n" +
+                "Получен:  ${tofu.capturedFingerprint}"
+            } else {
+                "ERROR: ${e.message}"
+            }
+        } finally {
+            tempSession?.disconnect()
+        }
+    }
 }
 
 /**

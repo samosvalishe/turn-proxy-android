@@ -1,33 +1,33 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class
+)
 
 package com.freeturn.app.ui.screens
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
@@ -47,15 +47,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.data.ClientConfig
-import com.freeturn.app.data.DnsMode
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.viewmodel.MainViewModel
+import com.freeturn.app.viewmodel.SshConnectionState
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
@@ -72,28 +71,35 @@ fun ClientSetupScreen(
 ) {
     val saved by viewModel.clientConfig.collectAsStateWithLifecycle()
     val sshConfig by viewModel.sshConfig.collectAsStateWithLifecycle()
+    val sshState by viewModel.sshState.collectAsStateWithLifecycle()
+    val serverState by viewModel.serverState.collectAsStateWithLifecycle()
+    val serverOpts by viewModel.serverOpts.collectAsStateWithLifecycle()
     val proxyListen by viewModel.proxyListen.collectAsStateWithLifecycle()
-    val customKernelExists by viewModel.customKernelExists.collectAsStateWithLifecycle()
-    val kernelError by viewModel.kernelError.collectAsStateWithLifecycle()
     val privacyMode by viewModel.privacyMode.collectAsStateWithLifecycle()
+    val isRegeneratingWrapKey by viewModel.isRegeneratingWrapKey.collectAsStateWithLifecycle()
+
+    val isSshConnected = sshState is SshConnectionState.Connected
+    val serverKnown = serverState as? com.freeturn.app.viewmodel.ServerState.Known
+    // Эффективное значение sync-флага: если сервер запущен — реальное состояние
+    // из probe; иначе — последнее сохранённое (frozen).
+    val effectiveVlessMode = serverKnown?.vlessMode ?: saved.vlessMode
+    val effectiveVlessBond = serverKnown?.vlessBond ?: serverOpts.vlessBond
+    val effectiveWrap      = serverKnown?.wrap      ?: serverOpts.wrapEnabled
 
     val context = LocalContext.current
-
-    val kernelPickerLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri -> uri?.let { viewModel.setCustomKernel(it) } }
 
     var serverAddress by rememberSaveable(saved.serverAddress) { mutableStateOf(saved.serverAddress) }
     var vkLink       by rememberSaveable(saved.vkLink)         { mutableStateOf(saved.vkLink) }
     var threads      by rememberSaveable(saved.threads)        { mutableFloatStateOf(saved.threads.toFloat()) }
-    var allocsPerStream by rememberSaveable(saved.allocsPerStream) { mutableIntStateOf(saved.allocsPerStream) }
+    var streamsPerCred by rememberSaveable(saved.streamsPerCred) { mutableFloatStateOf(saved.streamsPerCred.toFloat()) }
     var useUdp       by rememberSaveable(saved.useUdp)         { mutableStateOf(saved.useUdp) }
     var manualCaptcha by rememberSaveable(saved.manualCaptcha) { mutableStateOf(saved.manualCaptcha) }
+    var useCarrierDns by rememberSaveable(saved.useCarrierDns) { mutableStateOf(saved.useCarrierDns) }
     var localPort    by rememberSaveable(saved.localPort)      { mutableStateOf(saved.localPort) }
-    var dnsMode by rememberSaveable(saved.dnsMode) { mutableStateOf(saved.dnsMode) }
-    var forcePort443 by rememberSaveable(saved.forcePort443) { mutableStateOf(saved.forcePort443) }
+    var captchaSolver by rememberSaveable(saved.captchaSolver) { mutableStateOf(saved.captchaSolver) }
     var debugMode by rememberSaveable(saved.debugMode) { mutableStateOf(saved.debugMode) }
     var lastSliderInt by rememberSaveable { mutableIntStateOf(saved.threads) }
+    var lastStreamsInt by rememberSaveable { mutableIntStateOf(saved.streamsPerCred) }
 
     // Автозаполнение адреса сервера из SSH-конфига если поле пустое
     LaunchedEffect(sshConfig.ip, proxyListen) {
@@ -105,21 +111,21 @@ fun ClientSetupScreen(
 
     // Авто-сохранение с дебаунсом 600 мс на каждое изменение поля.
     // vlessMode исключён — сохраняется через setVlessMode с автоперезапуском сервера.
-    LaunchedEffect(serverAddress, vkLink, threads, allocsPerStream, useUdp, manualCaptcha, localPort, dnsMode, forcePort443, debugMode) {
+    LaunchedEffect(serverAddress, vkLink, threads, streamsPerCred, useUdp, manualCaptcha, useCarrierDns, localPort, captchaSolver, debugMode) {
         delay(600)
         viewModel.saveClientConfig(
             ClientConfig(
                 serverAddress = serverAddress.trim(),
                 vkLink        = vkLink.trim(),
                 threads       = threads.roundToInt(),
-                allocsPerStream = allocsPerStream,
+                streamsPerCred = streamsPerCred.roundToInt(),
                 useUdp        = useUdp,
                 manualCaptcha = manualCaptcha,
                 localPort     = localPort.trim(),
                 vlessMode     = saved.vlessMode,
-                dnsMode       = dnsMode,
-                forcePort443  = forcePort443,
-                debugMode     = debugMode
+                captchaSolver = captchaSolver,
+                debugMode     = debugMode,
+                useCarrierDns = useCarrierDns
             )
         )
     }
@@ -220,58 +226,31 @@ fun ClientSetupScreen(
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        stringResource(R.string.allocs_per_stream_label),
+                        stringResource(R.string.streams_per_cred_format, streamsPerCred.roundToInt()),
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
-                        stringResource(R.string.allocs_per_stream_recommendation),
+                        stringResource(R.string.streams_per_cred_recommendation),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    val allocsOptions = listOf(1, 2, 3)
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        allocsOptions.forEachIndexed { idx, value ->
-                            SegmentedButton(
-                                selected = allocsPerStream == value,
-                                onClick = {
-                                    HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                    allocsPerStream = value
-                                },
-                                shape = SegmentedButtonDefaults.itemShape(index = idx, count = allocsOptions.size)
-                            ) { Text(value.toString()) }
-                        }
-                    }
-                }
-
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Column {
-                        Text(stringResource(R.string.dns_mode_title), style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            stringResource(R.string.dns_mode_desc),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    val dnsOptions = listOf(
-                        DnsMode.AUTO to stringResource(R.string.dns_mode_auto),
-                        DnsMode.UDP to stringResource(R.string.dns_mode_udp),
-                        DnsMode.DOH to stringResource(R.string.dns_mode_doh)
+                    Slider(
+                        value = streamsPerCred,
+                        onValueChange = {
+                            val v = it.roundToInt()
+                            if (v != lastStreamsInt) {
+                                HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
+                                lastStreamsInt = v
+                            }
+                            streamsPerCred = it
+                        },
+                        valueRange = 1f..50f,
+                        steps = 0,
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        dnsOptions.forEachIndexed { idx, (value, label) ->
-                            SegmentedButton(
-                                selected = dnsMode == value,
-                                onClick = {
-                                    HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                    dnsMode = value
-                                },
-                                shape = SegmentedButtonDefaults.itemShape(index = idx, count = dnsOptions.size)
-                            ) { Text(label) }
-                        }
-                    }
                 }
 
-                if (!saved.vlessMode) {
+                if (!effectiveVlessMode) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Column {
                             Text(stringResource(R.string.transport_protocol), style = MaterialTheme.typography.bodyMedium)
@@ -300,18 +279,31 @@ fun ClientSetupScreen(
                             ) { Text(stringResource(R.string.udp)) }
                         }
                     }
-
                 }
 
-                SwitchRow(
-                    label = stringResource(R.string.vless_mode),
-                    description = stringResource(R.string.vless_mode_desc),
-                    checked = saved.vlessMode,
-                    onCheckedChange = {
-                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                        viewModel.setVlessMode(it)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column {
+                        Text(stringResource(R.string.captcha_solver_title), style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            stringResource(R.string.captcha_solver_desc),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-                )
+                    val solverOptions = listOf("v2", "v1")
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        solverOptions.forEachIndexed { idx, value ->
+                            SegmentedButton(
+                                selected = captchaSolver == value,
+                                onClick = {
+                                    HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                                    captchaSolver = value
+                                },
+                                shape = SegmentedButtonDefaults.itemShape(index = idx, count = solverOptions.size)
+                            ) { Text(value) }
+                        }
+                    }
+                }
 
                 SwitchRow(
                     label = stringResource(R.string.manual_captcha),
@@ -324,12 +316,12 @@ fun ClientSetupScreen(
                 )
 
                 SwitchRow(
-                    label = stringResource(R.string.force_port_443),
-                    description = stringResource(R.string.force_port_443_desc),
-                    checked = forcePort443,
+                    label = stringResource(R.string.use_carrier_dns),
+                    description = stringResource(R.string.use_carrier_dns_desc),
+                    checked = useCarrierDns,
                     onCheckedChange = {
                         HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                        forcePort443 = it
+                        useCarrierDns = it
                     }
                 )
 
@@ -345,94 +337,109 @@ fun ClientSetupScreen(
 
                 HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
 
-                // Ядро
-                Text(stringResource(R.string.core_title), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.server_sync_section),
+                    style = MaterialTheme.typography.titleMedium
+                )
 
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (customKernelExists)
-                            MaterialTheme.colorScheme.secondaryContainer
-                        else
-                            MaterialTheme.colorScheme.surfaceVariant
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                painter = painterResource(
-                                    if (customKernelExists) R.drawable.check_circle_24px
-                                    else R.drawable.memory_24px
-                                ),
-                                contentDescription = null,
-                                tint = if (customKernelExists)
-                                    MaterialTheme.colorScheme.primary
-                                else
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                Text(
-                                    if (customKernelExists) stringResource(R.string.custom_core)
-                                    else stringResource(R.string.builtin_core),
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                                Text(
-                                    if (customKernelExists) stringResource(R.string.loaded_from_memory)
-                                    else stringResource(R.string.from_apk),
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                        if (customKernelExists) {
-                            IconButton(onClick = {
-                                HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                                viewModel.clearCustomKernel()
-                            }) {
-                                Icon(
-                                    painter = painterResource(R.drawable.delete_24px),
-                                    contentDescription = stringResource(R.string.reset),
-                                    tint = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        } else {
-                            FilledTonalButton(onClick = {
-                                HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                                viewModel.clearKernelError()
-                                kernelPickerLauncher.launch(arrayOf("*/*"))
-                            }) {
-                                Text(stringResource(R.string.btn_load))
-                            }
-                        }
+                // VLESS-режим — sync с сервером (-vless на обеих сторонах).
+                // Без SSH-подключения замораживается на последнем известном значении.
+                SwitchRow(
+                    label = stringResource(R.string.vless_mode),
+                    description = if (isSshConnected)
+                        stringResource(R.string.vless_mode_desc)
+                    else
+                        stringResource(R.string.locked_disconnect_hint),
+                    checked = effectiveVlessMode,
+                    enabled = isSshConnected,
+                    onCheckedChange = {
+                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                        viewModel.setVlessMode(it)
                     }
-                }
+                )
 
-                if (kernelError != null) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            painter = painterResource(R.drawable.error_24px),
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            kernelError!!,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.error
-                        )
+                SwitchRow(
+                    label = stringResource(R.string.client_vless_bond),
+                    description = if (isSshConnected)
+                        stringResource(R.string.client_vless_bond_desc)
+                    else
+                        stringResource(R.string.locked_disconnect_hint),
+                    checked = effectiveVlessBond,
+                    enabled = isSshConnected && effectiveVlessMode,
+                    onCheckedChange = {
+                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                        viewModel.setServerVlessBond(it)
+                    }
+                )
+
+                SwitchRow(
+                    label = stringResource(R.string.client_wrap_enabled),
+                    description = if (isSshConnected)
+                        stringResource(R.string.client_wrap_desc)
+                    else
+                        stringResource(R.string.locked_disconnect_hint),
+                    checked = effectiveWrap,
+                    enabled = isSshConnected,
+                    onCheckedChange = {
+                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                        viewModel.setServerWrapEnabled(it)
+                    }
+                )
+
+                if (effectiveWrap) {
+                    OutlinedTextField(
+                        value = serverOpts.wrapKey.redact(privacyMode),
+                        onValueChange = { /* read-only */ },
+                        label = { Text(stringResource(R.string.server_wrap_key_label)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        readOnly = true,
+                        singleLine = true,
+                        trailingIcon = {
+                            if (serverOpts.wrapKey.isNotBlank() && !privacyMode) {
+                                IconButton(onClick = {
+                                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                                    val cm = context.getSystemService(android.content.ClipboardManager::class.java)
+                                    cm?.setPrimaryClip(
+                                        android.content.ClipData.newPlainText("wrap-key", serverOpts.wrapKey)
+                                    )
+                                }) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.content_copy_24px),
+                                        contentDescription = stringResource(R.string.copy)
+                                    )
+                                }
+                            }
+                        },
+                        supportingText = {
+                            if (serverOpts.wrapKey.isBlank()) {
+                                Text(
+                                    stringResource(R.string.wrap_key_empty_hint),
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    )
+                    if (isSshConnected) {
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            androidx.compose.material3.TextButton(
+                                onClick = {
+                                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                                    viewModel.regenerateWrapKey()
+                                },
+                                enabled = !isRegeneratingWrapKey,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                if (isRegeneratingWrapKey) {
+                                    androidx.compose.material3.CircularWavyProgressIndicator(
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(Modifier.size(8.dp))
+                                    Text(stringResource(R.string.server_wrap_regen_in_progress))
+                                } else {
+                                    Text(stringResource(R.string.server_wrap_regen))
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -460,6 +467,7 @@ private fun SwitchRow(
     label: String,
     description: String,
     checked: Boolean,
+    enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit
 ) {
     Row(
@@ -468,13 +476,18 @@ private fun SwitchRow(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.bodyMedium)
+            Text(
+                label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (enabled) MaterialTheme.colorScheme.onSurface
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            )
             Text(
                 description,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(checked = checked, enabled = enabled, onCheckedChange = onCheckedChange)
     }
 }

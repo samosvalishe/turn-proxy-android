@@ -254,7 +254,7 @@ fun HomeScreen(
                         Spacer(Modifier.height(12.dp))
                         ConfigRow(stringResource(R.string.server), clientConfig.serverAddress.redact(privacyMode))
                         ConfigRow(stringResource(R.string.threads), "${clientConfig.threads}")
-                        ConfigRow(stringResource(R.string.allocs_per_stream_label), "${clientConfig.allocsPerStream}")
+                        ConfigRow(stringResource(R.string.streams_per_cred_label), "${clientConfig.streamsPerCred}")
                         ConfigRow(
                             stringResource(R.string.transport_protocol),
                             if (clientConfig.vlessMode) "VLESS"
