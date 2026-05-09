@@ -215,11 +215,15 @@ class SshRepository(
         checkServerState(cfg)
     }
 
-    suspend fun fetchServerLogs() {
+    fun clearServerLogs() {
+        _serverLogs.value = null
+    }
+
+    suspend fun fetchServerLogs(lines: Int = 200) {
         val cfg = activeSshConfig ?: return
         if (cfg.ip.isEmpty()) return
         _serverLogs.value = "…"
-        when (val r = runCmd(cfg, "server.log", ServerCommand.FetchLogs())) {
+        when (val r = runCmd(cfg, "server.log", ServerCommand.FetchLogs(lines))) {
             is CmdResult.Err -> _serverLogs.value = "ERROR: ${r.message}"
             is CmdResult.Ok ->
                 _serverLogs.value = r.logs.joinToString("\n").ifEmpty { "(лог пуст)" }

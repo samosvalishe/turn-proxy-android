@@ -2,6 +2,11 @@
 
 package com.freeturn.app.ui.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -79,6 +84,8 @@ fun ServerManagementScreen(
     val sshLog by viewModel.sshLog.collectAsStateWithLifecycle()
     val privacyMode by viewModel.privacyMode.collectAsStateWithLifecycle()
     val installStage by viewModel.serverInstallStage.collectAsStateWithLifecycle()
+    val clientCfg by viewModel.clientConfig.collectAsStateWithLifecycle()
+    val serverLogs by viewModel.serverLogs.collectAsStateWithLifecycle()
 
     var proxyListenPort by rememberSaveable(savedListen) { mutableStateOf(savedListen.substringAfterLast(":", "56000")) }
     var proxyConnect by rememberSaveable(savedConnect) { mutableStateOf(savedConnect) }
@@ -125,6 +132,26 @@ fun ServerManagementScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Spacer(Modifier.height(4.dp))
+
+                AnimatedVisibility(
+                    visible = !clientCfg.syncServerSwitches,
+                    enter = fadeIn() + expandVertically(),
+                    exit = fadeOut() + shrinkVertically()
+                ) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Text(
+                            stringResource(R.string.sync_off_banner),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    }
+                }
 
                 // Status card
                 Card(modifier = Modifier.fillMaxWidth()) {
@@ -289,6 +316,77 @@ fun ServerManagementScreen(
                         Spacer(Modifier.width(8.dp))
                         Icon(painterResource(R.drawable.arrow_forward_24px), null)
                     }
+                }
+
+                // Журнал сервера (journalctl/server.log через SSH).
+                // Скрываем без SSH-подключения — симметрично с SSH-логом ниже.
+                if (isConnected) {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                stringResource(R.string.server_journal_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.weight(1f)
+                            )
+                            androidx.compose.material3.IconButton(
+                                onClick = {
+                                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                                    viewModel.fetchServerLogs()
+                                },
+                                enabled = isConnected && serverLogs != "…"
+                            ) {
+                                Icon(
+                                    painter = painterResource(R.drawable.refresh_24px),
+                                    contentDescription = stringResource(R.string.server_journal_refresh)
+                                )
+                            }
+                            if (serverLogs != null) {
+                                androidx.compose.material3.IconButton(
+                                    onClick = {
+                                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                                        viewModel.clearServerLogs()
+                                    },
+                                    enabled = serverLogs != "…"
+                                ) {
+                                    Icon(
+                                        painter = painterResource(R.drawable.delete_24px),
+                                        contentDescription = stringResource(R.string.server_journal_clear)
+                                    )
+                                }
+                            }
+                        }
+                        if (serverLogs != null) {
+                            Spacer(Modifier.height(12.dp))
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            ) {
+                                val text = when (serverLogs) {
+                                    "…"  -> stringResource(R.string.server_journal_loading)
+                                    "(лог пуст)" -> stringResource(R.string.server_journal_empty)
+                                    else -> serverLogs ?: ""
+                                }
+                                Text(
+                                    text = text,
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontFamily = FontFamily.Monospace
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 400.dp)
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(10.dp)
+                                )
+                            }
+                        }
+                    }
+                }
                 }
 
                 // SSH-лог (вывод всех команд)

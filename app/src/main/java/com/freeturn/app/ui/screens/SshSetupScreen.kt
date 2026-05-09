@@ -307,7 +307,7 @@ private fun ConnectionProgressCard(step: String) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(4.dp)
+        elevation = CardDefaults.cardElevation(1.dp)
     ) {
         Column(
             modifier = Modifier.padding(24.dp),

@@ -70,6 +70,7 @@ internal object ProfileJson {
             put("captchaSolver", p.client.captchaSolver)
             put("debugMode", p.client.debugMode)
             put("useCarrierDns", p.client.useCarrierDns)
+            put("syncServerSwitches", p.client.syncServerSwitches)
         })
         put("proxyListen", p.proxyListen)
         put("proxyConnect", p.proxyConnect)
@@ -105,7 +106,8 @@ internal object ProfileJson {
                     if (it == "v1" || it == "v2") it else "v2"
                 },
                 debugMode = cliO.optBoolean("debugMode", false),
-                useCarrierDns = cliO.optBoolean("useCarrierDns", false)
+                useCarrierDns = cliO.optBoolean("useCarrierDns", false),
+                syncServerSwitches = cliO.optBoolean("syncServerSwitches", true)
             ),
             proxyListen = o.optString("proxyListen").ifBlank { "0.0.0.0:56000" },
             proxyConnect = o.optString("proxyConnect").ifBlank { "127.0.0.1:40537" }

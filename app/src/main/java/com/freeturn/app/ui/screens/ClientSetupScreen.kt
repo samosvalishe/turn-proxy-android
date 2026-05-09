@@ -80,11 +80,13 @@ fun ClientSetupScreen(
 
     val isSshConnected = sshState is SshConnectionState.Connected
     val serverKnown = serverState as? com.freeturn.app.viewmodel.ServerState.Known
-    // Эффективное значение sync-флага: если сервер запущен — реальное состояние
-    // из probe; иначе — последнее сохранённое (frozen).
-    val effectiveVlessMode = serverKnown?.vlessMode ?: saved.vlessMode
-    val effectiveVlessBond = serverKnown?.vlessBond ?: serverOpts.vlessBond
-    val effectiveWrap      = serverKnown?.wrap      ?: serverOpts.wrapEnabled
+    // В sync-режиме эффективное значение — реальное состояние сервера из probe
+    // (если запущен), иначе сохранённое. В !sync режиме — всегда сохранённое:
+    // серверная и клиентская стороны могут различаться, и UI отражает клиента.
+    val syncOn = saved.syncServerSwitches
+    val effectiveVlessMode = if (syncOn) serverKnown?.vlessMode ?: saved.vlessMode else saved.vlessMode
+    val effectiveVlessBond = if (syncOn) serverKnown?.vlessBond ?: serverOpts.vlessBond else serverOpts.vlessBond
+    val effectiveWrap      = if (syncOn) serverKnown?.wrap      ?: serverOpts.wrapEnabled else serverOpts.wrapEnabled
 
     val context = LocalContext.current
 
@@ -125,7 +127,8 @@ fun ClientSetupScreen(
                 vlessMode     = saved.vlessMode,
                 captchaSolver = captchaSolver,
                 debugMode     = debugMode,
-                useCarrierDns = useCarrierDns
+                useCarrierDns = useCarrierDns,
+                syncServerSwitches = saved.syncServerSwitches
             )
         )
     }
@@ -342,16 +345,28 @@ fun ClientSetupScreen(
                     style = MaterialTheme.typography.titleMedium
                 )
 
-                // VLESS-режим — sync с сервером (-vless на обеих сторонах).
-                // Без SSH-подключения замораживается на последнем известном значении.
+                SwitchRow(
+                    label = stringResource(R.string.sync_server_switches),
+                    description = stringResource(R.string.sync_server_switches_desc),
+                    checked = syncOn,
+                    onCheckedChange = {
+                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                        viewModel.setSyncServerSwitches(it)
+                    }
+                )
+
+                // В sync-режиме менять эти флаги без SSH опасно (рассинхрон).
+                // В !sync — клиентские, SSH не нужен.
+                val controlsEnabled = if (syncOn) isSshConnected else true
+                val lockedHint = if (syncOn)
+                    stringResource(R.string.locked_disconnect_hint) else null
+
                 SwitchRow(
                     label = stringResource(R.string.vless_mode),
-                    description = if (isSshConnected)
-                        stringResource(R.string.vless_mode_desc)
-                    else
-                        stringResource(R.string.locked_disconnect_hint),
+                    description = lockedHint?.takeIf { !isSshConnected }
+                        ?: stringResource(R.string.vless_mode_desc),
                     checked = effectiveVlessMode,
-                    enabled = isSshConnected,
+                    enabled = controlsEnabled,
                     onCheckedChange = {
                         HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
                         viewModel.setVlessMode(it)
@@ -360,12 +375,10 @@ fun ClientSetupScreen(
 
                 SwitchRow(
                     label = stringResource(R.string.client_vless_bond),
-                    description = if (isSshConnected)
-                        stringResource(R.string.client_vless_bond_desc)
-                    else
-                        stringResource(R.string.locked_disconnect_hint),
+                    description = lockedHint?.takeIf { !isSshConnected }
+                        ?: stringResource(R.string.client_vless_bond_desc),
                     checked = effectiveVlessBond,
-                    enabled = isSshConnected && effectiveVlessMode,
+                    enabled = controlsEnabled && effectiveVlessMode,
                     onCheckedChange = {
                         HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
                         viewModel.setServerVlessBond(it)
@@ -374,12 +387,10 @@ fun ClientSetupScreen(
 
                 SwitchRow(
                     label = stringResource(R.string.client_wrap_enabled),
-                    description = if (isSshConnected)
-                        stringResource(R.string.client_wrap_desc)
-                    else
-                        stringResource(R.string.locked_disconnect_hint),
+                    description = lockedHint?.takeIf { !isSshConnected }
+                        ?: stringResource(R.string.client_wrap_desc),
                     checked = effectiveWrap,
-                    enabled = isSshConnected,
+                    enabled = controlsEnabled,
                     onCheckedChange = {
                         HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
                         viewModel.setServerWrapEnabled(it)

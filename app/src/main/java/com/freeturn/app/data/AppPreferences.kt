@@ -47,7 +47,13 @@ data class ClientConfig(
     // Если true — добавляется флаг -debug для расширенного вывода в логах.
     val debugMode: Boolean = false,
     // Если true — в argv передаётся -dns-servers с DNS активной сети (оператор связи).
-    val useCarrierDns: Boolean = false
+    val useCarrierDns: Boolean = false,
+    /**
+     * Если true — изменения vlessMode/vlessBond/wrapEnabled на клиенте дёргают
+     * рестарт сервера (текущее поведение). Если false — флаги меняются только
+     * у клиента, серверный процесс не трогается.
+     */
+    val syncServerSwitches: Boolean = true
 )
 
 class AppPreferences(context: Context) {
@@ -75,6 +81,7 @@ class AppPreferences(context: Context) {
         val CLIENT_CAPTCHA_SOLVER = stringPreferencesKey("client_captcha_solver")
         val CLIENT_DEBUG = booleanPreferencesKey("client_debug")
         val CLIENT_USE_CARRIER_DNS = booleanPreferencesKey("client_use_carrier_dns")
+        val CLIENT_SYNC_SERVER = booleanPreferencesKey("client_sync_server")
         // Устаревшие ключи — не пишутся, но молча удаляются при saveClientConfig.
         private val CLIENT_DNS_MODE_LEGACY = stringPreferencesKey("client_dns_mode")
         private val CLIENT_ALLOCS_PER_STREAM_LEGACY = intPreferencesKey("client_allocs_per_stream")
@@ -154,7 +161,8 @@ class AppPreferences(context: Context) {
                     if (it == "v1" || it == "v2") it else "v2"
                 },
                 debugMode = prefs[CLIENT_DEBUG] ?: false,
-                useCarrierDns = prefs[CLIENT_USE_CARRIER_DNS] ?: false
+                useCarrierDns = prefs[CLIENT_USE_CARRIER_DNS] ?: false,
+                syncServerSwitches = prefs[CLIENT_SYNC_SERVER] ?: true
             )
         }
 
@@ -270,6 +278,7 @@ class AppPreferences(context: Context) {
             prefs[CLIENT_CAPTCHA_SOLVER] = config.captchaSolver
             prefs[CLIENT_DEBUG] = config.debugMode
             prefs[CLIENT_USE_CARRIER_DNS] = config.useCarrierDns
+            prefs[CLIENT_SYNC_SERVER] = config.syncServerSwitches
             // Удаляем устаревшие ключи, которые больше не использует ядро.
             prefs.remove(CLIENT_FORCE_PORT_443_LEGACY)
             prefs.remove(CLIENT_TURN_PORT_443_LEGACY)

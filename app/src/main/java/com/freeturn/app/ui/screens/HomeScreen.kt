@@ -605,8 +605,8 @@ private fun InfoBottomSheet(
         item {
             RepoLinkItem(
                 title = stringResource(R.string.proxy_core),
-                subtitle = "cacggghp/vk-turn-proxy",
-                url = "https://github.com/cacggghp/vk-turn-proxy",
+                subtitle = "moroka8/vk-turn-proxy",
+                url = "https://github.com/moroka8/vk-turn-proxy",
                 containerColor = containerColor,
                 onHaptic = { HapticUtil.perform(context, HapticUtil.Pattern.SELECTION) },
                 onOpen = { uriHandler.openUri(it) }

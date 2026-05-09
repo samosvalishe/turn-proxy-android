@@ -431,9 +431,9 @@ private fun EasterEggScreen() {
             tooltip?.let { (m, _) ->
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = MaterialTheme.shapes.medium,
                     modifier = Modifier.padding(32.dp),
-                    tonalElevation = 4.dp,
+                    tonalElevation = 3.dp,
                 ) {
                     Column(
                         modifier = Modifier.padding(

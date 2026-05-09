@@ -36,6 +36,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val sshState: StateFlow<SshConnectionState> = sshRepository.sshState
     val serverState: StateFlow<ServerState> = sshRepository.serverState
     val sshLog: StateFlow<List<String>> = sshRepository.sshLog
+    val serverLogs: StateFlow<String?> = sshRepository.serverLogs
 
     val proxyState: StateFlow<ProxyState> = proxyManager.proxyState
     val connectedSince: StateFlow<Long?> = ProxyServiceState.connectedSince
@@ -342,7 +343,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val current = prefs.serverOptsFlow.first()
             if (current.vlessBond == enabled) return@launch
             prefs.saveServerOpts(current.copy(vlessBond = enabled))
-            restartServerIfRunning()
+            if (clientConfig.value.syncServerSwitches) restartServerIfRunning()
             restartProxyIfRunning()
         }
     }
@@ -351,15 +352,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val current = prefs.serverOptsFlow.first()
             if (current.wrapEnabled == enabled) return@launch
-            // При первом включении wrap, если ключа ещё нет — пробуем взять с сервера.
+            val sync = clientConfig.value.syncServerSwitches
             var next = current.copy(wrapEnabled = enabled)
-            if (enabled && next.wrapKey.isBlank()) {
+            // При первом включении wrap, если ключа ещё нет и sync включён —
+            // пробуем взять с сервера. В !sync режиме сервер не трогаем.
+            if (enabled && next.wrapKey.isBlank() && sync) {
                 val key = sshRepository.generateWrapKey()
                 if (!key.isNullOrBlank()) next = next.copy(wrapKey = key)
             }
             prefs.saveServerOpts(next)
-            restartServerIfRunning()
+            if (sync) restartServerIfRunning()
             restartProxyIfRunning()
+        }
+    }
+
+    /**
+     * Глобальный sync-флаг. При включении (false→true) выравниваем сервер с
+     * клиентскими свитчами разовым рестартом, иначе разъехавшиеся ключ/флаги
+     * провалят DTLS handshake.
+     */
+    fun setSyncServerSwitches(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = prefs.clientConfigFlow.first()
+            if (current.syncServerSwitches == enabled) return@launch
+            prefs.saveClientConfig(current.copy(syncServerSwitches = enabled))
+            mirrorActiveProfile()
+            if (enabled) {
+                restartServerIfRunning()
+                restartProxyIfRunning()
+            }
         }
     }
 
@@ -371,7 +392,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val key = sshRepository.generateWrapKey() ?: return@launch
                 val current = prefs.serverOptsFlow.first()
                 prefs.saveServerOpts(current.copy(wrapKey = key))
-                restartServerIfRunning()
+                if (clientConfig.value.syncServerSwitches) restartServerIfRunning()
                 restartProxyIfRunning()
             } finally {
                 _isRegeneratingWrapKey.value = false
@@ -417,17 +438,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { sshRepository.stopServer() }
     }
 
-    /** Переключает VLESS-режим. Если SSH подключён и сервер запущен — автоперезапуск. */
+    fun fetchServerLogs(lines: Int = 200) {
+        viewModelScope.launch { sshRepository.fetchServerLogs(lines) }
+    }
+
+    fun clearServerLogs() {
+        sshRepository.clearServerLogs()
+    }
+
+    /** Переключает VLESS-режим. Если sync ON и сервер запущен — автоперезапуск. */
     fun setVlessMode(enabled: Boolean) {
         val current = clientConfig.value
         if (current.vlessMode == enabled) return
         viewModelScope.launch {
             prefs.saveClientConfig(current.copy(vlessMode = enabled))
             mirrorActiveProfile()
-            val serverRunning = (serverState.value as? ServerState.Known)?.running == true
-            if (serverRunning) {
-                sshRepository.stopServer()
-                startServer()
+            if (current.syncServerSwitches) {
+                val serverRunning = (serverState.value as? ServerState.Known)?.running == true
+                if (serverRunning) {
+                    sshRepository.stopServer()
+                    startServer()
+                }
             }
             restartProxyIfRunning()
         }

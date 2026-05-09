@@ -65,6 +65,15 @@
     <string name="wrap_key_empty_hint">Ключ не сгенерирован — нажмите кнопку ниже</string>
     <string name="server_wrap_regen_in_progress">Генерация ключа…</string>
     <string name="server_sync_section">Синхронные настройки сервера</string>
+    <string name="sync_server_switches">Синхронизировать с сервером</string>
+    <string name="sync_server_switches_desc">При выкл. флаги VLESS/bond/WRAP меняются только у клиента, серверный процесс не перезапускается</string>
+    <string name="sync_off_banner">Sync с сервером выключен. Клиентские флаги VLESS/bond/WRAP сервер не получает — следите за совпадением вручную.</string>
+    <string name="server_journal_title">Журнал</string>
+    <string name="server_journal_fetch">Показать журнал</string>
+    <string name="server_journal_refresh">Обновить</string>
+    <string name="server_journal_loading">Загрузка журнала…</string>
+    <string name="server_journal_empty">Журнал пуст</string>
+    <string name="server_journal_clear">Очистить</string>
     <string name="transport_protocol">Транспорт</string>
     <string name="transport_protocol_desc">UDP снижает задержки, TCP — стабильнее</string>
     <string name="manual_captcha">Ручной ввод капчи</string>
