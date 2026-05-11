@@ -24,6 +24,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -108,25 +110,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val profilesSnapshot: StateFlow<ProfilesSnapshot> = prefs.profilesSnapshot
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProfilesSnapshot())
 
+    /**
+     * Сериализует все операции над списком профилей и зеркалирование активного
+     * профиля. Без этого параллельные viewModelScope.launch'и могли прочитать
+     * устаревший snapshot и затереть/перетянуть данные между профилями.
+     */
+    private val profileMutex = Mutex()
+
     /** Сохранить текущие настройки как новый профиль и сделать активным. */
     fun saveCurrentAsProfile(name: String) {
         viewModelScope.launch {
-            val current = prefs.profilesSnapshot.first()
-            val ssh = prefs.sshConfigFlow.first()
-            val client = prefs.clientConfigFlow.first()
-            val listen = prefs.proxyListenFlow.first()
-            val connect = prefs.proxyConnectFlow.first()
-            val base = name.trim().ifBlank { defaultProfileName(client.serverAddress) }
-            val profile = Profile(
-                id = UUID.randomUUID().toString(),
-                name = uniqueProfileName(base, current.list, excludingId = null),
-                ssh = ssh,
-                client = client,
-                proxyListen = listen,
-                proxyConnect = connect
-            )
-            prefs.saveProfiles(current.list + profile)
-            prefs.setActiveProfileId(profile.id)
+            profileMutex.withLock {
+                val current = prefs.profilesSnapshot.first()
+                val ssh = prefs.sshConfigFlow.first()
+                val client = prefs.clientConfigFlow.first()
+                val listen = prefs.proxyListenFlow.first()
+                val connect = prefs.proxyConnectFlow.first()
+                val server = prefs.serverOptsFlow.first()
+                val base = name.trim().ifBlank { defaultProfileName(client.serverAddress) }
+                val profile = Profile(
+                    id = UUID.randomUUID().toString(),
+                    name = uniqueProfileName(base, current.list, excludingId = null),
+                    ssh = ssh,
+                    client = client,
+                    proxyListen = listen,
+                    proxyConnect = connect,
+                    server = server
+                )
+                prefs.saveProfiles(current.list + profile)
+                prefs.setActiveProfileId(profile.id)
+            }
         }
     }
 
@@ -153,25 +166,44 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Публичный триггер пересохранения активного профиля текущими настройками. */
     fun updateActiveProfileFromCurrent() {
-        viewModelScope.launch { mirrorActiveProfile() }
+        viewModelScope.launch { profileMutex.withLock { mirrorActiveProfile() } }
     }
 
     /**
-     * Зеркалирует текущие prefs (ssh+client) в активный профиль. Источник истины —
+     * Зеркалирует текущие prefs (ssh+client+server) в активный профиль. Источник истины —
      * профиль, но legacy-ключи остаются «scratch»-областью для случая «нет профилей».
-     * Вызывается автоматически после каждой записи ssh/client конфига, чтобы
+     * Вызывается автоматически после каждой записи ssh/client/server конфига, чтобы
      * пользовательские правки не терялись при переключении профилей.
+     *
+     * Параметры `*Override` позволяют передать значение, которое мы только что
+     * записали в DataStore, не полагаясь на асинхронную эмиссию Flow.first() —
+     * иначе возможен race, когда .first() возвращает доcоставочный snapshot.
+     *
+     * ВАЖНО: вызывать только под profileMutex.
      */
-    private suspend fun mirrorActiveProfile() {
+    private suspend fun mirrorActiveProfile(
+        sshOverride: SshConfig? = null,
+        clientOverride: ClientConfig? = null,
+        listenOverride: String? = null,
+        connectOverride: String? = null,
+        serverOverride: AppPreferences.ServerOpts? = null,
+    ) {
         val current = prefs.profilesSnapshot.first()
         val activeId = current.activeId ?: return
-        val ssh = prefs.sshConfigFlow.first()
-        val client = prefs.clientConfigFlow.first()
-        val listen = prefs.proxyListenFlow.first()
-        val connect = prefs.proxyConnectFlow.first()
+        val ssh = sshOverride ?: prefs.sshConfigFlow.first()
+        val client = clientOverride ?: prefs.clientConfigFlow.first()
+        val listen = listenOverride ?: prefs.proxyListenFlow.first()
+        val connect = connectOverride ?: prefs.proxyConnectFlow.first()
+        val server = serverOverride ?: prefs.serverOptsFlow.first()
         val updated = current.list.map {
             if (it.id == activeId)
-                it.copy(ssh = ssh, client = client, proxyListen = listen, proxyConnect = connect)
+                it.copy(
+                    ssh = ssh,
+                    client = client,
+                    proxyListen = listen,
+                    proxyConnect = connect,
+                    server = server
+                )
             else it
         }
         if (updated != current.list) prefs.saveProfiles(updated)
@@ -179,35 +211,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun renameProfile(id: String, name: String) {
         viewModelScope.launch {
-            val current = prefs.profilesSnapshot.first()
-            val target = current.list.firstOrNull { it.id == id } ?: return@launch
-            val base = name.trim().ifBlank { target.name }
-            val unique = uniqueProfileName(base, current.list, excludingId = id)
-            val updated = current.list.map {
-                if (it.id == id) it.copy(name = unique) else it
+            profileMutex.withLock {
+                val current = prefs.profilesSnapshot.first()
+                val target = current.list.firstOrNull { it.id == id } ?: return@withLock
+                val base = name.trim().ifBlank { target.name }
+                val unique = uniqueProfileName(base, current.list, excludingId = id)
+                val updated = current.list.map {
+                    if (it.id == id) it.copy(name = unique) else it
+                }
+                prefs.saveProfiles(updated)
             }
-            prefs.saveProfiles(updated)
         }
     }
 
     /**
-     * Применяет профиль: загружает его ssh/client в legacy-ключи (которые читают
-     * существующие экраны) и помечает активным. Если прокси запущен — перезапускает,
-     * иначе логика клиента продолжит использовать старые настройки.
+     * Применяет профиль: загружает его ssh/client/server в legacy-ключи и помечает
+     * активным. Если прокси/сервер запущены — перезапускает.
      */
     fun applyProfile(id: String) {
         viewModelScope.launch {
-            val current = prefs.profilesSnapshot.first()
-            val target = current.list.firstOrNull { it.id == id } ?: return@launch
-            prefs.saveSshConfig(target.ssh)
-            prefs.saveClientConfig(target.client)
-            prefs.saveProxyConfig(target.proxyListen, target.proxyConnect)
-            prefs.setActiveProfileId(target.id)
+            val target = profileMutex.withLock {
+                val current = prefs.profilesSnapshot.first()
+                val t = current.list.firstOrNull { it.id == id } ?: return@withLock null
+                prefs.saveSshConfig(t.ssh)
+                prefs.saveClientConfig(t.client)
+                prefs.saveProxyConfig(t.proxyListen, t.proxyConnect)
+                prefs.saveServerOpts(t.server)
+                prefs.setActiveProfileId(t.id)
+                t
+            } ?: return@launch
+
+            // Рестарт вне лока, чтобы не блокировать другие профильные операции
+            // на время stop/start (может занять секунды).
+            val serverRunning = (serverState.value as? ServerState.Known)?.running == true
+            if (serverRunning) restartServerIfRunning()
 
             if (ProxyServiceState.isRunning.value) {
                 proxyManager.stopProxy()
-                // Ждём фактической остановки сервиса вместо магического delay,
-                // иначе onStartCommand может стартовать со старыми аргументами.
                 withTimeoutOrNull(2_000) {
                     ProxyServiceState.isRunning.first { !it }
                 }
@@ -218,16 +258,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteProfile(id: String) {
         viewModelScope.launch {
-            val current = prefs.profilesSnapshot.first()
-            val remaining = current.list.filterNot { it.id == id }
-            prefs.saveProfiles(remaining)
-            if (current.activeId == id) {
-                val next = remaining.firstOrNull()
-                prefs.setActiveProfileId(next?.id)
-                if (next != null) {
-                    prefs.saveSshConfig(next.ssh)
-                    prefs.saveClientConfig(next.client)
-                    prefs.saveProxyConfig(next.proxyListen, next.proxyConnect)
+            profileMutex.withLock {
+                val current = prefs.profilesSnapshot.first()
+                val remaining = current.list.filterNot { it.id == id }
+                prefs.saveProfiles(remaining)
+                if (current.activeId == id) {
+                    val next = remaining.firstOrNull()
+                    prefs.setActiveProfileId(next?.id)
+                    if (next != null) {
+                        prefs.saveSshConfig(next.ssh)
+                        prefs.saveClientConfig(next.client)
+                        prefs.saveProxyConfig(next.proxyListen, next.proxyConnect)
+                        prefs.saveServerOpts(next.server)
+                    }
                 }
             }
         }
@@ -253,13 +296,17 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // SSH
     fun connectSsh(config: SshConfig) {
         viewModelScope.launch {
-            prefs.saveSshConfig(config)
-            mirrorActiveProfile()
+            profileMutex.withLock {
+                prefs.saveSshConfig(config)
+                mirrorActiveProfile(sshOverride = config)
+            }
             val (success, fp) = sshRepository.connectSsh(config)
             if (success) {
                 if (config.hostFingerprint.isEmpty() && fp != null) {
-                    prefs.saveSshFingerprint(fp)
-                    mirrorActiveProfile()
+                    profileMutex.withLock {
+                        prefs.saveSshFingerprint(fp)
+                        mirrorActiveProfile(sshOverride = config.copy(hostFingerprint = fp))
+                    }
                 }
                 HapticUtil.perform(getApplication(), HapticUtil.Pattern.SUCCESS)
             } else {
@@ -301,7 +348,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     if (current.wrapKey.isBlank()) {
                         val key = sshRepository.generateWrapKey()
                         if (!key.isNullOrBlank()) {
-                            prefs.saveServerOpts(current.copy(wrapKey = key))
+                            val next = current.copy(wrapKey = key)
+                            profileMutex.withLock {
+                                prefs.saveServerOpts(next)
+                                mirrorActiveProfile(serverOverride = next)
+                            }
                         }
                     }
                 }
@@ -343,7 +394,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val current = prefs.serverOptsFlow.first()
             if (current.kcpFec == enabled) return@launch
-            prefs.saveServerOpts(current.copy(kcpFec = enabled))
+            val next = current.copy(kcpFec = enabled)
+            profileMutex.withLock {
+                prefs.saveServerOpts(next)
+                mirrorActiveProfile(serverOverride = next)
+            }
             if (clientConfig.value.syncServerSwitches) restartServerIfRunning()
             restartProxyIfRunning()
         }
@@ -353,7 +408,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val current = prefs.serverOptsFlow.first()
             if (current.vlessBond == enabled) return@launch
-            prefs.saveServerOpts(current.copy(vlessBond = enabled))
+            val next = current.copy(vlessBond = enabled)
+            profileMutex.withLock {
+                prefs.saveServerOpts(next)
+                mirrorActiveProfile(serverOverride = next)
+            }
             if (clientConfig.value.syncServerSwitches) restartServerIfRunning()
             restartProxyIfRunning()
         }
@@ -371,7 +430,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 val key = sshRepository.generateWrapKey()
                 if (!key.isNullOrBlank()) next = next.copy(wrapKey = key)
             }
-            prefs.saveServerOpts(next)
+            profileMutex.withLock {
+                prefs.saveServerOpts(next)
+                mirrorActiveProfile(serverOverride = next)
+            }
             if (sync) restartServerIfRunning()
             restartProxyIfRunning()
         }
@@ -386,8 +448,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val current = prefs.clientConfigFlow.first()
             if (current.syncServerSwitches == enabled) return@launch
-            prefs.saveClientConfig(current.copy(syncServerSwitches = enabled))
-            mirrorActiveProfile()
+            val next = current.copy(syncServerSwitches = enabled)
+            profileMutex.withLock {
+                prefs.saveClientConfig(next)
+                mirrorActiveProfile(clientOverride = next)
+            }
             if (enabled) {
                 restartServerIfRunning()
                 restartProxyIfRunning()
@@ -405,7 +470,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val current = prefs.serverOptsFlow.first()
             val trimmed = key.trim()
             if (current.wrapKey == trimmed) return@launch
-            prefs.saveServerOpts(current.copy(wrapKey = trimmed))
+            val next = current.copy(wrapKey = trimmed)
+            profileMutex.withLock {
+                prefs.saveServerOpts(next)
+                mirrorActiveProfile(serverOverride = next)
+            }
             if (clientConfig.value.syncServerSwitches) restartServerIfRunning()
             restartProxyIfRunning()
         }
@@ -418,7 +487,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val key = sshRepository.generateWrapKey() ?: return@launch
                 val current = prefs.serverOptsFlow.first()
-                prefs.saveServerOpts(current.copy(wrapKey = key))
+                val next = current.copy(wrapKey = key)
+                profileMutex.withLock {
+                    prefs.saveServerOpts(next)
+                    mirrorActiveProfile(serverOverride = next)
+                }
                 if (clientConfig.value.syncServerSwitches) restartServerIfRunning()
                 restartProxyIfRunning()
             } finally {
@@ -479,8 +552,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val current = clientConfig.value
         if (current.vlessMode == enabled) return
         viewModelScope.launch {
-            prefs.saveClientConfig(current.copy(vlessMode = enabled))
-            mirrorActiveProfile()
+            val next = current.copy(vlessMode = enabled)
+            profileMutex.withLock {
+                prefs.saveClientConfig(next)
+                mirrorActiveProfile(clientOverride = next)
+            }
             if (current.syncServerSwitches) {
                 val serverRunning = (serverState.value as? ServerState.Known)?.running == true
                 if (serverRunning) {
@@ -514,15 +590,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // Preferences
     fun saveClientConfig(config: ClientConfig) {
         viewModelScope.launch {
-            prefs.saveClientConfig(config)
-            mirrorActiveProfile()
+            profileMutex.withLock {
+                prefs.saveClientConfig(config)
+                mirrorActiveProfile(clientOverride = config)
+            }
         }
     }
 
     fun saveProxyServerConfig(listen: String, connect: String) {
         viewModelScope.launch {
-            prefs.saveProxyConfig(listen, connect)
-            mirrorActiveProfile()
+            profileMutex.withLock {
+                prefs.saveProxyConfig(listen, connect)
+                mirrorActiveProfile(listenOverride = listen, connectOverride = connect)
+            }
         }
     }
 

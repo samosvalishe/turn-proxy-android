@@ -17,7 +17,8 @@ data class Profile(
     val ssh: SshConfig = SshConfig(),
     val client: ClientConfig = ClientConfig(),
     val proxyListen: String = "0.0.0.0:56000",
-    val proxyConnect: String = "127.0.0.1:40537"
+    val proxyConnect: String = "127.0.0.1:40537",
+    val server: AppPreferences.ServerOpts = AppPreferences.ServerOpts()
 )
 
 data class ProfilesSnapshot(
@@ -78,11 +79,18 @@ internal object ProfileJson {
         })
         put("proxyListen", p.proxyListen)
         put("proxyConnect", p.proxyConnect)
+        put("server", JSONObject().apply {
+            put("vlessBond", p.server.vlessBond)
+            put("wrapEnabled", p.server.wrapEnabled)
+            put("wrapKey", p.server.wrapKey)
+            put("kcpFec", p.server.kcpFec)
+        })
     }
 
     private fun decode(o: JSONObject): Profile {
         val sshO = o.optJSONObject("ssh") ?: JSONObject()
         val cliO = o.optJSONObject("client") ?: JSONObject()
+        val srvO = o.optJSONObject("server") ?: JSONObject()
         return Profile(
             id = o.optString("id").ifBlank { UUID.randomUUID().toString() },
             name = o.optString("name").ifBlank { "Без названия" },
@@ -120,7 +128,13 @@ internal object ProfileJson {
                 magicTurn = cliO.optString("magicTurn")
             ),
             proxyListen = o.optString("proxyListen").ifBlank { "0.0.0.0:56000" },
-            proxyConnect = o.optString("proxyConnect").ifBlank { "127.0.0.1:40537" }
+            proxyConnect = o.optString("proxyConnect").ifBlank { "127.0.0.1:40537" },
+            server = AppPreferences.ServerOpts(
+                vlessBond = srvO.optBoolean("vlessBond", false),
+                wrapEnabled = srvO.optBoolean("wrapEnabled", false),
+                wrapKey = srvO.optString("wrapKey"),
+                kcpFec = srvO.optBoolean("kcpFec", false)
+            )
         )
     }
 }
