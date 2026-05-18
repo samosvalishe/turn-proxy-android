@@ -49,8 +49,7 @@ data class ClientConfig(
     val isRawMode: Boolean = false,
     val rawCommand: String = "",
     val vlessMode: Boolean = false,
-    /** "v1" | "v2" — соответствует флагу -captcha-solver ядра. Дефолт = v2. */
-    val captchaSolver: String = "v2",
+
     // Если true — добавляется флаг -debug для расширенного вывода в логах.
     val debugMode: Boolean = false,
     // Если true — в argv передаётся -dns-servers с DNS активной сети (оператор связи).
@@ -92,7 +91,7 @@ class AppPreferences(context: Context) {
         val CLIENT_IS_RAW = booleanPreferencesKey("client_is_raw")
         val CLIENT_RAW_CMD = stringPreferencesKey("client_raw_cmd")
         val CLIENT_VLESS = booleanPreferencesKey("client_vless")
-        val CLIENT_CAPTCHA_SOLVER = stringPreferencesKey("client_captcha_solver")
+        private val CLIENT_CAPTCHA_SOLVER_LEGACY = stringPreferencesKey("client_captcha_solver")
         val CLIENT_DEBUG = booleanPreferencesKey("client_debug")
         val CLIENT_USE_CARRIER_DNS = booleanPreferencesKey("client_use_carrier_dns")
         val CLIENT_DNS_MODE = stringPreferencesKey("client_dns_mode")
@@ -172,9 +171,7 @@ class AppPreferences(context: Context) {
                 isRawMode = prefs[CLIENT_IS_RAW] ?: false,
                 rawCommand = prefs[CLIENT_RAW_CMD] ?: "",
                 vlessMode = prefs[CLIENT_VLESS] ?: false,
-                captchaSolver = (prefs[CLIENT_CAPTCHA_SOLVER] ?: "v2").let {
-                    if (it == "v1" || it == "v2") it else "v2"
-                },
+
                 debugMode = prefs[CLIENT_DEBUG] ?: false,
                 useCarrierDns = prefs[CLIENT_USE_CARRIER_DNS] ?: false,
                 dnsMode = (prefs[CLIENT_DNS_MODE] ?: DnsMode.AUTO).let {
@@ -299,7 +296,7 @@ class AppPreferences(context: Context) {
             prefs[CLIENT_IS_RAW] = config.isRawMode
             prefs[CLIENT_RAW_CMD] = config.rawCommand
             prefs[CLIENT_VLESS] = config.vlessMode
-            prefs[CLIENT_CAPTCHA_SOLVER] = config.captchaSolver
+            prefs.remove(CLIENT_CAPTCHA_SOLVER_LEGACY)
             prefs[CLIENT_DEBUG] = config.debugMode
             prefs[CLIENT_USE_CARRIER_DNS] = config.useCarrierDns
             prefs[CLIENT_DNS_MODE] = if (config.dnsMode in DnsMode.ALL) config.dnsMode else DnsMode.AUTO

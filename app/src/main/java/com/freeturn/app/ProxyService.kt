@@ -200,9 +200,7 @@ class ProxyService : Service() {
                 cmdArgs.add("-wrap-key"); cmdArgs.add(srv.wrapKey)
             }
             if (cfg.manualCaptcha) cmdArgs.add("--manual-captcha")
-            if (cfg.captchaSolver != "v2") {
-                cmdArgs.add("-captcha-solver"); cmdArgs.add(cfg.captchaSolver)
-            }
+
             if (cfg.debugMode) cmdArgs.add("-debug")
             if (cfg.useCarrierDns) {
                 val dns = activeNetworkDnsServers()

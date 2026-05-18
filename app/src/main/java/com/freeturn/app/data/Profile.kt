@@ -68,7 +68,7 @@ internal object ProfileJson {
             put("isRawMode", p.client.isRawMode)
             put("rawCommand", p.client.rawCommand)
             put("vlessMode", p.client.vlessMode)
-            put("captchaSolver", p.client.captchaSolver)
+
             put("debugMode", p.client.debugMode)
             put("useCarrierDns", p.client.useCarrierDns)
             put("dnsMode", p.client.dnsMode)
@@ -114,9 +114,7 @@ internal object ProfileJson {
                 isRawMode = cliO.optBoolean("isRawMode", false),
                 rawCommand = cliO.optString("rawCommand"),
                 vlessMode = cliO.optBoolean("vlessMode", false),
-                captchaSolver = cliO.optString("captchaSolver", "v2").let {
-                    if (it == "v1" || it == "v2") it else "v2"
-                },
+
                 debugMode = cliO.optBoolean("debugMode", false),
                 useCarrierDns = cliO.optBoolean("useCarrierDns", false),
                 dnsMode = cliO.optString("dnsMode", DnsMode.AUTO).let {

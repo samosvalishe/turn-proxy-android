@@ -102,7 +102,7 @@ fun ClientSetupScreen(
     var dnsMode by rememberSaveable(saved.dnsMode) { mutableStateOf(saved.dnsMode) }
     var forcePort443 by rememberSaveable(saved.forcePort443) { mutableStateOf(saved.forcePort443) }
     var localPort    by rememberSaveable(saved.localPort)      { mutableStateOf(saved.localPort) }
-    var captchaSolver by rememberSaveable(saved.captchaSolver) { mutableStateOf(saved.captchaSolver) }
+
     var debugMode by rememberSaveable(saved.debugMode) { mutableStateOf(saved.debugMode) }
     var magicSwitch by rememberSaveable(saved.magicSwitch) { mutableStateOf(saved.magicSwitch) }
     var magicTurn by rememberSaveable(saved.magicTurn) { mutableStateOf(saved.magicTurn) }
@@ -119,7 +119,7 @@ fun ClientSetupScreen(
 
     // Авто-сохранение с дебаунсом 600 мс на каждое изменение поля.
     // vlessMode исключён — сохраняется через setVlessMode с автоперезапуском сервера.
-    LaunchedEffect(serverAddress, vkLink, threads, streamsPerCred, useUdp, manualCaptcha, useCarrierDns, localPort, captchaSolver, dnsMode, forcePort443, debugMode, magicSwitch, magicTurn) {
+    LaunchedEffect(serverAddress, vkLink, threads, streamsPerCred, useUdp, manualCaptcha, useCarrierDns, localPort, dnsMode, forcePort443, debugMode, magicSwitch, magicTurn) {
         delay(600)
         viewModel.saveClientConfig(
             ClientConfig(
@@ -131,7 +131,7 @@ fun ClientSetupScreen(
                 manualCaptcha = manualCaptcha,
                 localPort     = localPort.trim(),
                 vlessMode     = saved.vlessMode,
-                captchaSolver = captchaSolver,
+
                 debugMode     = debugMode,
                 useCarrierDns = useCarrierDns,
                 dnsMode       = dnsMode,
@@ -322,29 +322,7 @@ fun ClientSetupScreen(
                     }
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Column {
-                        Text(stringResource(R.string.captcha_solver_title), style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            stringResource(R.string.captcha_solver_desc),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    val solverOptions = listOf("v2", "v1")
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        solverOptions.forEachIndexed { idx, value ->
-                            SegmentedButton(
-                                selected = captchaSolver == value,
-                                onClick = {
-                                    HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                    captchaSolver = value
-                                },
-                                shape = SegmentedButtonDefaults.itemShape(index = idx, count = solverOptions.size)
-                            ) { Text(value) }
-                        }
-                    }
-                }
+
 
                 SwitchRow(
                     label = stringResource(R.string.manual_captcha),

@@ -55,8 +55,7 @@
     <string name="threads_recommendation">Рекомендуется 4–8</string>
     <string name="streams_per_cred_recommendation">Сколько TURN-потоков обслуживает один VK-аккаунт. По умолчанию 10.</string>
     <string name="streams_per_cred_format">Потоков на аккаунт: %1$d</string>
-    <string name="captcha_solver_title">Алгоритм капчи</string>
-    <string name="captcha_solver_desc">v2 — нейросетевой (быстрее), v1 — классический</string>
+
     <string name="client_vless_bond">VLESS bonding</string>
     <string name="client_vless_bond_desc">Должен совпадать с настройкой сервера. Только для VLESS-режима.</string>
     <string name="client_wrap_enabled">WRAP-обфускация</string>
