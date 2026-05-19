@@ -76,6 +76,12 @@ internal object ProfileJson {
             put("syncServerSwitches", p.client.syncServerSwitches)
             put("magicSwitch", p.client.magicSwitch)
             put("magicTurn", p.client.magicTurn)
+            put("wireGuardEnabled", p.client.wireGuardEnabled)
+            put("wireGuardConfig", p.client.wireGuardConfig)
+            put("wireGuardTunnelName", p.client.wireGuardTunnelName)
+            put("xrayEnabled", p.client.xrayEnabled)
+            put("xrayConfig", p.client.xrayConfig)
+            put("tunnelTransport", p.client.tunnelTransport)
         })
         put("proxyListen", p.proxyListen)
         put("proxyConnect", p.proxyConnect)
@@ -123,7 +129,19 @@ internal object ProfileJson {
                 forcePort443 = cliO.optBoolean("forcePort443", false),
                 syncServerSwitches = cliO.optBoolean("syncServerSwitches", true),
                 magicSwitch = cliO.optBoolean("magicSwitch", false),
-                magicTurn = cliO.optString("magicTurn")
+                magicTurn = cliO.optString("magicTurn"),
+                wireGuardEnabled = cliO.optBoolean("wireGuardEnabled", false),
+                wireGuardConfig = cliO.optString("wireGuardConfig"),
+                wireGuardTunnelName = cliO.optString("wireGuardTunnelName").ifBlank { "freeturn-wg" },
+                xrayEnabled = cliO.optBoolean("xrayEnabled", false),
+                xrayConfig = cliO.optString("xrayConfig"),
+                tunnelTransport = cliO.optString(
+                    "tunnelTransport",
+                    if (cliO.optBoolean("xrayEnabled", false)) TunnelTransport.VLESS
+                    else TunnelTransport.WIREGUARD
+                ).let {
+                    if (it in TunnelTransport.ALL) it else TunnelTransport.WIREGUARD
+                }
             ),
             proxyListen = o.optString("proxyListen").ifBlank { "0.0.0.0:56000" },
             proxyConnect = o.optString("proxyConnect").ifBlank { "127.0.0.1:40537" },

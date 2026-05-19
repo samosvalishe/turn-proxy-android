@@ -58,6 +58,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.VpnService
 import android.os.Build
 import android.os.PowerManager
 import android.provider.Settings
@@ -90,6 +91,7 @@ import com.freeturn.app.viewmodel.MainViewModel
 import com.freeturn.app.viewmodel.ProxyState
 import com.freeturn.app.viewmodel.SshConnectionState
 import com.freeturn.app.viewmodel.UpdateState
+import com.freeturn.app.data.TunnelTransport
 import androidx.core.net.toUri
 
 @SuppressLint("BatteryLife")
@@ -156,6 +158,13 @@ fun HomeScreen(
     val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val profilesSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val snackbarHostState = remember { SnackbarHostState() }
+    val wireGuardPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        if (VpnService.prepare(context) == null) {
+            viewModel.startProxy()
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -196,7 +205,16 @@ fun HomeScreen(
                     when (proxyState) {
                         is ProxyState.Idle, is ProxyState.Error -> {
                             HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                            viewModel.startProxy()
+                            if (clientConfig.tunnelTransport == TunnelTransport.WIREGUARD) {
+                                val vpnIntent = VpnService.prepare(context)
+                                if (vpnIntent != null) {
+                                    wireGuardPermissionLauncher.launch(vpnIntent)
+                                } else {
+                                    viewModel.startProxy()
+                                }
+                            } else {
+                                viewModel.startProxy()
+                            }
                         }
                         is ProxyState.Running, is ProxyState.Connecting, is ProxyState.Starting -> {
                             HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_OFF)
@@ -262,6 +280,12 @@ fun HomeScreen(
                             else stringResource(R.string.tcp)
                         )
                         ConfigRow(stringResource(R.string.local_port), clientConfig.localPort.redact(privacyMode))
+                        ConfigRow(
+                            stringResource(R.string.tunnel_transport_title),
+                            if (clientConfig.tunnelTransport == TunnelTransport.WIREGUARD)
+                                stringResource(R.string.transport_wireguard)
+                            else stringResource(R.string.transport_vless)
+                        )
                     }
                 }
 

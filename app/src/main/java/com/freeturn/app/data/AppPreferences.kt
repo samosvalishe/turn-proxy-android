@@ -37,6 +37,12 @@ object DnsMode {
     val ALL = listOf(AUTO, UDP, DOH)
 }
 
+object TunnelTransport {
+    const val WIREGUARD = "wireguard"
+    const val VLESS = "vless"
+    val ALL = listOf(WIREGUARD, VLESS)
+}
+
 data class ClientConfig(
     val serverAddress: String = "",
     val vkLink: String = "",
@@ -66,7 +72,13 @@ data class ClientConfig(
     val syncServerSwitches: Boolean = true,
     val magicSwitch: Boolean = false,
     /** Адрес для флага -turn ядра, если magicSwitch включён. Пусто = не передавать. */
-    val magicTurn: String = ""
+    val magicTurn: String = "",
+    val wireGuardEnabled: Boolean = false,
+    val wireGuardConfig: String = "",
+    val wireGuardTunnelName: String = "freeturn-wg",
+    val xrayEnabled: Boolean = false,
+    val xrayConfig: String = "",
+    val tunnelTransport: String = TunnelTransport.WIREGUARD
 )
 
 class AppPreferences(context: Context) {
@@ -99,6 +111,12 @@ class AppPreferences(context: Context) {
         val CLIENT_SYNC_SERVER = booleanPreferencesKey("client_sync_server")
         val CLIENT_MAGIC_SWITCH = booleanPreferencesKey("client_magic_switch")
         val CLIENT_MAGIC_TURN = stringPreferencesKey("client_magic_turn")
+        val CLIENT_WG_ENABLED = booleanPreferencesKey("client_wg_enabled")
+        val CLIENT_WG_CONFIG = stringPreferencesKey("client_wg_config")
+        val CLIENT_WG_TUNNEL_NAME = stringPreferencesKey("client_wg_tunnel_name")
+        val CLIENT_XRAY_ENABLED = booleanPreferencesKey("client_xray_enabled")
+        val CLIENT_XRAY_CONFIG = stringPreferencesKey("client_xray_config")
+        val CLIENT_TUNNEL_TRANSPORT = stringPreferencesKey("client_tunnel_transport")
         // Устаревшие ключи — не пишутся, но молча удаляются при saveClientConfig.
         private val CLIENT_ALLOCS_PER_STREAM_LEGACY = intPreferencesKey("client_allocs_per_stream")
         private val CLIENT_TURN_PORT_443_LEGACY = booleanPreferencesKey("client_turn_port_443")
@@ -180,7 +198,18 @@ class AppPreferences(context: Context) {
                 forcePort443 = prefs[CLIENT_FORCE_PORT_443] ?: false,
                 syncServerSwitches = prefs[CLIENT_SYNC_SERVER] ?: true,
                 magicSwitch = prefs[CLIENT_MAGIC_SWITCH] ?: false,
-                magicTurn = prefs[CLIENT_MAGIC_TURN] ?: ""
+                magicTurn = prefs[CLIENT_MAGIC_TURN] ?: "",
+                wireGuardEnabled = prefs[CLIENT_WG_ENABLED] ?: false,
+                wireGuardConfig = prefs[CLIENT_WG_CONFIG] ?: "",
+                wireGuardTunnelName = prefs[CLIENT_WG_TUNNEL_NAME] ?: "freeturn-wg",
+                xrayEnabled = prefs[CLIENT_XRAY_ENABLED] ?: false,
+                xrayConfig = prefs[CLIENT_XRAY_CONFIG] ?: "",
+                tunnelTransport = (prefs[CLIENT_TUNNEL_TRANSPORT] ?: run {
+                    if (prefs[CLIENT_XRAY_ENABLED] == true) TunnelTransport.VLESS
+                    else TunnelTransport.WIREGUARD
+                }).let {
+                    if (it in TunnelTransport.ALL) it else TunnelTransport.WIREGUARD
+                }
             )
         }
 
@@ -304,6 +333,14 @@ class AppPreferences(context: Context) {
             prefs[CLIENT_SYNC_SERVER] = config.syncServerSwitches
             prefs[CLIENT_MAGIC_SWITCH] = config.magicSwitch
             prefs[CLIENT_MAGIC_TURN] = config.magicTurn.trim()
+            prefs[CLIENT_WG_ENABLED] = config.wireGuardEnabled
+            prefs[CLIENT_WG_CONFIG] = config.wireGuardConfig.trim()
+            prefs[CLIENT_WG_TUNNEL_NAME] = config.wireGuardTunnelName.trim().ifBlank { "freeturn-wg" }
+            prefs[CLIENT_XRAY_ENABLED] = config.xrayEnabled
+            prefs[CLIENT_XRAY_CONFIG] = config.xrayConfig.trim()
+            prefs[CLIENT_TUNNEL_TRANSPORT] =
+                if (config.tunnelTransport in TunnelTransport.ALL) config.tunnelTransport
+                else TunnelTransport.WIREGUARD
             // Удаляем устаревшие ключи.
             prefs.remove(CLIENT_TURN_PORT_443_LEGACY)
             prefs.remove(CLIENT_ALLOCS_PER_STREAM_LEGACY)

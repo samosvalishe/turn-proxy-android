@@ -54,6 +54,7 @@ import com.freeturn.app.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.data.ClientConfig
 import com.freeturn.app.data.DnsMode
+import com.freeturn.app.data.TunnelTransport
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.viewmodel.MainViewModel
 import com.freeturn.app.viewmodel.SshConnectionState
@@ -106,6 +107,18 @@ fun ClientSetupScreen(
     var debugMode by rememberSaveable(saved.debugMode) { mutableStateOf(saved.debugMode) }
     var magicSwitch by rememberSaveable(saved.magicSwitch) { mutableStateOf(saved.magicSwitch) }
     var magicTurn by rememberSaveable(saved.magicTurn) { mutableStateOf(saved.magicTurn) }
+    var wireGuardTunnelName by rememberSaveable(saved.wireGuardTunnelName) {
+        mutableStateOf(saved.wireGuardTunnelName)
+    }
+    var wireGuardConfig by rememberSaveable(saved.wireGuardConfig) {
+        mutableStateOf(saved.wireGuardConfig)
+    }
+    var xrayConfig by rememberSaveable(saved.xrayConfig) {
+        mutableStateOf(saved.xrayConfig)
+    }
+    var tunnelTransport by rememberSaveable(saved.tunnelTransport) {
+        mutableStateOf(saved.tunnelTransport)
+    }
     var lastSliderInt by rememberSaveable { mutableIntStateOf(saved.threads) }
     var lastStreamsInt by rememberSaveable { mutableIntStateOf(saved.streamsPerCred) }
 
@@ -119,7 +132,25 @@ fun ClientSetupScreen(
 
     // Авто-сохранение с дебаунсом 600 мс на каждое изменение поля.
     // vlessMode исключён — сохраняется через setVlessMode с автоперезапуском сервера.
-    LaunchedEffect(serverAddress, vkLink, threads, streamsPerCred, useUdp, manualCaptcha, useCarrierDns, localPort, dnsMode, forcePort443, debugMode, magicSwitch, magicTurn) {
+    LaunchedEffect(
+        serverAddress,
+        vkLink,
+        threads,
+        streamsPerCred,
+        useUdp,
+        manualCaptcha,
+        useCarrierDns,
+        localPort,
+        dnsMode,
+        forcePort443,
+        debugMode,
+        magicSwitch,
+        magicTurn,
+        wireGuardTunnelName,
+        wireGuardConfig,
+        xrayConfig,
+        tunnelTransport
+    ) {
         delay(600)
         viewModel.saveClientConfig(
             ClientConfig(
@@ -138,7 +169,13 @@ fun ClientSetupScreen(
                 forcePort443  = forcePort443,
                 syncServerSwitches = saved.syncServerSwitches,
                 magicSwitch   = magicSwitch,
-                magicTurn     = magicTurn.trim()
+                magicTurn     = magicTurn.trim(),
+                wireGuardEnabled = tunnelTransport == TunnelTransport.WIREGUARD,
+                wireGuardConfig = wireGuardConfig.trim(),
+                wireGuardTunnelName = wireGuardTunnelName.trim().ifBlank { "freeturn-wg" },
+                xrayEnabled = tunnelTransport == TunnelTransport.VLESS,
+                xrayConfig = xrayConfig.trim(),
+                tunnelTransport = tunnelTransport
             )
         )
     }
@@ -384,6 +421,76 @@ fun ClientSetupScreen(
                         singleLine = true,
                         readOnly = privacyMode,
                         supportingText = { Text(stringResource(R.string.magic_switch_address_support)) }
+                    )
+                }
+
+                HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
+
+                Text(stringResource(R.string.tunnel_transport_title), style = MaterialTheme.typography.titleMedium)
+
+                Text(
+                    stringResource(R.string.tunnel_transport_desc),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        selected = tunnelTransport == TunnelTransport.WIREGUARD,
+                        onClick = {
+                            HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                            tunnelTransport = TunnelTransport.WIREGUARD
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                    ) { Text(stringResource(R.string.transport_wireguard)) }
+                    SegmentedButton(
+                        selected = tunnelTransport == TunnelTransport.VLESS,
+                        onClick = {
+                            HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                            tunnelTransport = TunnelTransport.VLESS
+                        },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                    ) { Text(stringResource(R.string.transport_vless)) }
+                }
+
+                if (tunnelTransport == TunnelTransport.WIREGUARD) {
+                    Text(stringResource(R.string.wireguard_section), style = MaterialTheme.typography.titleMedium)
+                    OutlinedTextField(
+                        value = wireGuardTunnelName.redact(privacyMode),
+                        onValueChange = { if (!privacyMode) wireGuardTunnelName = it },
+                        label = { Text(stringResource(R.string.wireguard_tunnel_name)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        readOnly = privacyMode
+                    )
+                    OutlinedTextField(
+                        value = wireGuardConfig.redact(privacyMode),
+                        onValueChange = { if (!privacyMode) wireGuardConfig = it },
+                        label = { Text(stringResource(R.string.wireguard_config_label)) },
+                        placeholder = { Text(stringResource(R.string.wireguard_config_placeholder)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 8,
+                        readOnly = privacyMode,
+                        supportingText = { Text(stringResource(R.string.wireguard_config_support)) }
+                    )
+                }
+
+                if (tunnelTransport == TunnelTransport.VLESS) {
+                    Text(stringResource(R.string.xray_section), style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        stringResource(R.string.xray_enabled_desc),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = xrayConfig.redact(privacyMode),
+                        onValueChange = { if (!privacyMode) xrayConfig = it },
+                        label = { Text(stringResource(R.string.xray_config_label)) },
+                        placeholder = { Text(stringResource(R.string.xray_config_placeholder)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 10,
+                        readOnly = privacyMode,
+                        supportingText = { Text(stringResource(R.string.xray_config_support)) }
                     )
                 }
 

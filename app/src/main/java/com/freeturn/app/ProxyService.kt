@@ -19,6 +19,9 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.DnsMode
+import com.freeturn.app.data.TunnelTransport
+import com.freeturn.app.domain.WireGuardTunnelManager
+import com.freeturn.app.domain.XrayTunnelManager
 import com.freeturn.app.domain.server.KCP_FEC_VALUE
 import java.io.BufferedReader
 import java.io.File
@@ -35,6 +38,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
 sealed class StartupResult {
@@ -70,6 +74,8 @@ class ProxyService : Service() {
         // VLESS: целевое число сессий приходит в этой строке до первого connected.
         private val VLESS_TOTAL_REGEX =
             Pattern.compile("""VLESS mode: waiting for sessions to connect \(total: (\d+)\)""")
+        private const val WIREGUARD_START_DELAY_MS = 2_000L
+        private const val NETWORK_CALLBACK_WARMUP_MS = 3_000L
     }
 
     private var wakeLock: PowerManager.WakeLock? = null
@@ -83,11 +89,14 @@ class ProxyService : Service() {
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     @Volatile private var networkInitialized = false
     @Volatile private var networkDebounceJob: kotlinx.coroutines.Job? = null
+    @Volatile private var lastPhysicalNetworkKey: String? = null
     private val restartCount = AtomicInteger(0)
     @Volatile private var captchaNotificationActive = false
 
     private lateinit var prefs: AppPreferences
     private lateinit var serviceScope: CoroutineScope
+    private lateinit var wireGuard: WireGuardTunnelManager
+    private lateinit var xray: XrayTunnelManager
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -95,6 +104,8 @@ class ProxyService : Service() {
         super.onCreate()
         prefs = AppPreferences(applicationContext)
         serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        wireGuard = WireGuardTunnelManager(applicationContext)
+        xray = XrayTunnelManager(applicationContext)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService(NotificationManager::class.java)
             nm.createNotificationChannel(
@@ -227,6 +238,8 @@ class ProxyService : Service() {
         val startedAt = System.currentTimeMillis()
         var startupEmitted = false
         var startupFailed = false
+        var wireGuardStarted = false
+        var xrayStarted = false
         var captchaSessionCounter = 0L
 
         // --- Трекинг активных соединений для индикации состояния в UI. ---
@@ -390,9 +403,43 @@ class ProxyService : Service() {
                                 startupEmitted = true
                             }
                             hasConnection -> {
-                                ProxyServiceState.setStartupResult(StartupResult.Success)
-                                ProxyServiceState.markConnectedIfAbsent(SystemClock.elapsedRealtime())
-                                updateNotification("Прокси активен")
+                                try {
+                                    if (cfg.tunnelTransport in TunnelTransport.ALL) {
+                                        ProxyServiceState.addLog(
+                                            "Туннельное приложение: ждём ${WIREGUARD_START_DELAY_MS}мс после поднятия TURN-туннеля"
+                                        )
+                                        kotlinx.coroutines.delay(WIREGUARD_START_DELAY_MS)
+                                        if (userStopped.get() || process.get() !== proc) {
+                                            ProxyServiceState.addLog(
+                                                "Туннельное приложение: старт отменён, прокси уже останавливается"
+                                            )
+                                            break
+                                        }
+                                    }
+                                    wireGuard.startAfterProxyReady(cfg)
+                                    wireGuardStarted = cfg.tunnelTransport == TunnelTransport.WIREGUARD
+                                    xray.startAfterProxyReady(cfg)
+                                    xrayStarted = cfg.tunnelTransport == TunnelTransport.VLESS
+                                    ProxyServiceState.setStartupResult(StartupResult.Success)
+                                    ProxyServiceState.markConnectedIfAbsent(SystemClock.elapsedRealtime())
+                                    updateNotification(
+                                        when {
+                                            wireGuardStarted && xrayStarted -> "Прокси, WireGuard и Xray активны"
+                                            wireGuardStarted -> "Прокси и WireGuard активны"
+                                            xrayStarted -> "Прокси и Xray активны"
+                                            else -> "Прокси активен"
+                                        }
+                                    )
+                                } catch (e: Exception) {
+                                    val message = e.message ?: e.javaClass.simpleName
+                                    ProxyServiceState.addLog("Туннельное приложение: ошибка запуска: $message")
+                                    ProxyServiceState.setStartupResult(
+                                        StartupResult.Failed("Туннельное приложение не запустилось: $message")
+                                    )
+                                    updateNotification("Ошибка туннельного приложения")
+                                    startupFailed = true
+                                    proc.destroyCompat()
+                                }
                                 startupEmitted = true
                             }
                         }
@@ -433,6 +480,8 @@ class ProxyService : Service() {
         } finally {
             ProxyServiceState.setCaptchaSession(null)
             cancelCaptchaNotification()
+            xray.stop()
+            wireGuard.stop()
             // Процесс мёртв — активных соединений нет. При watchdog-рестарте
             // publishStats на новом старте снова выставит правильный target.
             ProxyServiceState.setConnectionStats(ConnectionStats.IDLE)
@@ -489,36 +538,107 @@ class ProxyService : Service() {
     private fun registerNetworkCallback() {
         networkInitialized = false
         val cm = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
-        val cb = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) {
-                if (!networkInitialized) {
-                    networkInitialized = true
-                    return
+        val registeredAt = SystemClock.elapsedRealtime()
+        lastPhysicalNetworkKey = physicalNetworkKey(cm)
+        networkInitialized = true
+
+        fun schedulePhysicalNetworkCheck(reason: String) {
+            if (SystemClock.elapsedRealtime() - registeredAt < NETWORK_CALLBACK_WARMUP_MS) {
+                ProxyServiceState.addLog("=== СЕТЬ: начальное событие проигнорировано ($reason) ===")
+                return
+            }
+
+            networkDebounceJob?.cancel()
+            networkDebounceJob = serviceScope.launch {
+                kotlinx.coroutines.delay(2_000)
+                val oldKey = lastPhysicalNetworkKey
+                val newKey = physicalNetworkKey(cm)
+                if (oldKey == newKey) {
+                    ProxyServiceState.addLog("=== СЕТЬ: физическая сеть не изменилась ($reason) ===")
+                    return@launch
                 }
-                
-                // Дебаунс: отменяем предыдущий ждущий перезапуск, если он был
-                networkDebounceJob?.cancel()
-                networkDebounceJob = serviceScope.launch {
-                    kotlinx.coroutines.delay(2000)
-                    if (!userStopped.get() && process.get() != null) {
-                        ProxyServiceState.addLog("=== СМЕНА СЕТИ — ПЕРЕЗАПУСК ===")
-                        updateNotification("Смена сети, переподключение...")
-                        restartCount.set(0)
-                        val p = process.get()
-                        p?.destroyCompat()
-                    }
+
+                lastPhysicalNetworkKey = newKey
+                if (newKey == null) {
+                    ProxyServiceState.addLog("=== СЕТЬ: физическая сеть недоступна ($reason) ===")
+                    return@launch
+                }
+
+                if (!userStopped.get() && process.get() != null) {
+                    ProxyServiceState.addLog("=== СМЕНА СЕТИ — ПЕРЕЗАПУСК ===")
+                    updateNotification("Смена сети, переподключение...")
+                    restartCount.set(0)
+                    process.get()?.destroyCompat()
                 }
             }
         }
-        networkCallback = cb
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            cm.registerDefaultNetworkCallback(cb)
-        } else {
-            val request = NetworkRequest.Builder()
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .build()
-            cm.registerNetworkCallback(request, cb)
+
+        val cb = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                val caps = cm.getNetworkCapabilities(network)
+                if (caps == null || caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) ||
+                    !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)) {
+                    ProxyServiceState.addLog("=== СЕТЬ: VPN-событие проигнорировано ===")
+                    return
+                }
+
+                if (!networkInitialized) {
+                    networkInitialized = true
+                    lastPhysicalNetworkKey = physicalNetworkKey(cm)
+                    return
+                }
+
+                schedulePhysicalNetworkCheck("available")
+            }
+
+            override fun onLost(network: Network) {
+                schedulePhysicalNetworkCheck("lost")
+            }
+
+            override fun onCapabilitiesChanged(
+                network: Network,
+                networkCapabilities: NetworkCapabilities
+            ) {
+                if (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) ||
+                    !networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)) {
+                    return
+                }
+                schedulePhysicalNetworkCheck("capabilities")
+            }
         }
+        networkCallback = cb
+        val request = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+            .build()
+        cm.registerNetworkCallback(request, cb)
+    }
+
+    private fun physicalNetworkKey(cm: ConnectivityManager): String? {
+        return cm.allNetworks.mapNotNull { network ->
+            val caps = cm.getNetworkCapabilities(network) ?: return@mapNotNull null
+            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) ||
+                !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) ||
+                !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)) {
+                return@mapNotNull null
+            }
+            val transports = buildList {
+                if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) add("wifi")
+                if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) add("cellular")
+                if (caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) add("ethernet")
+                if (caps.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH)) add("bluetooth")
+            }
+            if (transports.isEmpty()) return@mapNotNull null
+            val lp = cm.getLinkProperties(network)
+            val iface = lp?.interfaceName.orEmpty()
+            val addresses = lp?.linkAddresses
+                ?.map { it.address.hostAddress.orEmpty() }
+                ?.filter { it.isNotBlank() }
+                ?.sorted()
+                ?.joinToString(",")
+                .orEmpty()
+            "${transports.joinToString("+")}|$iface|$addresses"
+        }.sorted().joinToString(";").ifBlank { null }
     }
 
     private fun unregisterNetworkCallback() {
@@ -604,6 +724,10 @@ class ProxyService : Service() {
         cancelCaptchaNotification()
         ProxyServiceState.addLog("=== ОСТАНОВКА ИЗ ИНТЕРФЕЙСА ===")
         process.get()?.destroyCompat()
+        runBlocking {
+            xray.stop()
+            wireGuard.stop()
+        }
         serviceScope.cancel()
         if (wakeLock?.isHeld == true) wakeLock?.release()
     }

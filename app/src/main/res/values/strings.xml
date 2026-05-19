@@ -50,6 +50,23 @@
     <string name="local_listen_address">Локальный адрес прослушивания</string>
     <string name="local_listen_placeholder">127.0.0.1:9000</string>
     <string name="local_listen_support">Адрес, на котором клиент принимает трафик от WireGuard/Hysteria</string>
+    <string name="wireguard_section">WireGuard</string>
+    <string name="wireguard_enabled">Поднимать WireGuard</string>
+    <string name="wireguard_enabled_desc">После успешного TURN-туннеля приложение автоматически включает Android VPN</string>
+    <string name="wireguard_tunnel_name">Имя туннеля</string>
+    <string name="wireguard_config_label">WireGuard-конфиг</string>
+    <string name="wireguard_config_placeholder">[Interface]\nPrivateKey = …\nAddress = 10.0.0.2/32\n\n[Peer]\nPublicKey = …\nAllowedIPs = 0.0.0.0/0\nEndpoint = 127.0.0.1:9000</string>
+    <string name="wireguard_config_support">Endpoint будет автоматически заменён на локальный адрес прослушивания выше</string>
+    <string name="tunnel_transport_title">Транспорт туннеля</string>
+    <string name="tunnel_transport_desc">Выберите, что поднимать после успешного TURN-туннеля</string>
+    <string name="transport_wireguard">WireGuard</string>
+    <string name="transport_vless">VLESS</string>
+    <string name="xray_section">Xray / VLESS</string>
+    <string name="xray_enabled">Поднимать Xray</string>
+    <string name="xray_enabled_desc">После успешного TURN-туннеля запускает Xray core и направляет VLESS outbound в локальный TURN endpoint</string>
+    <string name="xray_config_label">Xray JSON-конфиг</string>
+    <string name="xray_config_placeholder">{\n  "inbounds": [{ "port": 10808, "listen": "127.0.0.1", "protocol": "socks" }],\n  "outbounds": [{ "protocol": "vless", "settings": { "vnext": [{ "address": "127.0.0.1", "port": 9000, "users": [] }] } }]\n}</string>
+    <string name="xray_config_support">Первый VLESS outbound будет автоматически переписан на локальный адрес прослушивания выше</string>
     <string name="parameters_title">Параметры</string>
     <string name="threads_format">Потоки: %1$d</string>
     <string name="threads_recommendation">Рекомендуется 4–8</string>
