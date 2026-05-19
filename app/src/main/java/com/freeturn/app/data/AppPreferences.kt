@@ -43,6 +43,13 @@ object TunnelTransport {
     val ALL = listOf(WIREGUARD, VLESS)
 }
 
+object SplitTunnelMode {
+    const val ALL = "all"
+    const val INCLUDE = "include"
+    const val EXCLUDE = "exclude"
+    val VALUES = listOf(ALL, INCLUDE, EXCLUDE)
+}
+
 data class ClientConfig(
     val serverAddress: String = "",
     val vkLink: String = "",
@@ -78,7 +85,9 @@ data class ClientConfig(
     val wireGuardTunnelName: String = "freeturn-wg",
     val xrayEnabled: Boolean = false,
     val xrayConfig: String = "",
-    val tunnelTransport: String = TunnelTransport.WIREGUARD
+    val tunnelTransport: String = TunnelTransport.WIREGUARD,
+    val splitTunnelMode: String = SplitTunnelMode.ALL,
+    val splitTunnelApps: String = ""
 )
 
 class AppPreferences(context: Context) {
@@ -117,6 +126,8 @@ class AppPreferences(context: Context) {
         val CLIENT_XRAY_ENABLED = booleanPreferencesKey("client_xray_enabled")
         val CLIENT_XRAY_CONFIG = stringPreferencesKey("client_xray_config")
         val CLIENT_TUNNEL_TRANSPORT = stringPreferencesKey("client_tunnel_transport")
+        val CLIENT_SPLIT_TUNNEL_MODE = stringPreferencesKey("client_split_tunnel_mode")
+        val CLIENT_SPLIT_TUNNEL_APPS = stringPreferencesKey("client_split_tunnel_apps")
         // Устаревшие ключи — не пишутся, но молча удаляются при saveClientConfig.
         private val CLIENT_ALLOCS_PER_STREAM_LEGACY = intPreferencesKey("client_allocs_per_stream")
         private val CLIENT_TURN_PORT_443_LEGACY = booleanPreferencesKey("client_turn_port_443")
@@ -209,7 +220,11 @@ class AppPreferences(context: Context) {
                     else TunnelTransport.WIREGUARD
                 }).let {
                     if (it in TunnelTransport.ALL) it else TunnelTransport.WIREGUARD
-                }
+                },
+                splitTunnelMode = (prefs[CLIENT_SPLIT_TUNNEL_MODE] ?: SplitTunnelMode.ALL).let {
+                    if (it in SplitTunnelMode.VALUES) it else SplitTunnelMode.ALL
+                },
+                splitTunnelApps = prefs[CLIENT_SPLIT_TUNNEL_APPS] ?: ""
             )
         }
 
@@ -341,6 +356,10 @@ class AppPreferences(context: Context) {
             prefs[CLIENT_TUNNEL_TRANSPORT] =
                 if (config.tunnelTransport in TunnelTransport.ALL) config.tunnelTransport
                 else TunnelTransport.WIREGUARD
+            prefs[CLIENT_SPLIT_TUNNEL_MODE] =
+                if (config.splitTunnelMode in SplitTunnelMode.VALUES) config.splitTunnelMode
+                else SplitTunnelMode.ALL
+            prefs[CLIENT_SPLIT_TUNNEL_APPS] = config.splitTunnelApps.trim()
             // Удаляем устаревшие ключи.
             prefs.remove(CLIENT_TURN_PORT_443_LEGACY)
             prefs.remove(CLIENT_ALLOCS_PER_STREAM_LEGACY)

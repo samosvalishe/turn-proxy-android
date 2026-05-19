@@ -82,6 +82,8 @@ internal object ProfileJson {
             put("xrayEnabled", p.client.xrayEnabled)
             put("xrayConfig", p.client.xrayConfig)
             put("tunnelTransport", p.client.tunnelTransport)
+            put("splitTunnelMode", p.client.splitTunnelMode)
+            put("splitTunnelApps", p.client.splitTunnelApps)
         })
         put("proxyListen", p.proxyListen)
         put("proxyConnect", p.proxyConnect)
@@ -141,7 +143,11 @@ internal object ProfileJson {
                     else TunnelTransport.WIREGUARD
                 ).let {
                     if (it in TunnelTransport.ALL) it else TunnelTransport.WIREGUARD
-                }
+                },
+                splitTunnelMode = cliO.optString("splitTunnelMode", SplitTunnelMode.ALL).let {
+                    if (it in SplitTunnelMode.VALUES) it else SplitTunnelMode.ALL
+                },
+                splitTunnelApps = cliO.optString("splitTunnelApps")
             ),
             proxyListen = o.optString("proxyListen").ifBlank { "0.0.0.0:56000" },
             proxyConnect = o.optString("proxyConnect").ifBlank { "127.0.0.1:40537" },
