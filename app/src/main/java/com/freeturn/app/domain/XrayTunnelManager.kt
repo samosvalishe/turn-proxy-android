@@ -6,6 +6,7 @@ import com.freeturn.app.ProxyServiceState
 import com.freeturn.app.data.ClientConfig
 import com.freeturn.app.data.TunnelTransport
 import java.io.File
+import java.io.IOException
 import java.io.InputStreamReader
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -18,25 +19,57 @@ class XrayTunnelManager(context: Context) {
     private val appContext = context.applicationContext
     private val process = AtomicReference<Process?>(null)
 
+    val isRunning: Boolean
+        get() = process.get()?.let { proc ->
+            try {
+                proc.exitValue()
+                false
+            } catch (_: IllegalThreadStateException) {
+                true
+            }
+        } ?: false
+
     suspend fun startAfterProxyReady(cfg: ClientConfig) {
         if (cfg.tunnelTransport != TunnelTransport.VLESS) return
-        val rawConfig = cfg.xrayConfig.trim()
-        if (rawConfig.isBlank()) {
+        start(cfg, rewriteOutboundEndpoint = true)
+    }
+
+    suspend fun startDirect(cfg: ClientConfig) {
+        if (cfg.tunnelTransport != TunnelTransport.VLESS) return
+        start(cfg, rewriteOutboundEndpoint = false)
+    }
+
+    private suspend fun start(cfg: ClientConfig, rewriteOutboundEndpoint: Boolean) {
+        val inputConfig = cfg.xrayConfig.trim()
+        if (inputConfig.isBlank()) {
             throw IllegalArgumentException("Xray config is empty")
+        }
+        val rawConfig = if (inputConfig.startsWith("{")) {
+            inputConfig
+        } else {
+            XrayProfileImporter.import(inputConfig).client.xrayConfig
         }
 
         val executable = File(appContext.applicationInfo.nativeLibraryDir, "libxray.so")
-        if (!executable.canExecute()) {
+        ProxyServiceState.addLog("Xray: nativeLibraryDir=${appContext.applicationInfo.nativeLibraryDir}")
+        ProxyServiceState.addLog("Xray: supported ABIs=${Build.SUPPORTED_ABIS.joinToString(",")}")
+        if (!executable.exists() || executable.length() <= 0L) {
             throw IllegalStateException(
-                "libxray.so не найден. Добавьте Xray core в app/src/main/jniLibs/<abi>/libxray.so"
+                "libxray.so не найден в native libs (${Build.SUPPORTED_ABIS.joinToString(",")}). " +
+                    "В APK сейчас есть arm64-v8a; нужен arm64-девайс или Xray core под ABI устройства."
             )
         }
+        ProxyServiceState.addLog("Xray: core ${executable.absolutePath}")
 
         stop()
 
         val xrayDir = File(appContext.filesDir, "xray").apply { mkdirs() }
         val configFile = File(xrayDir, "config.json")
-        val preparedConfig = rawConfig.withVlessEndpoint(cfg.localPort.trim())
+        val preparedConfig = if (rewriteOutboundEndpoint) {
+            rawConfig.withFirstSupportedOutboundEndpoint(cfg.localPort.trim())
+        } else {
+            rawConfig
+        }
         withContext(Dispatchers.IO) {
             copyAssetIfPresent("xray/geoip.dat", File(xrayDir, "geoip.dat"))
             copyAssetIfPresent("xray/geosite.dat", File(xrayDir, "geosite.dat"))
@@ -44,12 +77,7 @@ class XrayTunnelManager(context: Context) {
         }
 
         val proc = withContext(Dispatchers.IO) {
-            val pb = ProcessBuilder(executable.absolutePath, "-config", configFile.absolutePath)
-                .redirectErrorStream(true)
-                .directory(xrayDir)
-            pb.environment()["XRAY_LOCATION_ASSET"] = xrayDir.absolutePath
-            pb.environment()["XRAY_LOCATION_CONFIG"] = xrayDir.absolutePath
-            pb.start()
+            startXrayProcess(executable, configFile, xrayDir)
         }
         Thread {
             try {
@@ -72,7 +100,10 @@ class XrayTunnelManager(context: Context) {
             throw IllegalStateException("Xray завершился сразу после запуска, проверьте config")
         }
         process.set(proc)
-        ProxyServiceState.addLog("Xray: ядро запущено через ${cfg.localPort.trim()}")
+        ProxyServiceState.addLog(
+            if (rewriteOutboundEndpoint) "Xray: ядро запущено через ${cfg.localPort.trim()}"
+            else "Xray: ядро запущено напрямую"
+        )
     }
 
     suspend fun stop() {
@@ -95,6 +126,31 @@ class XrayTunnelManager(context: Context) {
         } catch (_: Exception) {
         }
     }
+
+    private fun startXrayProcess(executable: File, configFile: File, xrayDir: File): Process {
+        val directArgs = listOf(executable.absolutePath, "-config", configFile.absolutePath)
+        return try {
+            processBuilder(directArgs, xrayDir).start()
+        } catch (e: IOException) {
+            if (!e.message.orEmpty().contains("Permission denied", ignoreCase = true)) throw e
+            val linker = if (Build.SUPPORTED_64_BIT_ABIS.isNotEmpty()) {
+                "/system/bin/linker64"
+            } else {
+                "/system/bin/linker"
+            }
+            ProxyServiceState.addLog("Xray: прямой запуск запрещен, пробуем через $linker")
+            processBuilder(listOf(linker) + directArgs, xrayDir).start()
+        }
+    }
+
+    private fun processBuilder(args: List<String>, xrayDir: File): ProcessBuilder =
+        ProcessBuilder(args)
+            .redirectErrorStream(true)
+            .directory(xrayDir)
+            .also { pb ->
+                pb.environment()["XRAY_LOCATION_ASSET"] = xrayDir.absolutePath
+                pb.environment()["XRAY_LOCATION_CONFIG"] = xrayDir.absolutePath
+            }
 }
 
 private fun Process.waitForCompat(timeout: Long, unit: TimeUnit): Boolean {
@@ -116,22 +172,37 @@ private fun Process.waitForCompat(timeout: Long, unit: TimeUnit): Boolean {
     }
 }
 
-private fun String.withVlessEndpoint(endpoint: String): String {
+private fun String.withFirstSupportedOutboundEndpoint(endpoint: String): String {
     val (host, port) = endpoint.parseHostPort()
     val root = JSONObject(this)
     val outbounds = root.optJSONArray("outbounds")
         ?: throw IllegalArgumentException("outbounds не найден в Xray config")
     for (i in 0 until outbounds.length()) {
         val outbound = outbounds.optJSONObject(i) ?: continue
-        if (!outbound.optString("protocol").equals("vless", ignoreCase = true)) continue
+        val protocol = outbound.optString("protocol").lowercase()
+        if (protocol !in setOf("vless", "vmess", "trojan", "shadowsocks", "hysteria", "hysteria2")) {
+            continue
+        }
         val settings = outbound.optJSONObject("settings") ?: continue
-        val vnext = settings.optJSONArray("vnext") ?: continue
-        val first = vnext.optJSONObject(0) ?: continue
-        first.put("address", host)
-        first.put("port", port)
+        val vnext = settings.optJSONArray("vnext")
+        if (vnext != null && vnext.length() > 0) {
+            val first = vnext.optJSONObject(0) ?: continue
+            first.put("address", host)
+            first.put("port", port)
+            return root.toString(2)
+        }
+        val servers = settings.optJSONArray("servers")
+        if (servers != null && servers.length() > 0) {
+            val first = servers.optJSONObject(0) ?: continue
+            first.put("address", host)
+            first.put("port", port)
+            return root.toString(2)
+        }
+        settings.put("address", host)
+        settings.put("port", port)
         return root.toString(2)
     }
-    throw IllegalArgumentException("VLESS outbound не найден в Xray config")
+    throw IllegalArgumentException("поддерживаемый outbound Xray не найден в config")
 }
 
 private fun String.parseHostPort(): Pair<String, Int> {

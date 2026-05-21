@@ -81,9 +81,11 @@ internal object ProfileJson {
             put("wireGuardTunnelName", p.client.wireGuardTunnelName)
             put("xrayEnabled", p.client.xrayEnabled)
             put("xrayConfig", p.client.xrayConfig)
+            put("xrayProfileName", p.client.xrayProfileName)
             put("tunnelTransport", p.client.tunnelTransport)
             put("splitTunnelMode", p.client.splitTunnelMode)
             put("splitTunnelApps", p.client.splitTunnelApps)
+            put("tunnelRoute", p.client.tunnelRoute)
         })
         put("proxyListen", p.proxyListen)
         put("proxyConnect", p.proxyConnect)
@@ -137,6 +139,7 @@ internal object ProfileJson {
                 wireGuardTunnelName = cliO.optString("wireGuardTunnelName").ifBlank { "freeturn-wg" },
                 xrayEnabled = cliO.optBoolean("xrayEnabled", false),
                 xrayConfig = cliO.optString("xrayConfig"),
+                xrayProfileName = cliO.optString("xrayProfileName"),
                 tunnelTransport = cliO.optString(
                     "tunnelTransport",
                     if (cliO.optBoolean("xrayEnabled", false)) TunnelTransport.VLESS
@@ -147,7 +150,10 @@ internal object ProfileJson {
                 splitTunnelMode = cliO.optString("splitTunnelMode", SplitTunnelMode.ALL).let {
                     if (it in SplitTunnelMode.VALUES) it else SplitTunnelMode.ALL
                 },
-                splitTunnelApps = cliO.optString("splitTunnelApps")
+                splitTunnelApps = cliO.optString("splitTunnelApps"),
+                tunnelRoute = cliO.optString("tunnelRoute", TunnelRoute.FREETURN).let {
+                    if (it in TunnelRoute.ALL) it else TunnelRoute.FREETURN
+                }
             ),
             proxyListen = o.optString("proxyListen").ifBlank { "0.0.0.0:56000" },
             proxyConnect = o.optString("proxyConnect").ifBlank { "127.0.0.1:40537" },

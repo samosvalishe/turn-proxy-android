@@ -3,6 +3,7 @@ package com.freeturn.app.domain
 import android.content.Context
 import com.freeturn.app.ProxyServiceState
 import com.freeturn.app.data.ClientConfig
+import com.freeturn.app.data.SplitTunnelMode
 import com.freeturn.app.data.TunnelTransport
 import com.wireguard.android.backend.GoBackend
 import com.wireguard.android.backend.Tunnel
@@ -29,7 +30,11 @@ class WireGuardTunnelManager(context: Context) {
         val endpoint = cfg.localPort.trim()
         val preparedConfig = rawConfig
             .withLocalEndpoint(endpoint)
-            .excludingApp(appContext.packageName)
+            .withSplitTunnel(
+                appPackage = appContext.packageName,
+                mode = cfg.splitTunnelMode,
+                packages = cfg.splitTunnelApps.toPackageList()
+            )
         val config = Config.parse(
             ByteArrayInputStream(preparedConfig.toByteArray(StandardCharsets.UTF_8))
         )
@@ -83,40 +88,53 @@ private fun String.withLocalEndpoint(endpoint: String): String {
     return lines.joinToString("\n")
 }
 
-private fun String.excludingApp(packageName: String): String {
+private fun String.withSplitTunnel(
+    appPackage: String,
+    mode: String,
+    packages: List<String>
+): String {
     var inInterface = false
-    var hasIncludedApplications = false
-    var changed = false
-    val lines = lineSequence().map { line ->
+    var inserted = false
+    val lines = mutableListOf<String>()
+    lineSequence().forEach { line ->
         val section = line.trim()
         if (section.startsWith("[") && section.endsWith("]")) {
             inInterface = section.equals("[Interface]", ignoreCase = true)
         }
-        when {
-            inInterface && section.startsWith("IncludedApplications", ignoreCase = true) -> {
-                hasIncludedApplications = true
-                line
-            }
-            inInterface && section.startsWith("ExcludedApplications", ignoreCase = true) && section.contains("=") -> {
-                val apps = section.substringAfter("=")
-                    .split(',')
-                    .map { it.trim() }
-                    .filter { it.isNotEmpty() }
-                    .toMutableList()
-                if (packageName !in apps) apps += packageName
-                changed = true
-                "ExcludedApplications = ${apps.joinToString(",")}"
-            }
-            else -> line
-        }
-    }.toMutableList()
-    if (!changed && !hasIncludedApplications) {
-        val interfaceIndex = lines.indexOfFirst {
-            it.trim().equals("[Interface]", ignoreCase = true)
-        }
-        if (interfaceIndex >= 0) {
-            lines.add(interfaceIndex + 1, "ExcludedApplications = $packageName")
-        }
+        val isSplitLine = inInterface && (
+            section.startsWith("IncludedApplications", ignoreCase = true) ||
+                section.startsWith("ExcludedApplications", ignoreCase = true)
+            )
+        if (!isSplitLine) lines += line
     }
-    return lines.joinToString("\n")
+
+    val interfaceIndex = lines.indexOfFirst {
+        it.trim().equals("[Interface]", ignoreCase = true)
+    }
+    if (interfaceIndex < 0) return lines.joinToString("\n")
+
+    val splitLines = when (mode) {
+        SplitTunnelMode.INCLUDE -> {
+            val included = packages.filter { it != appPackage }.distinct()
+            if (included.isEmpty()) emptyList()
+            else listOf("IncludedApplications = ${included.joinToString(",")}")
+        }
+        SplitTunnelMode.EXCLUDE -> {
+            val excluded = (packages + appPackage).distinct()
+            listOf("ExcludedApplications = ${excluded.joinToString(",")}")
+        }
+        else -> listOf("ExcludedApplications = $appPackage")
+    }
+
+    if (splitLines.isNotEmpty()) {
+        lines.addAll(interfaceIndex + 1, splitLines)
+        inserted = true
+    }
+    return if (inserted) lines.joinToString("\n") else this
 }
+
+private fun String.toPackageList(): List<String> =
+    split(',', '\n', ' ', ';')
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .distinct()

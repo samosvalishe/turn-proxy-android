@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.io.IOException
 import androidx.core.content.edit
 
@@ -48,6 +47,12 @@ object SplitTunnelMode {
     const val INCLUDE = "include"
     const val EXCLUDE = "exclude"
     val VALUES = listOf(ALL, INCLUDE, EXCLUDE)
+}
+
+object TunnelRoute {
+    const val FREETURN = "freeturn"
+    const val DIRECT_XRAY = "direct_xray"
+    val ALL = listOf(FREETURN, DIRECT_XRAY)
 }
 
 data class ClientConfig(
@@ -85,9 +90,11 @@ data class ClientConfig(
     val wireGuardTunnelName: String = "freeturn-wg",
     val xrayEnabled: Boolean = false,
     val xrayConfig: String = "",
+    val xrayProfileName: String = "",
     val tunnelTransport: String = TunnelTransport.WIREGUARD,
     val splitTunnelMode: String = SplitTunnelMode.ALL,
-    val splitTunnelApps: String = ""
+    val splitTunnelApps: String = "",
+    val tunnelRoute: String = TunnelRoute.FREETURN
 )
 
 class AppPreferences(context: Context) {
@@ -125,9 +132,11 @@ class AppPreferences(context: Context) {
         val CLIENT_WG_TUNNEL_NAME = stringPreferencesKey("client_wg_tunnel_name")
         val CLIENT_XRAY_ENABLED = booleanPreferencesKey("client_xray_enabled")
         val CLIENT_XRAY_CONFIG = stringPreferencesKey("client_xray_config")
+        val CLIENT_XRAY_PROFILE_NAME = stringPreferencesKey("client_xray_profile_name")
         val CLIENT_TUNNEL_TRANSPORT = stringPreferencesKey("client_tunnel_transport")
         val CLIENT_SPLIT_TUNNEL_MODE = stringPreferencesKey("client_split_tunnel_mode")
         val CLIENT_SPLIT_TUNNEL_APPS = stringPreferencesKey("client_split_tunnel_apps")
+        val CLIENT_TUNNEL_ROUTE = stringPreferencesKey("client_tunnel_route")
         // Устаревшие ключи — не пишутся, но молча удаляются при saveClientConfig.
         private val CLIENT_ALLOCS_PER_STREAM_LEGACY = intPreferencesKey("client_allocs_per_stream")
         private val CLIENT_TURN_PORT_443_LEGACY = booleanPreferencesKey("client_turn_port_443")
@@ -215,6 +224,7 @@ class AppPreferences(context: Context) {
                 wireGuardTunnelName = prefs[CLIENT_WG_TUNNEL_NAME] ?: "freeturn-wg",
                 xrayEnabled = prefs[CLIENT_XRAY_ENABLED] ?: false,
                 xrayConfig = prefs[CLIENT_XRAY_CONFIG] ?: "",
+                xrayProfileName = prefs[CLIENT_XRAY_PROFILE_NAME] ?: "",
                 tunnelTransport = (prefs[CLIENT_TUNNEL_TRANSPORT] ?: run {
                     if (prefs[CLIENT_XRAY_ENABLED] == true) TunnelTransport.VLESS
                     else TunnelTransport.WIREGUARD
@@ -224,7 +234,10 @@ class AppPreferences(context: Context) {
                 splitTunnelMode = (prefs[CLIENT_SPLIT_TUNNEL_MODE] ?: SplitTunnelMode.ALL).let {
                     if (it in SplitTunnelMode.VALUES) it else SplitTunnelMode.ALL
                 },
-                splitTunnelApps = prefs[CLIENT_SPLIT_TUNNEL_APPS] ?: ""
+                splitTunnelApps = prefs[CLIENT_SPLIT_TUNNEL_APPS] ?: "",
+                tunnelRoute = (prefs[CLIENT_TUNNEL_ROUTE] ?: TunnelRoute.FREETURN).let {
+                    if (it in TunnelRoute.ALL) it else TunnelRoute.FREETURN
+                }
             )
         }
 
@@ -353,6 +366,7 @@ class AppPreferences(context: Context) {
             prefs[CLIENT_WG_TUNNEL_NAME] = config.wireGuardTunnelName.trim().ifBlank { "freeturn-wg" }
             prefs[CLIENT_XRAY_ENABLED] = config.xrayEnabled
             prefs[CLIENT_XRAY_CONFIG] = config.xrayConfig.trim()
+            prefs[CLIENT_XRAY_PROFILE_NAME] = config.xrayProfileName.trim()
             prefs[CLIENT_TUNNEL_TRANSPORT] =
                 if (config.tunnelTransport in TunnelTransport.ALL) config.tunnelTransport
                 else TunnelTransport.WIREGUARD
@@ -360,6 +374,9 @@ class AppPreferences(context: Context) {
                 if (config.splitTunnelMode in SplitTunnelMode.VALUES) config.splitTunnelMode
                 else SplitTunnelMode.ALL
             prefs[CLIENT_SPLIT_TUNNEL_APPS] = config.splitTunnelApps.trim()
+            prefs[CLIENT_TUNNEL_ROUTE] =
+                if (config.tunnelRoute in TunnelRoute.ALL) config.tunnelRoute
+                else TunnelRoute.FREETURN
             // Удаляем устаревшие ключи.
             prefs.remove(CLIENT_TURN_PORT_443_LEGACY)
             prefs.remove(CLIENT_ALLOCS_PER_STREAM_LEGACY)
@@ -403,8 +420,6 @@ class AppPreferences(context: Context) {
         context.dataStore.edit { it.clear() }
         withContext(Dispatchers.IO) {
             encryptedPrefs.edit { clear() }
-            // Чистим следы старого кастомного ядра, если оставались.
-            File(context.filesDir, "custom_vkturn").delete()
         }
     }
 }

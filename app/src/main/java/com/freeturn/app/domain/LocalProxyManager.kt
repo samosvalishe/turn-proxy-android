@@ -8,6 +8,8 @@ import com.freeturn.app.ProxyService
 import com.freeturn.app.ProxyServiceState
 import com.freeturn.app.StartupResult
 import com.freeturn.app.data.ClientConfig
+import com.freeturn.app.data.TunnelRoute
+import com.freeturn.app.data.TunnelTransport
 import com.freeturn.app.viewmodel.ProxyState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -111,11 +113,16 @@ class LocalProxyManager(private val context: Context) {
         if (ProxyServiceState.isRunning.value) return
         if (_proxyState.value is ProxyState.Error) _proxyState.value = ProxyState.Idle
 
-        if (!cfg.isRawMode && (cfg.serverAddress.isBlank() || cfg.vkLink.isBlank())) {
+        if (cfg.tunnelRoute == TunnelRoute.DIRECT_XRAY) {
+            if (cfg.tunnelTransport != TunnelTransport.VLESS || cfg.xrayConfig.isBlank()) {
+                setErrorWithAutoReset("Не задан Xray config")
+                return
+            }
+        } else if (!cfg.isRawMode && (cfg.serverAddress.isBlank() || cfg.vkLink.isBlank())) {
             setErrorWithAutoReset("Не заполнены настройки клиента")
             return
         }
-        if (cfg.isRawMode && cfg.rawCommand.isBlank()) {
+        if (cfg.tunnelRoute != TunnelRoute.DIRECT_XRAY && cfg.isRawMode && cfg.rawCommand.isBlank()) {
             setErrorWithAutoReset("Не задана raw-команда")
             return
         }

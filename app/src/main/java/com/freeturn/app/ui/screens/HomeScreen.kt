@@ -91,6 +91,7 @@ import com.freeturn.app.viewmodel.MainViewModel
 import com.freeturn.app.viewmodel.ProxyState
 import com.freeturn.app.viewmodel.SshConnectionState
 import com.freeturn.app.viewmodel.UpdateState
+import com.freeturn.app.data.TunnelRoute
 import com.freeturn.app.data.TunnelTransport
 import androidx.core.net.toUri
 
@@ -205,7 +206,8 @@ fun HomeScreen(
                     when (proxyState) {
                         is ProxyState.Idle, is ProxyState.Error -> {
                             HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                            if (clientConfig.tunnelTransport == TunnelTransport.WIREGUARD) {
+                            if (clientConfig.tunnelRoute == TunnelRoute.FREETURN &&
+                                clientConfig.tunnelTransport == TunnelTransport.WIREGUARD) {
                                 val vpnIntent = VpnService.prepare(context)
                                 if (vpnIntent != null) {
                                     wireGuardPermissionLauncher.launch(vpnIntent)
@@ -282,9 +284,13 @@ fun HomeScreen(
                         ConfigRow(stringResource(R.string.local_port), clientConfig.localPort.redact(privacyMode))
                         ConfigRow(
                             stringResource(R.string.tunnel_transport_title),
-                            if (clientConfig.tunnelTransport == TunnelTransport.WIREGUARD)
-                                stringResource(R.string.transport_wireguard)
-                            else stringResource(R.string.transport_vless)
+                            when {
+                                clientConfig.tunnelRoute == TunnelRoute.DIRECT_XRAY ->
+                                    stringResource(R.string.tunnel_route_direct_xray)
+                                clientConfig.tunnelTransport == TunnelTransport.WIREGUARD ->
+                                    stringResource(R.string.transport_wireguard)
+                                else -> stringResource(R.string.transport_vless)
+                            }
                         )
                     }
                 }
