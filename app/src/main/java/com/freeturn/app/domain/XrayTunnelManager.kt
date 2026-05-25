@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
 import org.json.JSONObject
 
 class XrayTunnelManager(context: Context) {
@@ -31,15 +32,24 @@ class XrayTunnelManager(context: Context) {
 
     suspend fun startAfterProxyReady(cfg: ClientConfig) {
         if (cfg.tunnelTransport != TunnelTransport.VLESS) return
-        start(cfg, rewriteOutboundEndpoint = true)
+        start(cfg, rewriteOutboundEndpoint = true, tunFd = null)
     }
 
     suspend fun startDirect(cfg: ClientConfig) {
         if (cfg.tunnelTransport != TunnelTransport.VLESS) return
-        start(cfg, rewriteOutboundEndpoint = false)
+        start(cfg, rewriteOutboundEndpoint = false, tunFd = null)
     }
 
-    private suspend fun start(cfg: ClientConfig, rewriteOutboundEndpoint: Boolean) {
+    suspend fun startDirectVpn(cfg: ClientConfig, tunFd: Int) {
+        if (cfg.tunnelTransport != TunnelTransport.VLESS) return
+        start(cfg, rewriteOutboundEndpoint = false, tunFd = tunFd)
+    }
+
+    private suspend fun start(
+        cfg: ClientConfig,
+        rewriteOutboundEndpoint: Boolean,
+        tunFd: Int?
+    ) {
         val inputConfig = cfg.xrayConfig.trim()
         if (inputConfig.isBlank()) {
             throw IllegalArgumentException("Xray config is empty")
@@ -65,10 +75,15 @@ class XrayTunnelManager(context: Context) {
 
         val xrayDir = File(appContext.filesDir, "xray").apply { mkdirs() }
         val configFile = File(xrayDir, "config.json")
-        val preparedConfig = if (rewriteOutboundEndpoint) {
-            rawConfig.withFirstSupportedOutboundEndpoint(cfg.localPort.trim())
-        } else {
-            rawConfig
+        val preparedConfig = when {
+            tunFd != null -> rawConfig.withAndroidTunInbound()
+            rewriteOutboundEndpoint -> {
+                require(rawConfig.firstSupportedOutboundProtocol() == "vless") {
+                    "для режима VLESS через FreeTurn нужен VLESS outbound. Для VMess/Trojan/Shadowsocks/Hysteria выберите режим Xray напрямую."
+                }
+                rawConfig.withFirstSupportedOutboundEndpoint(cfg.localPort.trim())
+            }
+            else -> rawConfig
         }
         withContext(Dispatchers.IO) {
             copyAssetIfPresent("xray/geoip.dat", File(xrayDir, "geoip.dat"))
@@ -77,7 +92,7 @@ class XrayTunnelManager(context: Context) {
         }
 
         val proc = withContext(Dispatchers.IO) {
-            startXrayProcess(executable, configFile, xrayDir)
+            startXrayProcess(executable, configFile, xrayDir, tunFd)
         }
         Thread {
             try {
@@ -127,10 +142,15 @@ class XrayTunnelManager(context: Context) {
         }
     }
 
-    private fun startXrayProcess(executable: File, configFile: File, xrayDir: File): Process {
+    private fun startXrayProcess(
+        executable: File,
+        configFile: File,
+        xrayDir: File,
+        tunFd: Int?
+    ): Process {
         val directArgs = listOf(executable.absolutePath, "-config", configFile.absolutePath)
         return try {
-            processBuilder(directArgs, xrayDir).start()
+            processBuilder(directArgs, xrayDir, tunFd).start()
         } catch (e: IOException) {
             if (!e.message.orEmpty().contains("Permission denied", ignoreCase = true)) throw e
             val linker = if (Build.SUPPORTED_64_BIT_ABIS.isNotEmpty()) {
@@ -139,17 +159,21 @@ class XrayTunnelManager(context: Context) {
                 "/system/bin/linker"
             }
             ProxyServiceState.addLog("Xray: прямой запуск запрещен, пробуем через $linker")
-            processBuilder(listOf(linker) + directArgs, xrayDir).start()
+            processBuilder(listOf(linker) + directArgs, xrayDir, tunFd).start()
         }
     }
 
-    private fun processBuilder(args: List<String>, xrayDir: File): ProcessBuilder =
+    private fun processBuilder(args: List<String>, xrayDir: File, tunFd: Int?): ProcessBuilder =
         ProcessBuilder(args)
             .redirectErrorStream(true)
             .directory(xrayDir)
             .also { pb ->
                 pb.environment()["XRAY_LOCATION_ASSET"] = xrayDir.absolutePath
                 pb.environment()["XRAY_LOCATION_CONFIG"] = xrayDir.absolutePath
+                if (tunFd != null) {
+                    pb.environment()["XRAY_TUN_FD"] = tunFd.toString()
+                    pb.environment()["xray.tun.fd"] = tunFd.toString()
+                }
             }
 }
 
@@ -203,6 +227,46 @@ private fun String.withFirstSupportedOutboundEndpoint(endpoint: String): String 
         return root.toString(2)
     }
     throw IllegalArgumentException("поддерживаемый outbound Xray не найден в config")
+}
+
+private fun String.firstSupportedOutboundProtocol(): String? {
+    val outbounds = JSONObject(this).optJSONArray("outbounds") ?: return null
+    for (i in 0 until outbounds.length()) {
+        val protocol = outbounds.optJSONObject(i)?.optString("protocol")?.lowercase().orEmpty()
+        if (protocol in setOf("vless", "vmess", "trojan", "shadowsocks", "hysteria", "hysteria2")) {
+            return protocol
+        }
+    }
+    return null
+}
+
+private fun String.withAndroidTunInbound(): String {
+    val root = JSONObject(this)
+    val inbounds = root.optJSONArray("inbounds") ?: JSONArray().also {
+        root.put("inbounds", it)
+    }
+    for (i in 0 until inbounds.length()) {
+        if (inbounds.optJSONObject(i)?.optString("protocol").equals("tun", ignoreCase = true)) {
+            return root.toString(2)
+        }
+    }
+    val tunInbound = JSONObject()
+        .put("tag", "android-tun")
+        .put("protocol", "tun")
+        .put("settings", JSONObject()
+            .put("name", "xray0")
+            .put("mtu", 1500)
+            .put("gateway", org.json.JSONArray()
+                .put("172.19.0.1/30")
+                .put("fdfe:dcba:9876::1/126")
+            )
+            .put("dns", org.json.JSONArray()
+                .put("1.1.1.1")
+                .put("8.8.8.8")
+            )
+        )
+    inbounds.put(0, tunInbound)
+    return root.toString(2)
 }
 
 private fun String.parseHostPort(): Pair<String, Int> {

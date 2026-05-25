@@ -173,10 +173,7 @@ class ProxyService : Service() {
         if (userStopped.get()) return
 
         val cfg = prefs.clientConfigFlow.first()
-        if (cfg.tunnelRoute == TunnelRoute.DIRECT_XRAY) {
-            startDirectXray(cfg)
-            return
-        }
+        ProxyServiceState.setLogsEnabled(cfg.logsEnabled)
         // Wrap-обфускация и VLESS bonding управляются на серверном экране, но
         // должны передаваться и клиенту с тем же ключом, иначе DTLS-handshake
         // не сойдётся. Источник истины — общий serverOpts.
@@ -509,44 +506,6 @@ class ProxyService : Service() {
                     } else {
                         ProxyServiceState.addLog("=== Сессия завершена нормально ===")
                     }
-                    ProxyServiceState.setRunning(false)
-                    stopSelf()
-                }
-                else -> scheduleWatchdogRestart()
-            }
-        }
-    }
-
-    private suspend fun startDirectXray(cfg: com.freeturn.app.data.ClientConfig) {
-        var startupFailed = false
-        try {
-            ProxyServiceState.addLog("Xray: прямой режим без libvkturn")
-            xray.startDirect(cfg)
-            ProxyServiceState.setConnectionStats(ConnectionStats(1, 1))
-            ProxyServiceState.setStartupResult(StartupResult.Success)
-            ProxyServiceState.markConnectedIfAbsent(SystemClock.elapsedRealtime())
-            updateNotification("Xray активен")
-            while (!userStopped.get() && xray.isRunning) {
-                kotlinx.coroutines.delay(1_000)
-            }
-            if (!userStopped.get()) {
-                ProxyServiceState.addLog("Xray: процесс остановился")
-            }
-        } catch (e: Exception) {
-            val message = e.message ?: e.javaClass.simpleName
-            ProxyServiceState.addLog("Xray: ошибка запуска: $message")
-            ProxyServiceState.setStartupResult(StartupResult.Failed("Xray не запустился: $message"))
-            updateNotification("Ошибка Xray")
-            startupFailed = true
-        } finally {
-            xray.stop()
-            ProxyServiceState.setConnectionStats(ConnectionStats.IDLE)
-            when {
-                userStopped.get() -> {
-                    ProxyServiceState.setRunning(false)
-                    stopSelf()
-                }
-                startupFailed -> {
                     ProxyServiceState.setRunning(false)
                     stopSelf()
                 }

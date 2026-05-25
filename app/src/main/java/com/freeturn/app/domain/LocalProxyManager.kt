@@ -7,6 +7,7 @@ import com.freeturn.app.ConnectionStats
 import com.freeturn.app.ProxyService
 import com.freeturn.app.ProxyServiceState
 import com.freeturn.app.StartupResult
+import com.freeturn.app.XrayVpnService
 import com.freeturn.app.data.ClientConfig
 import com.freeturn.app.data.TunnelRoute
 import com.freeturn.app.data.TunnelTransport
@@ -133,7 +134,12 @@ class LocalProxyManager(private val context: Context) {
         ProxyServiceState.setStartupResult(null)
         ProxyServiceState.setConnectionStats(ConnectionStats.IDLE)
         ProxyServiceState.clearConnectedSince()
-        val intent = Intent(context, ProxyService::class.java)
+        val serviceClass = if (cfg.tunnelRoute == TunnelRoute.DIRECT_XRAY) {
+            XrayVpnService::class.java
+        } else {
+            ProxyService::class.java
+        }
+        val intent = Intent(context, serviceClass)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(intent)
         } else {
@@ -181,6 +187,7 @@ class LocalProxyManager(private val context: Context) {
 
     fun stopProxy() {
         context.stopService(Intent(context, ProxyService::class.java))
+        context.stopService(Intent(context, XrayVpnService::class.java))
         _proxyState.value = ProxyState.Idle
     }
 

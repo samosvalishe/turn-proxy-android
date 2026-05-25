@@ -21,6 +21,9 @@ object XrayProfileImporter {
         val (name, config) = when {
             value.startsWith("{") -> {
                 val json = JSONObject(value)
+                require(json.has("outbounds") && json.optJSONArray("outbounds") != null) {
+                    "JSON должен быть Xray config с массивом outbounds. Для happ/hiddify/sing-box используйте share-ссылку протокола."
+                }
                 val name = json.optString("remarks")
                     .ifBlank { json.optString("name") }
                     .ifBlank { "Xray profile" }

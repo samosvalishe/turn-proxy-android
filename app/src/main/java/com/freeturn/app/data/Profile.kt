@@ -86,6 +86,7 @@ internal object ProfileJson {
             put("splitTunnelMode", p.client.splitTunnelMode)
             put("splitTunnelApps", p.client.splitTunnelApps)
             put("tunnelRoute", p.client.tunnelRoute)
+            put("logsEnabled", p.client.logsEnabled)
         })
         put("proxyListen", p.proxyListen)
         put("proxyConnect", p.proxyConnect)
@@ -153,7 +154,8 @@ internal object ProfileJson {
                 splitTunnelApps = cliO.optString("splitTunnelApps"),
                 tunnelRoute = cliO.optString("tunnelRoute", TunnelRoute.FREETURN).let {
                     if (it in TunnelRoute.ALL) it else TunnelRoute.FREETURN
-                }
+                },
+                logsEnabled = cliO.optBoolean("logsEnabled", true)
             ),
             proxyListen = o.optString("proxyListen").ifBlank { "0.0.0.0:56000" },
             proxyConnect = o.optString("proxyConnect").ifBlank { "127.0.0.1:40537" },

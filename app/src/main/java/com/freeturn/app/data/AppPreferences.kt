@@ -94,7 +94,8 @@ data class ClientConfig(
     val tunnelTransport: String = TunnelTransport.WIREGUARD,
     val splitTunnelMode: String = SplitTunnelMode.ALL,
     val splitTunnelApps: String = "",
-    val tunnelRoute: String = TunnelRoute.FREETURN
+    val tunnelRoute: String = TunnelRoute.FREETURN,
+    val logsEnabled: Boolean = true
 )
 
 class AppPreferences(context: Context) {
@@ -137,6 +138,7 @@ class AppPreferences(context: Context) {
         val CLIENT_SPLIT_TUNNEL_MODE = stringPreferencesKey("client_split_tunnel_mode")
         val CLIENT_SPLIT_TUNNEL_APPS = stringPreferencesKey("client_split_tunnel_apps")
         val CLIENT_TUNNEL_ROUTE = stringPreferencesKey("client_tunnel_route")
+        val CLIENT_LOGS_ENABLED = booleanPreferencesKey("client_logs_enabled")
         // Устаревшие ключи — не пишутся, но молча удаляются при saveClientConfig.
         private val CLIENT_ALLOCS_PER_STREAM_LEGACY = intPreferencesKey("client_allocs_per_stream")
         private val CLIENT_TURN_PORT_443_LEGACY = booleanPreferencesKey("client_turn_port_443")
@@ -237,7 +239,8 @@ class AppPreferences(context: Context) {
                 splitTunnelApps = prefs[CLIENT_SPLIT_TUNNEL_APPS] ?: "",
                 tunnelRoute = (prefs[CLIENT_TUNNEL_ROUTE] ?: TunnelRoute.FREETURN).let {
                     if (it in TunnelRoute.ALL) it else TunnelRoute.FREETURN
-                }
+                },
+                logsEnabled = prefs[CLIENT_LOGS_ENABLED] ?: true
             )
         }
 
@@ -377,6 +380,7 @@ class AppPreferences(context: Context) {
             prefs[CLIENT_TUNNEL_ROUTE] =
                 if (config.tunnelRoute in TunnelRoute.ALL) config.tunnelRoute
                 else TunnelRoute.FREETURN
+            prefs[CLIENT_LOGS_ENABLED] = config.logsEnabled
             // Удаляем устаревшие ключи.
             prefs.remove(CLIENT_TURN_PORT_443_LEGACY)
             prefs.remove(CLIENT_ALLOCS_PER_STREAM_LEGACY)

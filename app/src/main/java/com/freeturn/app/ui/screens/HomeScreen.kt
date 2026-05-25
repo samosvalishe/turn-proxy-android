@@ -206,8 +206,9 @@ fun HomeScreen(
                     when (proxyState) {
                         is ProxyState.Idle, is ProxyState.Error -> {
                             HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                            if (clientConfig.tunnelRoute == TunnelRoute.FREETURN &&
-                                clientConfig.tunnelTransport == TunnelTransport.WIREGUARD) {
+                            if (clientConfig.tunnelRoute == TunnelRoute.DIRECT_XRAY ||
+                                (clientConfig.tunnelRoute == TunnelRoute.FREETURN &&
+                                    clientConfig.tunnelTransport == TunnelTransport.WIREGUARD)) {
                                 val vpnIntent = VpnService.prepare(context)
                                 if (vpnIntent != null) {
                                     wireGuardPermissionLauncher.launch(vpnIntent)

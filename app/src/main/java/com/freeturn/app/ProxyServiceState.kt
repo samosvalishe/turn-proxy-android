@@ -39,6 +39,8 @@ object ProxyServiceState {
 
     private val _logs = MutableStateFlow<List<String>>(emptyList())
     val logs: StateFlow<List<String>> = _logs.asStateFlow()
+    private val _logsEnabled = MutableStateFlow(true)
+    val logsEnabled: StateFlow<Boolean> = _logsEnabled.asStateFlow()
 
     private val _proxyFailed = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val proxyFailed: SharedFlow<Unit> = _proxyFailed.asSharedFlow()
@@ -77,10 +79,15 @@ object ProxyServiceState {
     }
 
     fun addLog(msg: String) {
+        if (!_logsEnabled.value) return
         _logs.update { current ->
             val next = current + msg
             if (next.size > MAX_LOG_LINES) next.drop(next.size - MAX_LOG_LINES) else next
         }
+    }
+
+    fun setLogsEnabled(value: Boolean) {
+        _logsEnabled.value = value
     }
 
     fun setCaptchaSession(session: CaptchaSession?) {

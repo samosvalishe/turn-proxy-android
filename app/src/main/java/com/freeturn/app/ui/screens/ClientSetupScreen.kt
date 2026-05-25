@@ -39,6 +39,8 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -139,6 +141,9 @@ fun ClientSetupScreen(
     var splitTunnelApps by rememberSaveable(saved.splitTunnelApps) {
         mutableStateOf(saved.splitTunnelApps)
     }
+    var logsEnabled by rememberSaveable(saved.logsEnabled) {
+        mutableStateOf(saved.logsEnabled)
+    }
     var showSplitAppPicker by rememberSaveable { mutableStateOf(false) }
     var lastSliderInt by rememberSaveable { mutableIntStateOf(saved.threads) }
     var lastStreamsInt by rememberSaveable { mutableIntStateOf(saved.streamsPerCred) }
@@ -179,6 +184,7 @@ fun ClientSetupScreen(
         tunnelRoute = saved.tunnelRoute
         splitTunnelMode = saved.splitTunnelMode
         splitTunnelApps = saved.splitTunnelApps
+        logsEnabled = saved.logsEnabled
         lastSliderInt = saved.threads
         lastStreamsInt = saved.streamsPerCred
     }
@@ -206,7 +212,8 @@ fun ClientSetupScreen(
         tunnelTransport,
         tunnelRoute,
         splitTunnelMode,
-        splitTunnelApps
+        splitTunnelApps,
+        logsEnabled
     ) {
         delay(600)
         viewModel.saveClientConfig(
@@ -238,7 +245,8 @@ fun ClientSetupScreen(
                 tunnelTransport = tunnelTransport,
                 splitTunnelMode = splitTunnelMode,
                 splitTunnelApps = splitTunnelApps.trim(),
-                tunnelRoute = tunnelRoute
+                tunnelRoute = tunnelRoute,
+                logsEnabled = logsEnabled
             )
         )
     }
@@ -489,7 +497,7 @@ fun ClientSetupScreen(
 
                 HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
 
-                Text(stringResource(R.string.tunnel_route_title), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.connection_mode_tabs), style = MaterialTheme.typography.titleMedium)
 
                 Text(
                     stringResource(R.string.tunnel_route_desc),
@@ -497,23 +505,32 @@ fun ClientSetupScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    SegmentedButton(
-                        selected = tunnelRoute == TunnelRoute.FREETURN,
+                val selectedModeTab = if (tunnelRoute == TunnelRoute.DIRECT_XRAY) 1 else 0
+                TabRow(selectedTabIndex = selectedModeTab, modifier = Modifier.fillMaxWidth()) {
+                    Tab(
+                        selected = selectedModeTab == 0,
                         onClick = {
                             HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
                             tunnelRoute = TunnelRoute.FREETURN
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                    ) { Text(stringResource(R.string.tunnel_route_freeturn)) }
-                    SegmentedButton(
-                        selected = tunnelRoute == TunnelRoute.DIRECT_XRAY,
+                        }
+                    ) {
+                        Text(
+                            stringResource(R.string.mode_vk_turn),
+                            modifier = Modifier.padding(vertical = 12.dp)
+                        )
+                    }
+                    Tab(
+                        selected = selectedModeTab == 1,
                         onClick = {
                             HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
                             tunnelRoute = TunnelRoute.DIRECT_XRAY
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                    ) { Text(stringResource(R.string.tunnel_route_direct_xray)) }
+                        }
+                    ) {
+                        Text(
+                            stringResource(R.string.mode_xray_direct),
+                            modifier = Modifier.padding(vertical = 12.dp)
+                        )
+                    }
                 }
 
                 HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
@@ -580,8 +597,48 @@ fun ClientSetupScreen(
                     )
                 }
 
-                if (tunnelRoute == TunnelRoute.DIRECT_XRAY ||
+                if (tunnelRoute == TunnelRoute.FREETURN &&
                     tunnelTransport == TunnelTransport.VLESS) {
+                    Text(stringResource(R.string.vless_section), style = MaterialTheme.typography.titleMedium)
+                    if (xrayProfileName.isNotBlank()) {
+                        Text(
+                            stringResource(R.string.xray_profile_active, xrayProfileName),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Text(
+                        stringResource(R.string.vless_enabled_desc),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = xrayConfig.redact(privacyMode),
+                        onValueChange = {
+                            if (!privacyMode) {
+                                xrayConfig = it
+                                xrayProfileName = ""
+                            }
+                        },
+                        label = { Text(stringResource(R.string.vless_profile_label)) },
+                        placeholder = { Text(stringResource(R.string.vless_profile_placeholder)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 10,
+                        readOnly = privacyMode,
+                        supportingText = { Text(stringResource(R.string.vless_profile_support)) }
+                    )
+                    SplitTunnelSettings(
+                        mode = splitTunnelMode,
+                        apps = splitTunnelApps,
+                        privacyMode = privacyMode,
+                        xrayLimit = true,
+                        onModeChange = { splitTunnelMode = it },
+                        onAppsChange = { splitTunnelApps = it },
+                        onPickApps = { showSplitAppPicker = true }
+                    )
+                }
+
+                if (tunnelRoute == TunnelRoute.DIRECT_XRAY) {
                     Text(stringResource(R.string.xray_section), style = MaterialTheme.typography.titleMedium)
                     if (xrayProfileName.isNotBlank()) {
                         Text(
@@ -591,7 +648,7 @@ fun ClientSetupScreen(
                         )
                     }
                     Text(
-                        stringResource(R.string.xray_enabled_desc),
+                        stringResource(R.string.xray_direct_desc),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -620,6 +677,16 @@ fun ClientSetupScreen(
                         onPickApps = { showSplitAppPicker = true }
                     )
                 }
+
+                SwitchRow(
+                    label = stringResource(R.string.logs_enabled),
+                    description = stringResource(R.string.logs_enabled_desc),
+                    checked = logsEnabled,
+                    onCheckedChange = {
+                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                        logsEnabled = it
+                    }
+                )
 
                 HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
 

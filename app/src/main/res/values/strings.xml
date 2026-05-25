@@ -63,6 +63,9 @@
     <string name="tunnel_route_desc">FreeTurn сначала поднимает TURN-туннель через libvkturn, прямой Xray запускает только Xray core без VK/TURN</string>
     <string name="tunnel_route_freeturn">FreeTurn</string>
     <string name="tunnel_route_direct_xray">Xray напрямую</string>
+    <string name="connection_mode_tabs">Режим трафика</string>
+    <string name="mode_vk_turn">VK-TURN</string>
+    <string name="mode_xray_direct">Xray</string>
     <string name="transport_wireguard">WireGuard</string>
     <string name="transport_vless">Xray core</string>
     <string name="split_tunnel_title">Split tunneling</string>
@@ -84,6 +87,14 @@
     <string name="xray_profile_active">Активный Xray-профиль: %1$s</string>
     <string name="xray_config_placeholder">{\n  "inbounds": [{ "port": 10808, "listen": "127.0.0.1", "protocol": "socks" }],\n  "outbounds": [{ "protocol": "vless", "settings": { "vnext": [{ "address": "127.0.0.1", "port": 9000, "users": [] }] } }]\n}</string>
     <string name="xray_config_support">Можно вставить JSON или ссылку vless://, vmess://, trojan://, ss://, hysteria2://. Первый поддерживаемый outbound будет автоматически переписан на локальный адрес прослушивания выше</string>
+    <string name="xray_direct_desc">Запускает Xray core напрямую через Android VPN/TUN без libvkturn. Подходит для классических Xray-профилей и протоколов VMess/Trojan/Shadowsocks/Hysteria.</string>
+    <string name="vless_section">VLESS через FreeTurn</string>
+    <string name="vless_enabled_desc">Сначала поднимается TURN-туннель через libvkturn, затем Xray с VLESS outbound направляется в локальный TURN endpoint.</string>
+    <string name="vless_profile_label">VLESS-ссылка или Xray JSON с VLESS outbound</string>
+    <string name="vless_profile_placeholder">vless://uuid@example.com:443?encryption=none&amp;security=reality&amp;sni=example.com#profile</string>
+    <string name="vless_profile_support">В этом режиме нужен именно VLESS outbound. Для VMess/Trojan/Shadowsocks/Hysteria используйте режим Xray напрямую.</string>
+    <string name="logs_enabled">Вывод логов</string>
+    <string name="logs_enabled_desc">По умолчанию включено. Можно выключить, если подробный журнал не нужен.</string>
     <string name="parameters_title">Параметры</string>
     <string name="threads_format">Потоки: %1$d</string>
     <string name="threads_recommendation">Рекомендуется 4–8</string>
@@ -228,6 +239,7 @@
     <!-- Notifications -->
     <string name="notif_proxy_title">FreeTurn</string>
     <string name="notif_proxy_connecting">Подключение…</string>
+    <string name="notif_xray_vpn_connecting">Запуск Xray VPN…</string>
     <string name="notif_channel_proxy">Прокси</string>
     <string name="notif_channel_captcha">Капча</string>
     <string name="notif_captcha_title">Требуется прохождение капчи</string>
