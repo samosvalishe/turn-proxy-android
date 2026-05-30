@@ -16,7 +16,6 @@ import java.util.UUID
 import com.freeturn.app.domain.AppUpdater
 import com.freeturn.app.domain.LocalProxyManager
 import com.freeturn.app.domain.SshRepository
-import com.freeturn.app.domain.XrayProfileImporter
 import com.freeturn.app.ui.HapticUtil
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -281,38 +280,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         serverAddr.substringBefore(':').takeIf { it.isNotBlank() }
             ?: getApplication<Application>().getString(com.freeturn.app.R.string.profile_default_name)
 
-    fun importXrayProfile(raw: String) {
-        viewModelScope.launch {
-            runCatching { XrayProfileImporter.import(raw) }
-                .onSuccess { imported ->
-                    profileMutex.withLock {
-                        val current = prefs.profilesSnapshot.first()
-                        val ssh = prefs.sshConfigFlow.first()
-                        val listen = prefs.proxyListenFlow.first()
-                        val connect = prefs.proxyConnectFlow.first()
-                        val server = prefs.serverOptsFlow.first()
-                        val profile = Profile(
-                            id = UUID.randomUUID().toString(),
-                            name = uniqueProfileName(imported.name, current.list, excludingId = null),
-                            ssh = ssh,
-                            client = imported.client,
-                            proxyListen = listen,
-                            proxyConnect = connect,
-                            server = server
-                        )
-                        prefs.saveProfiles(current.list + profile)
-                        prefs.setActiveProfileId(profile.id)
-                        prefs.saveClientConfig(profile.client)
-                    }
-                    HapticUtil.perform(getApplication(), HapticUtil.Pattern.SUCCESS)
-                }
-                .onFailure { e ->
-                    proxyManager.setErrorWithAutoReset("Не удалось импортировать Xray профиль: ${e.message}")
-                    HapticUtil.perform(getApplication(), HapticUtil.Pattern.ERROR)
-                }
-        }
-    }
-
     fun setDynamicTheme(enabled: Boolean) {
         viewModelScope.launch { prefs.setDynamicTheme(enabled) }
     }
@@ -409,14 +376,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             sshRepository.updateServerState(ServerState.Error("Неверный формат адреса (ожидается host:port)"))
             return
         }
-        val vless = clientConfig.value.vlessMode
         val opts = serverOpts.value
         val wrapKey = if (opts.wrapEnabled) opts.wrapKey else ""
         viewModelScope.launch {
             sshRepository.startServer(
                 listen = l, connect = c,
-                vlessMode = vless,
-                vlessBond = opts.vlessBond,
+                vlessMode = false,
+                vlessBond = false,
                 wrapKey = wrapKey,
                 kcpFec = opts.kcpFec
             )
@@ -562,12 +528,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (!l.matches(Regex("""^[\w.\-]+:\d{1,5}$""")) ||
             !c.matches(Regex("""^[\w.\-]+:\d{1,5}$"""))) return
         val opts = prefs.serverOptsFlow.first()
-        val vless = clientConfig.value.vlessMode
         sshRepository.stopServer()
         sshRepository.startServer(
             listen = l, connect = c,
-            vlessMode = vless,
-            vlessBond = opts.vlessBond,
+            vlessMode = false,
+            vlessBond = false,
             wrapKey = if (opts.wrapEnabled) opts.wrapKey else "",
             kcpFec = opts.kcpFec
         )

@@ -19,10 +19,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.DnsMode
-import com.freeturn.app.data.TunnelRoute
 import com.freeturn.app.data.TunnelTransport
 import com.freeturn.app.domain.WireGuardTunnelManager
-import com.freeturn.app.domain.XrayTunnelManager
 import com.freeturn.app.domain.server.KCP_FEC_VALUE
 import java.io.BufferedReader
 import java.io.File
@@ -97,7 +95,6 @@ class ProxyService : Service() {
     private lateinit var prefs: AppPreferences
     private lateinit var serviceScope: CoroutineScope
     private lateinit var wireGuard: WireGuardTunnelManager
-    private lateinit var xray: XrayTunnelManager
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -106,7 +103,6 @@ class ProxyService : Service() {
         prefs = AppPreferences(applicationContext)
         serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         wireGuard = WireGuardTunnelManager(applicationContext)
-        xray = XrayTunnelManager(applicationContext)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService(NotificationManager::class.java)
             nm.createNotificationChannel(
@@ -178,6 +174,7 @@ class ProxyService : Service() {
         // должны передаваться и клиенту с тем же ключом, иначе DTLS-handshake
         // не сойдётся. Источник истины — общий serverOpts.
         val srv = prefs.serverOptsFlow.first()
+        val vlessMode = false
 
         val executable = "${applicationInfo.nativeLibraryDir}/libvkturn.so"
 
@@ -199,10 +196,10 @@ class ProxyService : Service() {
             if (cfg.streamsPerCred > 0 && cfg.streamsPerCred != 10) {
                 cmdArgs.add("-streams-per-cred"); cmdArgs.add(cfg.streamsPerCred.toString())
             }
-            if (cfg.vlessMode) cmdArgs.add("-vless")
+            if (vlessMode) cmdArgs.add("-vless")
             else if (cfg.useUdp) cmdArgs.add("-udp")
             // VLESS bonding имеет смысл только в VLESS-режиме.
-            if (cfg.vlessMode && srv.vlessBond) cmdArgs.add("-vless-bond")
+            if (vlessMode && srv.vlessBond) cmdArgs.add("-vless-bond")
             // WRAP: тот же ключ, что и у сервера (хранится в EncryptedSharedPreferences).
             // Без 64-hex ключа флаг не передаём — ядро упадёт.
             if (srv.wrapEnabled &&
@@ -241,7 +238,6 @@ class ProxyService : Service() {
         var startupEmitted = false
         var startupFailed = false
         var wireGuardStarted = false
-        var xrayStarted = false
         var captchaSessionCounter = 0L
 
         // --- Трекинг активных соединений для индикации состояния в UI. ---
@@ -258,7 +254,7 @@ class ProxyService : Service() {
         val nonVlessTotal = if (cfg.isRawMode) 0 else if (cfg.threads > 0) cfg.threads else 1
         var vlessActive = 0
         var vlessTotal = 0
-        var isVless = cfg.vlessMode
+        var isVless = vlessMode
 
         fun publishStats() {
             val stats = if (isVless) {
@@ -420,15 +416,11 @@ class ProxyService : Service() {
                                     }
                                     wireGuard.startAfterProxyReady(cfg)
                                     wireGuardStarted = cfg.tunnelTransport == TunnelTransport.WIREGUARD
-                                    xray.startAfterProxyReady(cfg)
-                                    xrayStarted = cfg.tunnelTransport == TunnelTransport.VLESS
                                     ProxyServiceState.setStartupResult(StartupResult.Success)
                                     ProxyServiceState.markConnectedIfAbsent(SystemClock.elapsedRealtime())
                                     updateNotification(
                                         when {
-                                            wireGuardStarted && xrayStarted -> "Прокси, WireGuard и Xray активны"
                                             wireGuardStarted -> "Прокси и WireGuard активны"
-                                            xrayStarted -> "Прокси и Xray активны"
                                             else -> "Прокси активен"
                                         }
                                     )
@@ -482,7 +474,6 @@ class ProxyService : Service() {
         } finally {
             ProxyServiceState.setCaptchaSession(null)
             cancelCaptchaNotification()
-            xray.stop()
             wireGuard.stop()
             // Процесс мёртв — активных соединений нет. При watchdog-рестарте
             // publishStats на новом старте снова выставит правильный target.
@@ -727,7 +718,6 @@ class ProxyService : Service() {
         ProxyServiceState.addLog("=== ОСТАНОВКА ИЗ ИНТЕРФЕЙСА ===")
         process.get()?.destroyCompat()
         runBlocking {
-            xray.stop()
             wireGuard.stop()
         }
         serviceScope.cancel()

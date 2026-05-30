@@ -67,7 +67,7 @@ internal object ProfileJson {
             put("localPort", p.client.localPort)
             put("isRawMode", p.client.isRawMode)
             put("rawCommand", p.client.rawCommand)
-            put("vlessMode", p.client.vlessMode)
+            put("vlessMode", false)
 
             put("debugMode", p.client.debugMode)
             put("useCarrierDns", p.client.useCarrierDns)
@@ -79,13 +79,9 @@ internal object ProfileJson {
             put("wireGuardEnabled", p.client.wireGuardEnabled)
             put("wireGuardConfig", p.client.wireGuardConfig)
             put("wireGuardTunnelName", p.client.wireGuardTunnelName)
-            put("xrayEnabled", p.client.xrayEnabled)
-            put("xrayConfig", p.client.xrayConfig)
-            put("xrayProfileName", p.client.xrayProfileName)
             put("tunnelTransport", p.client.tunnelTransport)
             put("splitTunnelMode", p.client.splitTunnelMode)
             put("splitTunnelApps", p.client.splitTunnelApps)
-            put("tunnelRoute", p.client.tunnelRoute)
             put("logsEnabled", p.client.logsEnabled)
         })
         put("proxyListen", p.proxyListen)
@@ -124,7 +120,7 @@ internal object ProfileJson {
                 localPort = cliO.optString("localPort", "127.0.0.1:9000"),
                 isRawMode = cliO.optBoolean("isRawMode", false),
                 rawCommand = cliO.optString("rawCommand"),
-                vlessMode = cliO.optBoolean("vlessMode", false),
+                vlessMode = false,
 
                 debugMode = cliO.optBoolean("debugMode", false),
                 useCarrierDns = cliO.optBoolean("useCarrierDns", false),
@@ -138,23 +134,13 @@ internal object ProfileJson {
                 wireGuardEnabled = cliO.optBoolean("wireGuardEnabled", false),
                 wireGuardConfig = cliO.optString("wireGuardConfig"),
                 wireGuardTunnelName = cliO.optString("wireGuardTunnelName").ifBlank { "freeturn-wg" },
-                xrayEnabled = cliO.optBoolean("xrayEnabled", false),
-                xrayConfig = cliO.optString("xrayConfig"),
-                xrayProfileName = cliO.optString("xrayProfileName"),
-                tunnelTransport = cliO.optString(
-                    "tunnelTransport",
-                    if (cliO.optBoolean("xrayEnabled", false)) TunnelTransport.VLESS
-                    else TunnelTransport.WIREGUARD
-                ).let {
+                tunnelTransport = cliO.optString("tunnelTransport", TunnelTransport.WIREGUARD).let {
                     if (it in TunnelTransport.ALL) it else TunnelTransport.WIREGUARD
                 },
                 splitTunnelMode = cliO.optString("splitTunnelMode", SplitTunnelMode.ALL).let {
                     if (it in SplitTunnelMode.VALUES) it else SplitTunnelMode.ALL
                 },
                 splitTunnelApps = cliO.optString("splitTunnelApps"),
-                tunnelRoute = cliO.optString("tunnelRoute", TunnelRoute.FREETURN).let {
-                    if (it in TunnelRoute.ALL) it else TunnelRoute.FREETURN
-                },
                 logsEnabled = cliO.optBoolean("logsEnabled", true)
             ),
             proxyListen = o.optString("proxyListen").ifBlank { "0.0.0.0:56000" },

@@ -255,18 +255,6 @@ fun ServerManagementScreen(
                     supportingText = { Text(stringResource(R.string.turn_client_desc)) }
                 )
 
-                // Индикатор VLESS-режима сервера
-                if (serverKnown?.running == true && serverKnown.vlessMode == true) {
-                    Text(
-                        text = stringResource(R.string.server_running_vless),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.extendedColorScheme.info
-                    )
-                }
-
-                // VLESS bonding / WRAP управляются на клиентском экране — общий source.
-                // Здесь не дублируем, чтобы не путать пользователя двумя точками контроля.
-
                 // Action buttons
                 FilledTonalButton(
                     onClick = {

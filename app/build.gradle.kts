@@ -109,7 +109,7 @@ fun normalizeTag(value: String): String =
 
 tasks.register("checkCoreUpdates") {
     group = "verification"
-    description = "Checks GitHub releases for libvkturn.so and libxray.so updates."
+    description = "Checks GitHub releases for bundled upstream native core updates."
 
     inputs.file(coreVersionsFile)
 
@@ -117,7 +117,7 @@ tasks.register("checkCoreUpdates") {
         val props = Properties().apply {
             coreVersionsFile.asFile.inputStream().use(::load)
         }
-        val cores = listOf("vkturn", "xray")
+        val cores = listOf("vkturn")
         cores.forEach { id ->
             val repo = props.getProperty("$id.repo").orEmpty()
             val current = props.getProperty("$id.current").orEmpty()

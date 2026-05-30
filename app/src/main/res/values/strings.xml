@@ -49,7 +49,7 @@
     <string name="call_link_support">Звонки → Создать → Скопировать ссылку (не нажимайте «Завершить»)</string>
     <string name="local_listen_address">Локальный адрес прослушивания</string>
     <string name="local_listen_placeholder">127.0.0.1:9000</string>
-    <string name="local_listen_support">Адрес, на котором клиент принимает трафик от WireGuard/Hysteria</string>
+    <string name="local_listen_support">Адрес, на котором клиент принимает трафик от WireGuard</string>
     <string name="wireguard_section">WireGuard</string>
     <string name="wireguard_enabled">Поднимать WireGuard</string>
     <string name="wireguard_enabled_desc">После успешного TURN-туннеля приложение автоматически включает Android VPN</string>
@@ -59,15 +59,7 @@
     <string name="wireguard_config_support">Endpoint будет автоматически заменён на локальный адрес прослушивания выше</string>
     <string name="tunnel_transport_title">Транспорт туннеля</string>
     <string name="tunnel_transport_desc">Выберите, что поднимать после успешного TURN-туннеля</string>
-    <string name="tunnel_route_title">Режим подключения</string>
-    <string name="tunnel_route_desc">FreeTurn сначала поднимает TURN-туннель через libvkturn, прямой Xray запускает только Xray core без VK/TURN</string>
-    <string name="tunnel_route_freeturn">FreeTurn</string>
-    <string name="tunnel_route_direct_xray">Xray напрямую</string>
-    <string name="connection_mode_tabs">Режим трафика</string>
-    <string name="mode_vk_turn">VK-TURN</string>
-    <string name="mode_xray_direct">Xray</string>
     <string name="transport_wireguard">WireGuard</string>
-    <string name="transport_vless">Xray core</string>
     <string name="split_tunnel_title">Split tunneling</string>
     <string name="split_tunnel_desc">Настройка применяется к WireGuard VPN. FreeTurn всегда исключается из VPN, чтобы не зациклить TURN-соединение.</string>
     <string name="split_tunnel_all">Все</string>
@@ -79,20 +71,6 @@
     <string name="split_tunnel_pick_apps">Выбрать приложения</string>
     <string name="split_tunnel_pick_title">Приложения</string>
     <string name="split_tunnel_done">Готово</string>
-    <string name="split_tunnel_xray_limit">Для Xray core список сохраняется, но системная маршрутизация по приложениям требует отдельного Android VPN/TUN-слоя. Сейчас split tunneling применяется только WireGuard VPN.</string>
-    <string name="xray_section">Xray core</string>
-    <string name="xray_enabled">Поднимать Xray</string>
-    <string name="xray_enabled_desc">После успешного TURN-туннеля запускает Xray core и направляет VLESS outbound в локальный TURN endpoint</string>
-    <string name="xray_config_label">Xray JSON-конфиг</string>
-    <string name="xray_profile_active">Активный Xray-профиль: %1$s</string>
-    <string name="xray_config_placeholder">{\n  "inbounds": [{ "port": 10808, "listen": "127.0.0.1", "protocol": "socks" }],\n  "outbounds": [{ "protocol": "vless", "settings": { "vnext": [{ "address": "127.0.0.1", "port": 9000, "users": [] }] } }]\n}</string>
-    <string name="xray_config_support">Можно вставить JSON или ссылку vless://, vmess://, trojan://, ss://, hysteria2://. Первый поддерживаемый outbound будет автоматически переписан на локальный адрес прослушивания выше</string>
-    <string name="xray_direct_desc">Запускает Xray core напрямую через Android VPN/TUN без libvkturn. Подходит для классических Xray-профилей и протоколов VMess/Trojan/Shadowsocks/Hysteria.</string>
-    <string name="vless_section">VLESS через FreeTurn</string>
-    <string name="vless_enabled_desc">Сначала поднимается TURN-туннель через libvkturn, затем Xray с VLESS outbound направляется в локальный TURN endpoint.</string>
-    <string name="vless_profile_label">VLESS-ссылка или Xray JSON с VLESS outbound</string>
-    <string name="vless_profile_placeholder">vless://uuid@example.com:443?encryption=none&amp;security=reality&amp;sni=example.com#profile</string>
-    <string name="vless_profile_support">В этом режиме нужен именно VLESS outbound. Для VMess/Trojan/Shadowsocks/Hysteria используйте режим Xray напрямую.</string>
     <string name="logs_enabled">Вывод логов</string>
     <string name="logs_enabled_desc">По умолчанию включено. Можно выключить, если подробный журнал не нужен.</string>
     <string name="parameters_title">Параметры</string>
@@ -101,8 +79,6 @@
     <string name="streams_per_cred_recommendation">Сколько TURN-потоков обслуживает один VK-аккаунт. По умолчанию 10.</string>
     <string name="streams_per_cred_format">Потоков на аккаунт: %1$d</string>
 
-    <string name="client_vless_bond">VLESS bonding</string>
-    <string name="client_vless_bond_desc">Должен совпадать с настройкой сервера. Только для VLESS-режима.</string>
     <string name="client_wrap_enabled">WRAP-обфускация</string>
     <string name="client_wrap_desc">Должна совпадать с настройкой сервера. Ключ берётся с сервера.</string>
     <string name="locked_disconnect_hint">Подключитесь к серверу, чтобы изменить</string>
@@ -114,8 +90,8 @@
     <string name="server_wrap_regen_in_progress">Генерация ключа…</string>
     <string name="server_sync_section">Синхронные настройки сервера</string>
     <string name="sync_server_switches">Синхронизировать с сервером</string>
-    <string name="sync_server_switches_desc">При выкл. флаги VLESS/bond/WRAP меняются только у клиента, серверный процесс не перезапускается</string>
-    <string name="sync_off_banner">Sync с сервером выключен. Клиентские флаги VLESS/bond/WRAP сервер не получает — следите за совпадением вручную.</string>
+    <string name="sync_server_switches_desc">При выкл. флаги WRAP/KCP меняются только у клиента, серверный процесс не перезапускается</string>
+    <string name="sync_off_banner">Sync с сервером выключен. Клиентские флаги WRAP/KCP сервер не получает — следите за совпадением вручную.</string>
     <string name="server_journal_title">Журнал</string>
     <string name="server_journal_fetch">Показать журнал</string>
     <string name="server_journal_refresh">Обновить</string>
@@ -162,8 +138,6 @@
     <string name="server_install_cached">Актуально</string>
     <string name="server_install_downloaded">Обновлено</string>
     <string name="server_version_label">Версия: %1$s</string>
-    <string name="server_vless_bond">VLESS bonding</string>
-    <string name="server_vless_bond_desc">Объединение нескольких VLESS-сессий в один туннель</string>
     <string name="server_wrap_enabled">WRAP-обфускация</string>
     <string name="server_wrap_desc">Маскирует DTLS-трафик ChaCha20-XOR (одинаковый ключ на сервере и клиенте)</string>
     <string name="server_wrap_key_label">Wrap-ключ (64 hex)</string>
@@ -171,9 +145,6 @@
     <string name="start_server">Запустить сервер</string>
     <string name="stop_server">Остановить сервер</string>
     <string name="continue_client_setup">Продолжить настройку клиента</string>
-    <string name="vless_mode">VLESS-режим</string>
-    <string name="vless_mode_desc">Проброс VLESS через TURN-туннель (требует -vless на сервере)</string>
-    <string name="server_running_vless">Сервер запущен в VLESS-режиме</string>
     <string name="ssh_log_title">SSH-лог</string>
     <string name="active">Активно</string>
     <string name="inactive">Неактивно</string>
@@ -239,7 +210,6 @@
     <!-- Notifications -->
     <string name="notif_proxy_title">FreeTurn</string>
     <string name="notif_proxy_connecting">Подключение…</string>
-    <string name="notif_xray_vpn_connecting">Запуск Xray VPN…</string>
     <string name="notif_channel_proxy">Прокси</string>
     <string name="notif_channel_captcha">Капча</string>
     <string name="notif_captcha_title">Требуется прохождение капчи</string>
@@ -262,10 +232,6 @@
     <string name="profiles_empty_title">Пока нет сохранённых профилей</string>
     <string name="profiles_empty_desc">Сохраните текущие настройки как профиль или импортируйте ссылку, чтобы переключаться между разными профилями.</string>
     <string name="profile_save_current">Сохранить текущие настройки</string>
-    <string name="profile_import_xray">Импорт Xray-профиля</string>
-    <string name="profile_import_xray_hint">Поддерживает vless://, vmess://, trojan://, ss://, hysteria2:// и JSON</string>
-    <string name="profile_import_xray_title">Импорт Xray</string>
-    <string name="profile_import_xray_label">Ссылка или JSON</string>
     <string name="profile_import">Импортировать</string>
     <string name="profile_save_dialog_title">Новый профиль</string>
     <string name="profile_name_label">Название профиля</string>

@@ -91,7 +91,6 @@ import com.freeturn.app.viewmodel.MainViewModel
 import com.freeturn.app.viewmodel.ProxyState
 import com.freeturn.app.viewmodel.SshConnectionState
 import com.freeturn.app.viewmodel.UpdateState
-import com.freeturn.app.data.TunnelRoute
 import com.freeturn.app.data.TunnelTransport
 import androidx.core.net.toUri
 
@@ -206,9 +205,7 @@ fun HomeScreen(
                     when (proxyState) {
                         is ProxyState.Idle, is ProxyState.Error -> {
                             HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                            if (clientConfig.tunnelRoute == TunnelRoute.DIRECT_XRAY ||
-                                (clientConfig.tunnelRoute == TunnelRoute.FREETURN &&
-                                    clientConfig.tunnelTransport == TunnelTransport.WIREGUARD)) {
+                            if (clientConfig.tunnelTransport == TunnelTransport.WIREGUARD) {
                                 val vpnIntent = VpnService.prepare(context)
                                 if (vpnIntent != null) {
                                     wireGuardPermissionLauncher.launch(vpnIntent)
@@ -278,20 +275,13 @@ fun HomeScreen(
                         ConfigRow(stringResource(R.string.streams_per_cred_label), "${clientConfig.streamsPerCred}")
                         ConfigRow(
                             stringResource(R.string.transport_protocol),
-                            if (clientConfig.vlessMode) "VLESS"
-                            else if (clientConfig.useUdp) stringResource(R.string.udp)
+                            if (clientConfig.useUdp) stringResource(R.string.udp)
                             else stringResource(R.string.tcp)
                         )
                         ConfigRow(stringResource(R.string.local_port), clientConfig.localPort.redact(privacyMode))
                         ConfigRow(
                             stringResource(R.string.tunnel_transport_title),
-                            when {
-                                clientConfig.tunnelRoute == TunnelRoute.DIRECT_XRAY ->
-                                    stringResource(R.string.tunnel_route_direct_xray)
-                                clientConfig.tunnelTransport == TunnelTransport.WIREGUARD ->
-                                    stringResource(R.string.transport_wireguard)
-                                else -> stringResource(R.string.transport_vless)
-                            }
+                            stringResource(R.string.transport_wireguard)
                         )
                     }
                 }

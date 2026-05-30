@@ -31,7 +31,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -70,7 +69,6 @@ fun ProfilesSheetContent(
     val updatedMsg = stringResource(R.string.profile_updated_toast)
 
     var showSaveDialog by rememberSaveable { mutableStateOf(false) }
-    var showImportDialog by rememberSaveable { mutableStateOf(false) }
     var renameTarget by rememberSaveable { mutableStateOf<String?>(null) }
     var deleteTarget by rememberSaveable { mutableStateOf<String?>(null) }
     var menuTarget by rememberSaveable { mutableStateOf<String?>(null) }
@@ -112,16 +110,6 @@ fun ProfilesSheetContent(
                 showSaveDialog = true
             }
         )
-        ListItem(
-            headlineContent = { Text(stringResource(R.string.profile_import_xray)) },
-            supportingContent = { Text(stringResource(R.string.profile_import_xray_hint)) },
-            leadingContent = { Icon(painterResource(R.drawable.cloud_download_24px), null) },
-            colors = listColors,
-            modifier = Modifier.hapticClickable(HapticUtil.Pattern.CLICK) {
-                showImportDialog = true
-            }
-        )
-
         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
         if (snapshot.list.isEmpty()) {
@@ -178,39 +166,6 @@ fun ProfilesSheetContent(
             onConfirm = { name ->
                 viewModel.saveCurrentAsProfile(name)
                 showSaveDialog = false
-            }
-        )
-    }
-
-    if (showImportDialog) {
-        var raw by rememberSaveable { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { showImportDialog = false },
-            title = { Text(stringResource(R.string.profile_import_xray_title)) },
-            text = {
-                OutlinedTextField(
-                    value = raw,
-                    onValueChange = { raw = it },
-                    label = { Text(stringResource(R.string.profile_import_xray_label)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 5
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        viewModel.importXrayProfile(raw)
-                        showImportDialog = false
-                    },
-                    enabled = raw.isNotBlank()
-                ) {
-                    Text(stringResource(R.string.profile_import))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showImportDialog = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
             }
         )
     }
@@ -322,7 +277,6 @@ private fun ProfileCard(
                     color = onContainer
                 )
                 val sub = listOfNotNull(
-                    profile.client.xrayProfileName.takeIf { it.isNotBlank() },
                     profile.client.serverAddress.takeIf { it.isNotBlank() },
                     profile.ssh.ip.takeIf { it.isNotBlank() }?.let { "SSH $it" }
                 ).joinToString(" · ").ifBlank { "—" }

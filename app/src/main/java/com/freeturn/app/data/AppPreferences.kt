@@ -38,8 +38,7 @@ object DnsMode {
 
 object TunnelTransport {
     const val WIREGUARD = "wireguard"
-    const val VLESS = "vless"
-    val ALL = listOf(WIREGUARD, VLESS)
+    val ALL = listOf(WIREGUARD)
 }
 
 object SplitTunnelMode {
@@ -47,12 +46,6 @@ object SplitTunnelMode {
     const val INCLUDE = "include"
     const val EXCLUDE = "exclude"
     val VALUES = listOf(ALL, INCLUDE, EXCLUDE)
-}
-
-object TunnelRoute {
-    const val FREETURN = "freeturn"
-    const val DIRECT_XRAY = "direct_xray"
-    val ALL = listOf(FREETURN, DIRECT_XRAY)
 }
 
 data class ClientConfig(
@@ -77,9 +70,8 @@ data class ClientConfig(
     // Если true — в argv ядра добавляется -port 443.
     val forcePort443: Boolean = false,
     /**
-     * Если true — изменения vlessMode/vlessBond/wrapEnabled на клиенте дёргают
-     * рестарт сервера (текущее поведение). Если false — флаги меняются только
-     * у клиента, серверный процесс не трогается.
+     * Если true — изменения WRAP/KCP на клиенте дёргают рестарт сервера.
+     * Если false — флаги меняются только у клиента, серверный процесс не трогается.
      */
     val syncServerSwitches: Boolean = true,
     val magicSwitch: Boolean = false,
@@ -88,13 +80,9 @@ data class ClientConfig(
     val wireGuardEnabled: Boolean = false,
     val wireGuardConfig: String = "",
     val wireGuardTunnelName: String = "freeturn-wg",
-    val xrayEnabled: Boolean = false,
-    val xrayConfig: String = "",
-    val xrayProfileName: String = "",
     val tunnelTransport: String = TunnelTransport.WIREGUARD,
     val splitTunnelMode: String = SplitTunnelMode.ALL,
     val splitTunnelApps: String = "",
-    val tunnelRoute: String = TunnelRoute.FREETURN,
     val logsEnabled: Boolean = true
 )
 
@@ -131,13 +119,10 @@ class AppPreferences(context: Context) {
         val CLIENT_WG_ENABLED = booleanPreferencesKey("client_wg_enabled")
         val CLIENT_WG_CONFIG = stringPreferencesKey("client_wg_config")
         val CLIENT_WG_TUNNEL_NAME = stringPreferencesKey("client_wg_tunnel_name")
-        val CLIENT_XRAY_ENABLED = booleanPreferencesKey("client_xray_enabled")
-        val CLIENT_XRAY_CONFIG = stringPreferencesKey("client_xray_config")
-        val CLIENT_XRAY_PROFILE_NAME = stringPreferencesKey("client_xray_profile_name")
         val CLIENT_TUNNEL_TRANSPORT = stringPreferencesKey("client_tunnel_transport")
         val CLIENT_SPLIT_TUNNEL_MODE = stringPreferencesKey("client_split_tunnel_mode")
         val CLIENT_SPLIT_TUNNEL_APPS = stringPreferencesKey("client_split_tunnel_apps")
-        val CLIENT_TUNNEL_ROUTE = stringPreferencesKey("client_tunnel_route")
+        private val CLIENT_TUNNEL_ROUTE = stringPreferencesKey("client_tunnel_route")
         val CLIENT_LOGS_ENABLED = booleanPreferencesKey("client_logs_enabled")
         // Устаревшие ключи — не пишутся, но молча удаляются при saveClientConfig.
         private val CLIENT_ALLOCS_PER_STREAM_LEGACY = intPreferencesKey("client_allocs_per_stream")
@@ -210,7 +195,7 @@ class AppPreferences(context: Context) {
                 localPort = prefs[CLIENT_LOCAL_PORT] ?: "127.0.0.1:9000",
                 isRawMode = prefs[CLIENT_IS_RAW] ?: false,
                 rawCommand = prefs[CLIENT_RAW_CMD] ?: "",
-                vlessMode = prefs[CLIENT_VLESS] ?: false,
+                vlessMode = false,
 
                 debugMode = prefs[CLIENT_DEBUG] ?: false,
                 useCarrierDns = prefs[CLIENT_USE_CARRIER_DNS] ?: false,
@@ -224,22 +209,13 @@ class AppPreferences(context: Context) {
                 wireGuardEnabled = prefs[CLIENT_WG_ENABLED] ?: false,
                 wireGuardConfig = prefs[CLIENT_WG_CONFIG] ?: "",
                 wireGuardTunnelName = prefs[CLIENT_WG_TUNNEL_NAME] ?: "freeturn-wg",
-                xrayEnabled = prefs[CLIENT_XRAY_ENABLED] ?: false,
-                xrayConfig = prefs[CLIENT_XRAY_CONFIG] ?: "",
-                xrayProfileName = prefs[CLIENT_XRAY_PROFILE_NAME] ?: "",
-                tunnelTransport = (prefs[CLIENT_TUNNEL_TRANSPORT] ?: run {
-                    if (prefs[CLIENT_XRAY_ENABLED] == true) TunnelTransport.VLESS
-                    else TunnelTransport.WIREGUARD
-                }).let {
+                tunnelTransport = (prefs[CLIENT_TUNNEL_TRANSPORT] ?: TunnelTransport.WIREGUARD).let {
                     if (it in TunnelTransport.ALL) it else TunnelTransport.WIREGUARD
                 },
                 splitTunnelMode = (prefs[CLIENT_SPLIT_TUNNEL_MODE] ?: SplitTunnelMode.ALL).let {
                     if (it in SplitTunnelMode.VALUES) it else SplitTunnelMode.ALL
                 },
                 splitTunnelApps = prefs[CLIENT_SPLIT_TUNNEL_APPS] ?: "",
-                tunnelRoute = (prefs[CLIENT_TUNNEL_ROUTE] ?: TunnelRoute.FREETURN).let {
-                    if (it in TunnelRoute.ALL) it else TunnelRoute.FREETURN
-                },
                 logsEnabled = prefs[CLIENT_LOGS_ENABLED] ?: true
             )
         }
@@ -355,7 +331,7 @@ class AppPreferences(context: Context) {
             prefs[CLIENT_LOCAL_PORT] = config.localPort
             prefs[CLIENT_IS_RAW] = config.isRawMode
             prefs[CLIENT_RAW_CMD] = config.rawCommand
-            prefs[CLIENT_VLESS] = config.vlessMode
+            prefs[CLIENT_VLESS] = false
             prefs.remove(CLIENT_CAPTCHA_SOLVER_LEGACY)
             prefs[CLIENT_DEBUG] = config.debugMode
             prefs[CLIENT_USE_CARRIER_DNS] = config.useCarrierDns
@@ -367,9 +343,6 @@ class AppPreferences(context: Context) {
             prefs[CLIENT_WG_ENABLED] = config.wireGuardEnabled
             prefs[CLIENT_WG_CONFIG] = config.wireGuardConfig.trim()
             prefs[CLIENT_WG_TUNNEL_NAME] = config.wireGuardTunnelName.trim().ifBlank { "freeturn-wg" }
-            prefs[CLIENT_XRAY_ENABLED] = config.xrayEnabled
-            prefs[CLIENT_XRAY_CONFIG] = config.xrayConfig.trim()
-            prefs[CLIENT_XRAY_PROFILE_NAME] = config.xrayProfileName.trim()
             prefs[CLIENT_TUNNEL_TRANSPORT] =
                 if (config.tunnelTransport in TunnelTransport.ALL) config.tunnelTransport
                 else TunnelTransport.WIREGUARD
@@ -377,9 +350,7 @@ class AppPreferences(context: Context) {
                 if (config.splitTunnelMode in SplitTunnelMode.VALUES) config.splitTunnelMode
                 else SplitTunnelMode.ALL
             prefs[CLIENT_SPLIT_TUNNEL_APPS] = config.splitTunnelApps.trim()
-            prefs[CLIENT_TUNNEL_ROUTE] =
-                if (config.tunnelRoute in TunnelRoute.ALL) config.tunnelRoute
-                else TunnelRoute.FREETURN
+            prefs.remove(CLIENT_TUNNEL_ROUTE)
             prefs[CLIENT_LOGS_ENABLED] = config.logsEnabled
             // Удаляем устаревшие ключи.
             prefs.remove(CLIENT_TURN_PORT_443_LEGACY)

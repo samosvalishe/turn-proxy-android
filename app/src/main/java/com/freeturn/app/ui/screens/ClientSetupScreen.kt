@@ -39,8 +39,6 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -63,7 +61,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.data.ClientConfig
 import com.freeturn.app.data.DnsMode
 import com.freeturn.app.data.SplitTunnelMode
-import com.freeturn.app.data.TunnelRoute
 import com.freeturn.app.data.TunnelTransport
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.viewmodel.MainViewModel
@@ -97,8 +94,6 @@ fun ClientSetupScreen(
     // (если запущен), иначе сохранённое. В !sync режиме — всегда сохранённое:
     // серверная и клиентская стороны могут различаться, и UI отражает клиента.
     val syncOn = saved.syncServerSwitches
-    val effectiveVlessMode = if (syncOn) serverKnown?.vlessMode ?: saved.vlessMode else saved.vlessMode
-    val effectiveVlessBond = if (syncOn) serverKnown?.vlessBond ?: serverOpts.vlessBond else serverOpts.vlessBond
     val effectiveWrap      = if (syncOn) serverKnown?.wrap      ?: serverOpts.wrapEnabled else serverOpts.wrapEnabled
 
     val context = LocalContext.current
@@ -123,18 +118,6 @@ fun ClientSetupScreen(
     var wireGuardConfig by rememberSaveable(saved.wireGuardConfig) {
         mutableStateOf(saved.wireGuardConfig)
     }
-    var xrayConfig by rememberSaveable(saved.xrayConfig) {
-        mutableStateOf(saved.xrayConfig)
-    }
-    var xrayProfileName by rememberSaveable(saved.xrayProfileName) {
-        mutableStateOf(saved.xrayProfileName)
-    }
-    var tunnelTransport by rememberSaveable(saved.tunnelTransport) {
-        mutableStateOf(saved.tunnelTransport)
-    }
-    var tunnelRoute by rememberSaveable(saved.tunnelRoute) {
-        mutableStateOf(saved.tunnelRoute)
-    }
     var splitTunnelMode by rememberSaveable(saved.splitTunnelMode) {
         mutableStateOf(saved.splitTunnelMode)
     }
@@ -156,12 +139,6 @@ fun ClientSetupScreen(
         }
     }
 
-    LaunchedEffect(tunnelRoute) {
-        if (tunnelRoute == TunnelRoute.DIRECT_XRAY) {
-            tunnelTransport = TunnelTransport.VLESS
-        }
-    }
-
     LaunchedEffect(saved) {
         serverAddress = saved.serverAddress
         vkLink = saved.vkLink
@@ -178,10 +155,6 @@ fun ClientSetupScreen(
         magicTurn = saved.magicTurn
         wireGuardTunnelName = saved.wireGuardTunnelName
         wireGuardConfig = saved.wireGuardConfig
-        xrayConfig = saved.xrayConfig
-        xrayProfileName = saved.xrayProfileName
-        tunnelTransport = saved.tunnelTransport
-        tunnelRoute = saved.tunnelRoute
         splitTunnelMode = saved.splitTunnelMode
         splitTunnelApps = saved.splitTunnelApps
         logsEnabled = saved.logsEnabled
@@ -190,7 +163,6 @@ fun ClientSetupScreen(
     }
 
     // Авто-сохранение с дебаунсом 600 мс на каждое изменение поля.
-    // vlessMode исключён — сохраняется через setVlessMode с автоперезапуском сервера.
     LaunchedEffect(
         serverAddress,
         vkLink,
@@ -207,10 +179,6 @@ fun ClientSetupScreen(
         magicTurn,
         wireGuardTunnelName,
         wireGuardConfig,
-        xrayConfig,
-        xrayProfileName,
-        tunnelTransport,
-        tunnelRoute,
         splitTunnelMode,
         splitTunnelApps,
         logsEnabled
@@ -225,7 +193,7 @@ fun ClientSetupScreen(
                 useUdp        = useUdp,
                 manualCaptcha = manualCaptcha,
                 localPort     = localPort.trim(),
-                vlessMode     = saved.vlessMode,
+                vlessMode     = false,
 
                 debugMode     = debugMode,
                 useCarrierDns = useCarrierDns,
@@ -234,18 +202,12 @@ fun ClientSetupScreen(
                 syncServerSwitches = saved.syncServerSwitches,
                 magicSwitch   = magicSwitch,
                 magicTurn     = magicTurn.trim(),
-                wireGuardEnabled = tunnelRoute == TunnelRoute.FREETURN &&
-                    tunnelTransport == TunnelTransport.WIREGUARD,
+                wireGuardEnabled = true,
                 wireGuardConfig = wireGuardConfig.trim(),
                 wireGuardTunnelName = wireGuardTunnelName.trim().ifBlank { "freeturn-wg" },
-                xrayEnabled = tunnelRoute == TunnelRoute.DIRECT_XRAY ||
-                    tunnelTransport == TunnelTransport.VLESS,
-                xrayConfig = xrayConfig.trim(),
-                xrayProfileName = xrayProfileName.trim(),
-                tunnelTransport = tunnelTransport,
+                tunnelTransport = TunnelTransport.WIREGUARD,
                 splitTunnelMode = splitTunnelMode,
                 splitTunnelApps = splitTunnelApps.trim(),
-                tunnelRoute = tunnelRoute,
                 logsEnabled = logsEnabled
             )
         )
@@ -399,34 +361,32 @@ fun ClientSetupScreen(
                     }
                 }
 
-                if (!effectiveVlessMode) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Column {
-                            Text(stringResource(R.string.transport_protocol), style = MaterialTheme.typography.bodyMedium)
-                            Text(
-                                stringResource(R.string.transport_protocol_desc),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                            SegmentedButton(
-                                selected = !useUdp,
-                                onClick = {
-                                    HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                    useUdp = false
-                                },
-                                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                            ) { Text(stringResource(R.string.tcp)) }
-                            SegmentedButton(
-                                selected = useUdp,
-                                onClick = {
-                                    HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                    useUdp = true
-                                },
-                                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                            ) { Text(stringResource(R.string.udp)) }
-                        }
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column {
+                        Text(stringResource(R.string.transport_protocol), style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            stringResource(R.string.transport_protocol_desc),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        SegmentedButton(
+                            selected = !useUdp,
+                            onClick = {
+                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                                useUdp = false
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                        ) { Text(stringResource(R.string.tcp)) }
+                        SegmentedButton(
+                            selected = useUdp,
+                            onClick = {
+                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                                useUdp = true
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                        ) { Text(stringResource(R.string.udp)) }
                     }
                 }
 
@@ -497,186 +457,41 @@ fun ClientSetupScreen(
 
                 HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
 
-                Text(stringResource(R.string.connection_mode_tabs), style = MaterialTheme.typography.titleMedium)
-
-                Text(
-                    stringResource(R.string.tunnel_route_desc),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                val selectedModeTab = if (tunnelRoute == TunnelRoute.DIRECT_XRAY) 1 else 0
-                TabRow(selectedTabIndex = selectedModeTab, modifier = Modifier.fillMaxWidth()) {
-                    Tab(
-                        selected = selectedModeTab == 0,
-                        onClick = {
-                            HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                            tunnelRoute = TunnelRoute.FREETURN
-                        }
-                    ) {
-                        Text(
-                            stringResource(R.string.mode_vk_turn),
-                            modifier = Modifier.padding(vertical = 12.dp)
-                        )
-                    }
-                    Tab(
-                        selected = selectedModeTab == 1,
-                        onClick = {
-                            HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                            tunnelRoute = TunnelRoute.DIRECT_XRAY
-                        }
-                    ) {
-                        Text(
-                            stringResource(R.string.mode_xray_direct),
-                            modifier = Modifier.padding(vertical = 12.dp)
-                        )
-                    }
-                }
-
-                HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
-
                 Text(stringResource(R.string.tunnel_transport_title), style = MaterialTheme.typography.titleMedium)
 
                 Text(
-                    if (tunnelRoute == TunnelRoute.DIRECT_XRAY) stringResource(R.string.xray_enabled_desc)
-                    else stringResource(R.string.tunnel_transport_desc),
+                    stringResource(R.string.tunnel_transport_desc),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                if (tunnelRoute == TunnelRoute.FREETURN) {
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        SegmentedButton(
-                            selected = tunnelTransport == TunnelTransport.WIREGUARD,
-                            onClick = {
-                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                tunnelTransport = TunnelTransport.WIREGUARD
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                        ) { Text(stringResource(R.string.transport_wireguard)) }
-                        SegmentedButton(
-                            selected = tunnelTransport == TunnelTransport.VLESS,
-                            onClick = {
-                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                tunnelTransport = TunnelTransport.VLESS
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                        ) { Text(stringResource(R.string.transport_vless)) }
-                    }
-                }
-
-                if (tunnelRoute == TunnelRoute.FREETURN &&
-                    tunnelTransport == TunnelTransport.WIREGUARD) {
-                    Text(stringResource(R.string.wireguard_section), style = MaterialTheme.typography.titleMedium)
-                    OutlinedTextField(
-                        value = wireGuardTunnelName.redact(privacyMode),
-                        onValueChange = { if (!privacyMode) wireGuardTunnelName = it },
-                        label = { Text(stringResource(R.string.wireguard_tunnel_name)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        readOnly = privacyMode
-                    )
-                    OutlinedTextField(
-                        value = wireGuardConfig.redact(privacyMode),
-                        onValueChange = { if (!privacyMode) wireGuardConfig = it },
-                        label = { Text(stringResource(R.string.wireguard_config_label)) },
-                        placeholder = { Text(stringResource(R.string.wireguard_config_placeholder)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 8,
-                        readOnly = privacyMode,
-                        supportingText = { Text(stringResource(R.string.wireguard_config_support)) }
-                    )
-                    SplitTunnelSettings(
-                        mode = splitTunnelMode,
-                        apps = splitTunnelApps,
-                        privacyMode = privacyMode,
-                        xrayLimit = false,
-                        onModeChange = { splitTunnelMode = it },
-                        onAppsChange = { splitTunnelApps = it },
-                        onPickApps = { showSplitAppPicker = true }
-                    )
-                }
-
-                if (tunnelRoute == TunnelRoute.FREETURN &&
-                    tunnelTransport == TunnelTransport.VLESS) {
-                    Text(stringResource(R.string.vless_section), style = MaterialTheme.typography.titleMedium)
-                    if (xrayProfileName.isNotBlank()) {
-                        Text(
-                            stringResource(R.string.xray_profile_active, xrayProfileName),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Text(
-                        stringResource(R.string.vless_enabled_desc),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    OutlinedTextField(
-                        value = xrayConfig.redact(privacyMode),
-                        onValueChange = {
-                            if (!privacyMode) {
-                                xrayConfig = it
-                                xrayProfileName = ""
-                            }
-                        },
-                        label = { Text(stringResource(R.string.vless_profile_label)) },
-                        placeholder = { Text(stringResource(R.string.vless_profile_placeholder)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 10,
-                        readOnly = privacyMode,
-                        supportingText = { Text(stringResource(R.string.vless_profile_support)) }
-                    )
-                    SplitTunnelSettings(
-                        mode = splitTunnelMode,
-                        apps = splitTunnelApps,
-                        privacyMode = privacyMode,
-                        xrayLimit = true,
-                        onModeChange = { splitTunnelMode = it },
-                        onAppsChange = { splitTunnelApps = it },
-                        onPickApps = { showSplitAppPicker = true }
-                    )
-                }
-
-                if (tunnelRoute == TunnelRoute.DIRECT_XRAY) {
-                    Text(stringResource(R.string.xray_section), style = MaterialTheme.typography.titleMedium)
-                    if (xrayProfileName.isNotBlank()) {
-                        Text(
-                            stringResource(R.string.xray_profile_active, xrayProfileName),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Text(
-                        stringResource(R.string.xray_direct_desc),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    OutlinedTextField(
-                        value = xrayConfig.redact(privacyMode),
-                        onValueChange = {
-                            if (!privacyMode) {
-                                xrayConfig = it
-                                xrayProfileName = ""
-                            }
-                        },
-                        label = { Text(stringResource(R.string.xray_config_label)) },
-                        placeholder = { Text(stringResource(R.string.xray_config_placeholder)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 10,
-                        readOnly = privacyMode,
-                        supportingText = { Text(stringResource(R.string.xray_config_support)) }
-                    )
-                    SplitTunnelSettings(
-                        mode = splitTunnelMode,
-                        apps = splitTunnelApps,
-                        privacyMode = privacyMode,
-                        xrayLimit = true,
-                        onModeChange = { splitTunnelMode = it },
-                        onAppsChange = { splitTunnelApps = it },
-                        onPickApps = { showSplitAppPicker = true }
-                    )
-                }
+                Text(stringResource(R.string.wireguard_section), style = MaterialTheme.typography.titleMedium)
+                OutlinedTextField(
+                    value = wireGuardTunnelName.redact(privacyMode),
+                    onValueChange = { if (!privacyMode) wireGuardTunnelName = it },
+                    label = { Text(stringResource(R.string.wireguard_tunnel_name)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    readOnly = privacyMode
+                )
+                OutlinedTextField(
+                    value = wireGuardConfig.redact(privacyMode),
+                    onValueChange = { if (!privacyMode) wireGuardConfig = it },
+                    label = { Text(stringResource(R.string.wireguard_config_label)) },
+                    placeholder = { Text(stringResource(R.string.wireguard_config_placeholder)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 8,
+                    readOnly = privacyMode,
+                    supportingText = { Text(stringResource(R.string.wireguard_config_support)) }
+                )
+                SplitTunnelSettings(
+                    mode = splitTunnelMode,
+                    apps = splitTunnelApps,
+                    privacyMode = privacyMode,
+                    onModeChange = { splitTunnelMode = it },
+                    onAppsChange = { splitTunnelApps = it },
+                    onPickApps = { showSplitAppPicker = true }
+                )
 
                 SwitchRow(
                     label = stringResource(R.string.logs_enabled),
@@ -720,30 +535,6 @@ fun ClientSetupScreen(
                     onCheckedChange = {
                         HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
                         viewModel.setServerKcpFec(it)
-                    }
-                )
-
-                SwitchRow(
-                    label = stringResource(R.string.vless_mode),
-                    description = lockedHint?.takeIf { !isSshConnected }
-                        ?: stringResource(R.string.vless_mode_desc),
-                    checked = effectiveVlessMode,
-                    enabled = controlsEnabled,
-                    onCheckedChange = {
-                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                        viewModel.setVlessMode(it)
-                    }
-                )
-
-                SwitchRow(
-                    label = stringResource(R.string.client_vless_bond),
-                    description = lockedHint?.takeIf { !isSshConnected }
-                        ?: stringResource(R.string.client_vless_bond_desc),
-                    checked = effectiveVlessBond,
-                    enabled = controlsEnabled && effectiveVlessMode,
-                    onCheckedChange = {
-                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                        viewModel.setServerVlessBond(it)
                     }
                 )
 
@@ -878,7 +669,6 @@ private fun SplitTunnelSettings(
     mode: String,
     apps: String,
     privacyMode: Boolean,
-    xrayLimit: Boolean,
     onModeChange: (String) -> Unit,
     onAppsChange: (String) -> Unit,
     onPickApps: () -> Unit
@@ -886,8 +676,7 @@ private fun SplitTunnelSettings(
     val context = LocalContext.current
     Text(stringResource(R.string.split_tunnel_title), style = MaterialTheme.typography.titleMedium)
     Text(
-        if (xrayLimit) stringResource(R.string.split_tunnel_xray_limit)
-        else stringResource(R.string.split_tunnel_desc),
+        stringResource(R.string.split_tunnel_desc),
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )

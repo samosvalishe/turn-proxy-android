@@ -7,10 +7,7 @@ import com.freeturn.app.ConnectionStats
 import com.freeturn.app.ProxyService
 import com.freeturn.app.ProxyServiceState
 import com.freeturn.app.StartupResult
-import com.freeturn.app.XrayVpnService
 import com.freeturn.app.data.ClientConfig
-import com.freeturn.app.data.TunnelRoute
-import com.freeturn.app.data.TunnelTransport
 import com.freeturn.app.viewmodel.ProxyState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -114,16 +111,11 @@ class LocalProxyManager(private val context: Context) {
         if (ProxyServiceState.isRunning.value) return
         if (_proxyState.value is ProxyState.Error) _proxyState.value = ProxyState.Idle
 
-        if (cfg.tunnelRoute == TunnelRoute.DIRECT_XRAY) {
-            if (cfg.tunnelTransport != TunnelTransport.VLESS || cfg.xrayConfig.isBlank()) {
-                setErrorWithAutoReset("Не задан Xray config")
-                return
-            }
-        } else if (!cfg.isRawMode && (cfg.serverAddress.isBlank() || cfg.vkLink.isBlank())) {
+        if (!cfg.isRawMode && (cfg.serverAddress.isBlank() || cfg.vkLink.isBlank())) {
             setErrorWithAutoReset("Не заполнены настройки клиента")
             return
         }
-        if (cfg.tunnelRoute != TunnelRoute.DIRECT_XRAY && cfg.isRawMode && cfg.rawCommand.isBlank()) {
+        if (cfg.isRawMode && cfg.rawCommand.isBlank()) {
             setErrorWithAutoReset("Не задана raw-команда")
             return
         }
@@ -134,12 +126,7 @@ class LocalProxyManager(private val context: Context) {
         ProxyServiceState.setStartupResult(null)
         ProxyServiceState.setConnectionStats(ConnectionStats.IDLE)
         ProxyServiceState.clearConnectedSince()
-        val serviceClass = if (cfg.tunnelRoute == TunnelRoute.DIRECT_XRAY) {
-            XrayVpnService::class.java
-        } else {
-            ProxyService::class.java
-        }
-        val intent = Intent(context, serviceClass)
+        val intent = Intent(context, ProxyService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(intent)
         } else {
@@ -187,7 +174,6 @@ class LocalProxyManager(private val context: Context) {
 
     fun stopProxy() {
         context.stopService(Intent(context, ProxyService::class.java))
-        context.stopService(Intent(context, XrayVpnService::class.java))
         _proxyState.value = ProxyState.Idle
     }
 
