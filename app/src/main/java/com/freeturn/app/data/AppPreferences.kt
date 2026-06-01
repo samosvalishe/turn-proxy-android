@@ -1,4 +1,4 @@
-@file:Suppress("DEPRECATION")
+
 
 package com.freeturn.app.data
 
@@ -122,10 +122,6 @@ class AppPreferences(context: Context) {
         val TG_SUBSCRIBE_SHOWN = booleanPreferencesKey("tg_subscribe_shown")
         val PROFILES_JSON = stringPreferencesKey("profiles_json")
         val ACTIVE_PROFILE_ID = stringPreferencesKey("active_profile_id")
-
-        // Устаревшие ключи — используются только для миграции
-        private val SSH_PASS_LEGACY = stringPreferencesKey("ssh_pass")
-        private val SSH_KEY_LEGACY = stringPreferencesKey("ssh_key")
     }
 
     // Шифрованное хранилище для SSH-пароля и ключа (Android Keystore + AES-256)
@@ -151,12 +147,10 @@ class AppPreferences(context: Context) {
                 ip = prefs[SSH_IP] ?: "",
                 port = prefs[SSH_PORT] ?: 22,
                 username = prefs[SSH_USER] ?: "root",
-                // Читаем из зашифрованного хранилища; если пусто — берём из DataStore (миграция)
-                password = encryptedPrefs.getString("ssh_pass", null)
-                    ?: prefs[SSH_PASS_LEGACY] ?: "",
+                // Читаем из зашифрованного хранилища
+                password = encryptedPrefs.getString("ssh_pass", null) ?: "",
                 authType = prefs[SSH_AUTH_TYPE] ?: "PASSWORD",
-                sshKey = encryptedPrefs.getString("ssh_key", null)
-                    ?: prefs[SSH_KEY_LEGACY] ?: "",
+                sshKey = encryptedPrefs.getString("ssh_key", null) ?: "",
                 hostFingerprint = prefs[SSH_HOST_FP] ?: ""
             )
         }
@@ -280,8 +274,6 @@ class AppPreferences(context: Context) {
             prefs[SSH_USER] = config.username
             prefs[SSH_AUTH_TYPE] = config.authType
             prefs[SSH_HOST_FP] = config.hostFingerprint
-            prefs.remove(SSH_PASS_LEGACY)
-            prefs.remove(SSH_KEY_LEGACY)
         }
     }
 
@@ -349,8 +341,6 @@ class AppPreferences(context: Context) {
         context.dataStore.edit { it.clear() }
         withContext(Dispatchers.IO) {
             encryptedPrefs.edit { clear() }
-            // Чистим следы старого кастомного ядра, если оставались.
-            File(context.filesDir, "custom_vkturn").delete()
         }
     }
 }
