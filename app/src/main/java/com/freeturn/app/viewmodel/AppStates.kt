@@ -15,9 +15,10 @@ sealed class ServerState {
     data class Known(
         val installed: Boolean,
         val running: Boolean,
-        val vlessMode: Boolean? = null,
-        val vlessBond: Boolean? = null,
-        val wrap: Boolean? = null,
+        /** true → сервер запущен с -mode tcp. null если не запущен/неизвестно. */
+        val tcpMode: Boolean? = null,
+        /** Профиль обфускации сервера (none|rtpopus). null если не запущен/неизвестно. */
+        val obfProfile: String? = null,
         val version: String? = null
     ) : ServerState()
     data class Working(val action: String) : ServerState()

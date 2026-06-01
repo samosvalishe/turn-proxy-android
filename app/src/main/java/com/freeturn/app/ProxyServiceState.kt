@@ -17,8 +17,8 @@ data class CaptchaSession(val url: String, val sessionId: Long)
 /**
  * Агрегированная статистика подключений прокси-ядра.
  *
- * - [active] — число реально живых каналов (DTLS-потоков для не-VLESS, smux-сессий для VLESS).
- * - [total]  — целевое число каналов. 0 означает «ещё неизвестно» (VLESS до первой waiting-строки).
+ * - [active] — число реально живых каналов (DTLS-потоков для udp-релея, smux-сессий для tcp-режима).
+ * - [total]  — целевое число каналов. 0 означает «ещё неизвестно» (tcp-режим до первой waiting-строки).
  */
 data class ConnectionStats(val active: Int, val total: Int) {
     companion object {

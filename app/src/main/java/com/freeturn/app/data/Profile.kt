@@ -60,6 +60,7 @@ internal object ProfileJson {
         put("client", JSONObject().apply {
             put("serverAddress", p.client.serverAddress)
             put("vkLink", p.client.vkLink)
+            put("provider", p.client.provider)
             put("threads", p.client.threads)
             put("streamsPerCred", p.client.streamsPerCred)
             put("useUdp", p.client.useUdp)
@@ -67,12 +68,12 @@ internal object ProfileJson {
             put("localPort", p.client.localPort)
             put("isRawMode", p.client.isRawMode)
             put("rawCommand", p.client.rawCommand)
-            put("vlessMode", p.client.vlessMode)
+            put("tcpForward", p.client.tcpForward)
+            put("bond", p.client.bond)
 
             put("debugMode", p.client.debugMode)
             put("useCarrierDns", p.client.useCarrierDns)
             put("dnsMode", p.client.dnsMode)
-            put("forcePort443", p.client.forcePort443)
             put("syncServerSwitches", p.client.syncServerSwitches)
             put("magicSwitch", p.client.magicSwitch)
             put("magicTurn", p.client.magicTurn)
@@ -80,10 +81,8 @@ internal object ProfileJson {
         put("proxyListen", p.proxyListen)
         put("proxyConnect", p.proxyConnect)
         put("server", JSONObject().apply {
-            put("vlessBond", p.server.vlessBond)
-            put("wrapEnabled", p.server.wrapEnabled)
-            put("wrapKey", p.server.wrapKey)
-            put("kcpFec", p.server.kcpFec)
+            put("obfProfile", p.server.obfProfile)
+            put("obfKey", p.server.obfKey)
         })
     }
 
@@ -106,6 +105,9 @@ internal object ProfileJson {
             client = ClientConfig(
                 serverAddress = cliO.optString("serverAddress"),
                 vkLink = cliO.optString("vkLink"),
+                provider = cliO.optString("provider", Provider.VK).let {
+                    if (it in Provider.ALL) it else Provider.VK
+                },
                 threads = cliO.optInt("threads", 4),
                 streamsPerCred = cliO.optInt("streamsPerCred", 10),
                 useUdp = cliO.optBoolean("useUdp", true),
@@ -113,14 +115,14 @@ internal object ProfileJson {
                 localPort = cliO.optString("localPort", "127.0.0.1:9000"),
                 isRawMode = cliO.optBoolean("isRawMode", false),
                 rawCommand = cliO.optString("rawCommand"),
-                vlessMode = cliO.optBoolean("vlessMode", false),
+                tcpForward = cliO.optBoolean("tcpForward", false),
+                bond = cliO.optBoolean("bond", false),
 
                 debugMode = cliO.optBoolean("debugMode", false),
                 useCarrierDns = cliO.optBoolean("useCarrierDns", false),
                 dnsMode = cliO.optString("dnsMode", DnsMode.AUTO).let {
                     if (it in DnsMode.ALL) it else DnsMode.AUTO
                 },
-                forcePort443 = cliO.optBoolean("forcePort443", false),
                 syncServerSwitches = cliO.optBoolean("syncServerSwitches", true),
                 magicSwitch = cliO.optBoolean("magicSwitch", false),
                 magicTurn = cliO.optString("magicTurn")
@@ -128,10 +130,10 @@ internal object ProfileJson {
             proxyListen = o.optString("proxyListen").ifBlank { "0.0.0.0:56000" },
             proxyConnect = o.optString("proxyConnect").ifBlank { "127.0.0.1:40537" },
             server = AppPreferences.ServerOpts(
-                vlessBond = srvO.optBoolean("vlessBond", false),
-                wrapEnabled = srvO.optBoolean("wrapEnabled", false),
-                wrapKey = srvO.optString("wrapKey"),
-                kcpFec = srvO.optBoolean("kcpFec", false)
+                obfProfile = srvO.optString("obfProfile", ObfProfile.NONE).let {
+                    if (it in ObfProfile.ALL) it else ObfProfile.NONE
+                },
+                obfKey = srvO.optString("obfKey", "")
             )
         )
     }

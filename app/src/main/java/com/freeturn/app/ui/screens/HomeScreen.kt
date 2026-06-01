@@ -256,9 +256,14 @@ fun HomeScreen(
                         ConfigRow(stringResource(R.string.threads), "${clientConfig.threads}")
                         ConfigRow(stringResource(R.string.streams_per_cred_label), "${clientConfig.streamsPerCred}")
                         ConfigRow(
+                            stringResource(R.string.tcp_forward_mode),
+                            if (clientConfig.tcpForward) {
+                                if (clientConfig.bond) "TCP + bond" else "TCP"
+                            } else "UDP"
+                        )
+                        ConfigRow(
                             stringResource(R.string.transport_protocol),
-                            if (clientConfig.vlessMode) "VLESS"
-                            else if (clientConfig.useUdp) stringResource(R.string.udp)
+                            if (clientConfig.useUdp) stringResource(R.string.udp)
                             else stringResource(R.string.tcp)
                         )
                         ConfigRow(stringResource(R.string.local_port), clientConfig.localPort.redact(privacyMode))

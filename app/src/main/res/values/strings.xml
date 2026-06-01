@@ -56,21 +56,25 @@
     <string name="streams_per_cred_recommendation">Сколько TURN-потоков обслуживает один VK-аккаунт. По умолчанию 10.</string>
     <string name="streams_per_cred_format">Потоков на аккаунт: %1$d</string>
 
-    <string name="client_vless_bond">VLESS bonding</string>
-    <string name="client_vless_bond_desc">Должен совпадать с настройкой сервера. Только для VLESS-режима.</string>
-    <string name="client_wrap_enabled">WRAP-обфускация</string>
-    <string name="client_wrap_desc">Должна совпадать с настройкой сервера. Ключ берётся с сервера.</string>
+    <string name="tcp_forward_mode">TCP-форвард (Xray/sing-box)</string>
+    <string name="tcp_forward_mode_desc">Режим -mode tcp для проброса Xray/VLESS/Trojan. Выкл = UDP-релей для WireGuard. Должен совпадать с сервером.</string>
+    <string name="client_bond">Bond (стрипинг TCP)</string>
+    <string name="client_bond_desc">Распределяет TCP по smux-сессиям. Только в TCP-режиме. Клиентский флаг — сервер настраивать не нужно.</string>
+    <string name="obf_profile_title">Обфускация</string>
+    <string name="obf_profile_desc">Профиль маскировки payload (обход шейпинга VK). Должен совпадать с сервером. Ключ берётся с сервера.</string>
+    <string name="obf_none">Выкл</string>
+    <string name="obf_rtpopus">rtpopus</string>
+    <string name="provider_title">Провайдер</string>
+    <string name="provider_vk">VK Calls</string>
     <string name="locked_disconnect_hint">Подключитесь к серверу, чтобы изменить</string>
     <string name="wrap_key_empty_hint">Ключ не сгенерирован — нажмите кнопку ниже</string>
     <string name="wrap_key_invalid_hint">Неверный формат — нужны 64 hex-символа</string>
     <string name="wrap_key_apply">Применить</string>
-    <string name="client_kcp_fec">KCP FEC (Reed-Solomon 10:3)</string>
-    <string name="client_kcp_fec_desc">Упреждающая коррекция ошибок поверх KCP. Снижает retransmit-ы при случайных потерях, добавляет ~30% overhead. Должна совпадать на клиенте и сервере.</string>
     <string name="server_wrap_regen_in_progress">Генерация ключа…</string>
     <string name="server_sync_section">Синхронные настройки сервера</string>
     <string name="sync_server_switches">Синхронизировать с сервером</string>
-    <string name="sync_server_switches_desc">При выкл. флаги VLESS/bond/WRAP меняются только у клиента, серверный процесс не перезапускается</string>
-    <string name="sync_off_banner">Sync с сервером выключен. Клиентские флаги VLESS/bond/WRAP сервер не получает — следите за совпадением вручную.</string>
+    <string name="sync_server_switches_desc">При выкл. флаги TCP-режим/обфускация меняются только у клиента, серверный процесс не перезапускается</string>
+    <string name="sync_off_banner">Sync с сервером выключен. Клиентские флаги TCP-режим/обфускация сервер не получает — следите за совпадением вручную.</string>
     <string name="server_journal_title">Журнал</string>
     <string name="server_journal_fetch">Показать журнал</string>
     <string name="server_journal_refresh">Обновить</string>
@@ -88,8 +92,6 @@
     <string name="dns_mode_auto">Авто</string>
     <string name="dns_mode_udp">UDP/53</string>
     <string name="dns_mode_doh">DoH</string>
-    <string name="force_port_443">TURN на порту 443</string>
-    <string name="force_port_443_desc">Помогает, если оператор режет нестандартные порты</string>
     <string name="finish_setup">Завершить настройку</string>
 
     <!-- LogsScreen -->
@@ -117,18 +119,12 @@
     <string name="server_install_cached">Актуально</string>
     <string name="server_install_downloaded">Обновлено</string>
     <string name="server_version_label">Версия: %1$s</string>
-    <string name="server_vless_bond">VLESS bonding</string>
-    <string name="server_vless_bond_desc">Объединение нескольких VLESS-сессий в один туннель</string>
-    <string name="server_wrap_enabled">WRAP-обфускация</string>
-    <string name="server_wrap_desc">Маскирует DTLS-трафик ChaCha20-XOR (одинаковый ключ на сервере и клиенте)</string>
-    <string name="server_wrap_key_label">Wrap-ключ (64 hex)</string>
+    <string name="server_obf_key_label">Obf-ключ (64 hex)</string>
     <string name="server_wrap_regen">Сгенерировать новый ключ на сервере</string>
     <string name="start_server">Запустить сервер</string>
     <string name="stop_server">Остановить сервер</string>
     <string name="continue_client_setup">Продолжить настройку клиента</string>
-    <string name="vless_mode">VLESS-режим</string>
-    <string name="vless_mode_desc">Проброс VLESS через TURN-туннель (требует -vless на сервере)</string>
-    <string name="server_running_vless">Сервер запущен в VLESS-режиме</string>
+    <string name="server_running_tcp">Сервер запущен в TCP-форвард режиме</string>
     <string name="ssh_log_title">SSH-лог</string>
     <string name="active">Активно</string>
     <string name="inactive">Неактивно</string>
@@ -241,4 +237,9 @@
     <string name="profile_update_current">Обновить активный профиль</string>
     <string name="profile_update_current_hint">Перезаписать текущими настройками</string>
     <string name="profile_updated_toast">Профиль обновлён</string>
+
+    <!-- Notification & Tile -->
+    <string name="notif_proxy_stop_action">Отключить</string>
+    <string name="notif_proxy_status_format">Потоки: %1$d/%2$d • %3$s</string>
+    <string name="tile_service_label">Free Turn</string>
 </resources>

@@ -19,7 +19,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.DnsMode
-import com.freeturn.app.domain.server.KCP_FEC_VALUE
+import com.freeturn.app.data.Provider
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import java.util.regex.Pattern
 import kotlin.random.Random
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -59,21 +60,26 @@ class ProxyService : Service() {
             Pattern.compile("""(?:manually open this URL|Open this URL in your browser):\s*(https?://\S+)""")
 
         // События жизненного цикла соединений, публикуемые ядром (client/main.go).
-        // Не-VLESS: несколько потоков со своим [STREAM N], у каждого свой Established/Closed.
+        // UDP-релей: несколько потоков со своим [STREAM N], у каждого свой Established/Closed.
         private val STREAM_ESTABLISHED_REGEX =
             Pattern.compile("""\[STREAM (\d+)\] Established DTLS connection""")
         private val STREAM_CLOSED_REGEX =
             Pattern.compile("""\[STREAM (\d+)\] Closed DTLS connection""")
-        // VLESS: ядро само пишет агрегированное число активных сессий.
-        private val VLESS_ACTIVE_REGEX =
+        // TCP-режим (-mode tcp): ядро само пишет агрегированное число активных сессий.
+        private val TCP_ACTIVE_REGEX =
             Pattern.compile("""\[session \d+\] (?:connected|disconnected) \(active: (\d+)\)""")
-        // VLESS: целевое число сессий приходит в этой строке до первого connected.
-        private val VLESS_TOTAL_REGEX =
-            Pattern.compile("""VLESS mode: waiting for sessions to connect \(total: (\d+)\)""")
+        // TCP-режим: целевое число сессий приходит в этой строке до первого connected.
+        // Новое ядро (tcpfwd.go): "TCP mode: waiting for sessions to connect (total: N)...".
+        private val TCP_TOTAL_REGEX =
+            Pattern.compile("""TCP mode: waiting for sessions to connect \(total: (\d+)\)""")
     }
 
     private var wakeLock: PowerManager.WakeLock? = null
     private var openAppIntent: PendingIntent? = null
+
+    private var currentBaseStatus = ""
+    private var currentSpeedText = ""
+    @Volatile private var speedLoopJob: kotlinx.coroutines.Job? = null
 
     private val process = AtomicReference<Process?>(null)
     private val userStopped = AtomicBoolean(false)
@@ -124,14 +130,8 @@ class ProxyService : Service() {
                 PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_IMMUTABLE)
             }
         }
-        val notification = NotificationCompat.Builder(this, CHANNEL_PROXY)
-            .setContentTitle(getString(R.string.notif_proxy_title))
-            .setContentText(getString(R.string.notif_proxy_connecting))
-            .setSmallIcon(android.R.drawable.ic_menu_preferences)
-            .setOngoing(true)
-            .setContentIntent(openAppIntent)
-            .build()
-        startForeground(NOTIF_ID_FG, notification)
+        currentBaseStatus = getString(R.string.notif_proxy_connecting)
+        startForeground(NOTIF_ID_FG, createNotification())
 
         // Если процесс ядра ещё жив — это повторный onStartCommand (например,
         // sticky-рестарт). Не запускаем второй процесс, но требование о
@@ -152,6 +152,7 @@ class ProxyService : Service() {
         registerNetworkCallback()
 
         ProxyServiceState.addLog("=== ЗАПУСК ПРОКСИ ===")
+        startSpeedMonitor()
         serviceScope.launch { startBinaryProcess() }
 
         return START_STICKY
@@ -161,12 +162,30 @@ class ProxyService : Service() {
         if (userStopped.get()) return
 
         val cfg = prefs.clientConfigFlow.first()
-        // Wrap-обфускация и VLESS bonding управляются на серверном экране, но
-        // должны передаваться и клиенту с тем же ключом, иначе DTLS-handshake
-        // не сойдётся. Источник истины — общий serverOpts.
+        // Obf-обфускация управляется на серверном экране, но должна передаваться
+        // и клиенту с тем же ключом, иначе DTLS-handshake не сойдётся. Источник
+        // истины — общий serverOpts.
         val srv = prefs.serverOptsFlow.first()
 
-        val executable = "${applicationInfo.nativeLibraryDir}/libvkturn.so"
+        // Имя ядра версионируется (libfreeturn-<ver>-android-arm64.so) и меняется
+        // между релизами — не хардкодим. Ищем в nativeLibraryDir libfreeturn*.so
+        // (Android извлекает туда только файлы вида lib*.so). При нескольких версиях
+        // берём лексикографически старшую.
+        val libDir = File(applicationInfo.nativeLibraryDir)
+        val executable = libDir.listFiles { f ->
+            f.name.startsWith("libfreeturn") && f.name.endsWith(".so")
+        }?.maxByOrNull { it.name }?.absolutePath
+
+        if (executable == null) {
+            ProxyServiceState.addLog(
+                "КРИТИЧЕСКАЯ ОШИБКА: ядро libfreeturn*.so не найдено в ${libDir.path}. " +
+                "Положите бинарник в jniLibs/arm64-v8a/ (имя обязано начинаться с lib и оканчиваться на .so)."
+            )
+            ProxyServiceState.setStartupResult(StartupResult.Failed("core binary not found"))
+            ProxyServiceState.setRunning(false)
+            stopSelf()
+            return
+        }
 
         val cmdArgs = mutableListOf<String>()
 
@@ -178,28 +197,33 @@ class ProxyService : Service() {
             cmdArgs.add(executable)
             cmdArgs.add("-peer"); cmdArgs.add(cfg.serverAddress)
 
-            cmdArgs.add(if (cfg.vkLink.contains("yandex")) "-yandex-link" else "-vk-link")
-            cmdArgs.add(cfg.vkLink)
+            cmdArgs.add("-provider"); cmdArgs.add(cfg.provider)
+            // -link нужен только провайдеру vk (callroom URL).
+            if (cfg.provider == Provider.VK) { cmdArgs.add("-link"); cmdArgs.add(cfg.vkLink) }
             cmdArgs.add("-listen"); cmdArgs.add(cfg.localPort)
             if (cfg.threads > 0) { cmdArgs.add("-n"); cmdArgs.add(cfg.threads.toString()) }
             // -streams-per-cred передаём только если пользователь поменял дефолт.
             if (cfg.streamsPerCred > 0 && cfg.streamsPerCred != 10) {
                 cmdArgs.add("-streams-per-cred"); cmdArgs.add(cfg.streamsPerCred.toString())
             }
-            if (cfg.vlessMode) cmdArgs.add("-vless")
-            else if (cfg.useUdp) cmdArgs.add("-udp")
-            // VLESS bonding имеет смысл только в VLESS-режиме.
-            if (cfg.vlessMode && srv.vlessBond) cmdArgs.add("-vless-bond")
-            // WRAP: тот же ключ, что и у сервера (хранится в EncryptedSharedPreferences).
-            // Без 64-hex ключа флаг не передаём — ядро упадёт.
-            if (srv.wrapEnabled &&
-                srv.wrapKey.length == 64 &&
-                srv.wrapKey.matches(Regex("^[0-9a-fA-F]+$"))
+            // Режим туннеля: tcp-форвард (Xray/sing-box) vs udp-релей (WireGuard, дефолт).
+            if (cfg.tcpForward) { cmdArgs.add("-mode"); cmdArgs.add("tcp") }
+            // Bond работает только в tcp-режиме; в новом ядре это client-only флаг
+            // (сервер сам детектит bond по magic-префиксу).
+            if (cfg.tcpForward && cfg.bond) cmdArgs.add("-bond")
+            // TURN-транспорт: UDP вместо TCP/TLS по умолчанию.
+            if (cfg.useUdp) { cmdArgs.add("-transport"); cmdArgs.add("udp") }
+            // Обфускация (-obf-profile): профиль и ключ должны совпадать с сервером
+            // (хранятся в общем serverOpts). Без валидного 64-hex не передаём —
+            // ядро упадёт на DecodeKey.
+            if (srv.obfEnabled &&
+                srv.obfKey.length == 64 &&
+                srv.obfKey.matches(Regex("^[0-9a-fA-F]+$"))
             ) {
-                cmdArgs.add("-wrap")
-                cmdArgs.add("-wrap-key"); cmdArgs.add(srv.wrapKey)
+                cmdArgs.add("-obf-profile"); cmdArgs.add(srv.obfProfile)
+                cmdArgs.add("-obf-key"); cmdArgs.add(srv.obfKey)
             }
-            if (cfg.manualCaptcha) cmdArgs.add("--manual-captcha")
+            if (cfg.manualCaptcha) cmdArgs.add("-manual-captcha")
 
             if (cfg.debugMode) cmdArgs.add("-debug")
             if (cfg.useCarrierDns) {
@@ -208,10 +232,10 @@ class ProxyService : Service() {
                     cmdArgs.add("-dns-servers"); cmdArgs.add(dns)
                 }
             }
-            if (cfg.dnsMode == DnsMode.UDP || cfg.dnsMode == DnsMode.DOH) {
-                cmdArgs.add("-dns"); cmdArgs.add(cfg.dnsMode)
+            // -dns-mode: plain|doh (auto — дефолт ядра, не шлём).
+            if (cfg.dnsMode == DnsMode.PLAIN || cfg.dnsMode == DnsMode.DOH) {
+                cmdArgs.add("-dns-mode"); cmdArgs.add(cfg.dnsMode)
             }
-            if (cfg.forcePort443) { cmdArgs.add("-port"); cmdArgs.add("443") }
             // Альтернативный TURN-узел: переключает клиент на указанный server-side relay
             // вместо автоподбора. Адрес задаётся пользователем, флаг работает только при
             // непустом значении (иначе ядро запустится без -turn и будет автоподбор).
@@ -230,28 +254,31 @@ class ProxyService : Service() {
         var captchaSessionCounter = 0L
 
         // --- Трекинг активных соединений для индикации состояния в UI. ---
-        // Не-VLESS: каждый поток логирует свой [STREAM N] Established/Closed парой
-        // (defer Closed ставится ДО логирования Established, см. client/main.go).
+        // UDP-релей (-mode udp): каждый поток логирует свой [STREAM N] Established/Closed
+        // парой (defer Closed ставится ДО логирования Established, см. client/main.go).
         // Считаем именно инкрементами, а не множеством уникальных ID: в ядре есть
         // особенность — первый поток запускается с id=1 и цикл снова итерируется
         // с i=1, из-за чего один streamID дублируется при -n N. Для счётчика это
         // безопасно (на два Established придёт два Closed), для Set это давало
         // бы заниженное число активных (N-1 вместо N).
-        var nonVlessActive = 0
-        // Для не-VLESS целевое число потоков известно из конфига (-n). Если threads == 0,
+        var udpActive = 0
+        // Для UDP-релея целевое число потоков известно из конфига (-n). Если threads == 0,
         // ядро запускает один поток, считаем total = 1.
-        val nonVlessTotal = if (cfg.isRawMode) 0 else if (cfg.threads > 0) cfg.threads else 1
-        var vlessActive = 0
-        var vlessTotal = 0
-        var isVless = cfg.vlessMode
+        val udpTotal = if (cfg.isRawMode) 0 else if (cfg.threads > 0) cfg.threads else 1
+        var tcpActive = 0
+        var tcpTotal = 0
+        var isTcp = cfg.tcpForward
 
         fun publishStats() {
-            val stats = if (isVless) {
-                ConnectionStats(vlessActive, vlessTotal)
+            val stats = if (isTcp) {
+                ConnectionStats(tcpActive, tcpTotal)
             } else {
-                ConnectionStats(nonVlessActive, nonVlessTotal)
+                ConnectionStats(udpActive, udpTotal)
             }
             ProxyServiceState.setConnectionStats(stats)
+            if (currentBaseStatus == "Прокси активен") {
+                buildAndShowNotification()
+            }
         }
         // Сброс на старте сессии (в том числе на watchdog-рестарте).
         publishStats()
@@ -266,10 +293,6 @@ class ProxyService : Service() {
                 // в первую очередь.
                 pb.environment()["VK_PROFILE_PATH"] =
                     File(filesDir, "vk_profile.json").absolutePath
-                // KCP FEC — должно совпадать с сервером. Включается из ServerOpts.
-                if (srv.kcpFec) {
-                    pb.environment()["VK_TURN_KCP_FEC"] = KCP_FEC_VALUE
-                }
                 // CWD тоже подменяем на writeable dir — на случай если Go-код или его
                 // зависимости пишут что-то относительными путями (логи кеша tls-client и т.п.).
                 pb.directory(filesDir)
@@ -298,7 +321,7 @@ class ProxyService : Service() {
                         null
                     }
                     if (line == null) break
-                    val l = line ?: continue
+                    val l = line
                     ProxyServiceState.addLog(l)
 
                     // Детекция URL ручной капчи. Каждый раз выдаём новый sessionId,
@@ -337,28 +360,28 @@ class ProxyService : Service() {
                     var statsChanged = false
                     STREAM_ESTABLISHED_REGEX.matcher(l).let { m ->
                         if (m.find()) {
-                            nonVlessActive += 1
+                            udpActive += 1
                             statsChanged = true
-                            isVless = false
+                            isTcp = false
                         }
                     }
                     STREAM_CLOSED_REGEX.matcher(l).let { m ->
                         if (m.find()) {
-                            if (nonVlessActive > 0) nonVlessActive -= 1
+                            if (udpActive > 0) udpActive -= 1
                             statsChanged = true
                         }
                     }
-                    VLESS_TOTAL_REGEX.matcher(l).let { m ->
+                    TCP_TOTAL_REGEX.matcher(l).let { m ->
                         if (m.find()) {
-                            vlessTotal = m.group(1)!!.toInt()
-                            isVless = true
+                            tcpTotal = m.group(1)!!.toInt()
+                            isTcp = true
                             statsChanged = true
                         }
                     }
-                    VLESS_ACTIVE_REGEX.matcher(l).let { m ->
+                    TCP_ACTIVE_REGEX.matcher(l).let { m ->
                         if (m.find()) {
-                            vlessActive = m.group(1)!!.toInt()
-                            isVless = true
+                            tcpActive = m.group(1)!!.toInt()
+                            isTcp = true
                             statsChanged = true
                         }
                     }
@@ -380,8 +403,8 @@ class ProxyService : Service() {
                             lower.startsWith("fatal error:") ||
                             lower.contains("all vk credentials failed") ||
                             lower.contains("fatal_captcha")
-                        val hasConnection = (isVless && vlessActive > 0) ||
-                            (!isVless && nonVlessActive > 0)
+                        val hasConnection = (isTcp && tcpActive > 0) ||
+                            (!isTcp && udpActive > 0)
                         when {
                             hasFatal -> {
                                 ProxyServiceState.setStartupResult(StartupResult.Failed(l))
@@ -421,14 +444,26 @@ class ProxyService : Service() {
                     "Процесс завершился без вывода (код: $exitCode)"))
             }
 
+        } catch (e: CancellationException) {
+            // Остановка из UI отменяет корутину serviceScope → CancellationException
+            // ("Job was cancelled"). Это штатный путь остановки, не критическая ошибка.
+            // Пробрасываем дальше, чтобы не ломать семантику отмены; finally ниже
+            // обработает userStopped → stopSelf.
+            throw e
         } catch (e: Exception) {
-            val msg = e.message ?: ""
-            if (msg.contains("error=13") || msg.contains("Permission denied")) {
-                ProxyServiceState.addLog("КРИТИЧЕСКАЯ ОШИБКА: Отказано в запуске ядра — ваше устройство блокирует выполнение файлов из внутреннего хранилища (SELinux/noexec). Используйте встроенное ядро.")
-                ProxyServiceState.setStartupResult(StartupResult.Failed(msg))
-                startupFailed = true
+            // Любое исключение во время пользовательской остановки — следствие
+            // destroy()/закрытия пайпов, а не реальная ошибка. Не шумим в логах.
+            if (userStopped.get()) {
+                startupFailed = false
             } else {
-                ProxyServiceState.addLog("КРИТИЧЕСКАЯ ОШИБКА: ${e.message}")
+                val msg = e.message ?: ""
+                if (msg.contains("error=13") || msg.contains("Permission denied")) {
+                    ProxyServiceState.addLog("КРИТИЧЕСКАЯ ОШИБКА: Отказано в запуске ядра — ваше устройство блокирует выполнение файлов из внутреннего хранилища (SELinux/noexec). Используйте встроенное ядро.")
+                    ProxyServiceState.setStartupResult(StartupResult.Failed(msg))
+                    startupFailed = true
+                } else {
+                    ProxyServiceState.addLog("КРИТИЧЕСКАЯ ОШИБКА: ${e.message}")
+                }
             }
         } finally {
             ProxyServiceState.setCaptchaSession(null)
@@ -557,15 +592,81 @@ class ProxyService : Service() {
     }
 
     private fun updateNotification(text: String) {
-        val notification = NotificationCompat.Builder(this, CHANNEL_PROXY)
+        currentBaseStatus = text
+        buildAndShowNotification()
+    }
+
+    private fun formatSpeed(bytes: Long): String {
+        return when {
+            bytes < 1024 -> "$bytes B/s"
+            bytes < 1024 * 1024 -> "${bytes / 1024} KB/s"
+            else -> String.format(java.util.Locale.US, "%.1f MB/s", bytes / (1024f * 1024f))
+        }
+    }
+
+    private fun startSpeedMonitor() {
+        speedLoopJob?.cancel()
+        speedLoopJob = serviceScope.launch {
+            val uid = android.os.Process.myUid()
+            var lastRx = android.net.TrafficStats.getUidRxBytes(uid)
+            var lastTx = android.net.TrafficStats.getUidTxBytes(uid)
+            while (!userStopped.get()) {
+                kotlinx.coroutines.delay(1000)
+                val currentRx = android.net.TrafficStats.getUidRxBytes(uid)
+                val currentTx = android.net.TrafficStats.getUidTxBytes(uid)
+                
+                if (currentRx != android.net.TrafficStats.UNSUPPORTED.toLong() && lastRx != android.net.TrafficStats.UNSUPPORTED.toLong()) {
+                    val rxSpeed = maxOf(0, currentRx - lastRx)
+                    val txSpeed = maxOf(0, currentTx - lastTx)
+                    currentSpeedText = "↓ ${formatSpeed(rxSpeed)} ↑ ${formatSpeed(txSpeed)}"
+                    lastRx = currentRx
+                    lastTx = currentTx
+                    if (currentBaseStatus == "Прокси активен") {
+                        buildAndShowNotification()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun createNotification(): android.app.Notification {
+        var text = currentBaseStatus
+        val stats = ProxyServiceState.connectionStats.value
+        
+        if (currentBaseStatus == "Прокси активен" || currentBaseStatus == getString(R.string.proxy_active)) {
+            if (stats.total > 0) {
+                text = String.format(
+                    java.util.Locale.US,
+                    getString(R.string.notif_proxy_status_format),
+                    stats.active,
+                    stats.total,
+                    currentSpeedText
+                )
+            } else if (currentSpeedText.isNotEmpty()) {
+                text += " • $currentSpeedText"
+            }
+        }
+
+        val stopIntent = Intent(this, ProxyReceiver::class.java).apply {
+            action = "com.freeturn.app.STOP_PROXY"
+        }
+        val stopPendingIntent = PendingIntent.getBroadcast(
+            this, 0, stopIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        return NotificationCompat.Builder(this, CHANNEL_PROXY)
             .setContentTitle(getString(R.string.notif_proxy_title))
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_menu_preferences)
             .setOngoing(true)
             .setContentIntent(openAppIntent)
+            .addAction(0, getString(R.string.notif_proxy_stop_action), stopPendingIntent)
             .build()
+    }
+
+    private fun buildAndShowNotification() {
         try {
-            NotificationManagerCompat.from(this).notify(NOTIF_ID_FG, notification)
+            NotificationManagerCompat.from(this).notify(NOTIF_ID_FG, createNotification())
         } catch (_: SecurityException) {}
     }
 

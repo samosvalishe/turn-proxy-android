@@ -32,36 +32,53 @@ data class SshConfig(
 
 object DnsMode {
     const val AUTO = "auto"
-    const val UDP = "udp"
+    const val PLAIN = "plain"
     const val DOH = "doh"
-    val ALL = listOf(AUTO, UDP, DOH)
+    val ALL = listOf(AUTO, PLAIN, DOH)
+}
+
+/** Источник TURN-creds (флаг -provider ядра). Client-only. */
+object Provider {
+    const val VK = "vk"
+    val ALL = listOf(VK)
+}
+
+/** Wire-профиль обфускации payload (флаг -obf-profile ядра). Должен совпадать с сервером. */
+object ObfProfile {
+    const val NONE = "none"
+    const val RTPOPUS = "rtpopus"
+    val ALL = listOf(NONE, RTPOPUS)
 }
 
 data class ClientConfig(
     val serverAddress: String = "",
     val vkLink: String = "",
+    /** Источник TURN-creds (-provider). Пока только "vk". */
+    val provider: String = Provider.VK,
     val threads: Int = 4,
     /** Соответствует флагу `-streams-per-cred` ядра. Дефолт ядра = 10. */
     val streamsPerCred: Int = 10,
+    /** TURN-транспорт UDP (-transport udp). false = TCP/TLS (дефолт ядра). */
     val useUdp: Boolean = true,
     val manualCaptcha: Boolean = false,
     val localPort: String = "127.0.0.1:9000",
     val isRawMode: Boolean = false,
     val rawCommand: String = "",
-    val vlessMode: Boolean = false,
+    /** Режим туннеля TCP-форвард (-mode tcp, Xray/sing-box). false = UDP-релей (WireGuard). */
+    val tcpForward: Boolean = false,
+    /** Bonding TCP по smux-сессиям (-bond). Только при tcpForward. Client-only в новом ядре. */
+    val bond: Boolean = false,
 
     // Если true — добавляется флаг -debug для расширенного вывода в логах.
     val debugMode: Boolean = false,
     // Если true — в argv передаётся -dns-servers с DNS активной сети (оператор связи).
     val useCarrierDns: Boolean = false,
-    // "auto" | "udp" | "doh" — соответствует флагу -dns ядра.
+    // "auto" | "plain" | "doh" — соответствует флагу -dns-mode ядра.
     val dnsMode: String = DnsMode.AUTO,
-    // Если true — в argv ядра добавляется -port 443.
-    val forcePort443: Boolean = false,
     /**
-     * Если true — изменения vlessMode/vlessBond/wrapEnabled на клиенте дёргают
-     * рестарт сервера (текущее поведение). Если false — флаги меняются только
-     * у клиента, серверный процесс не трогается.
+     * Если true — изменения tcpForward/obfEnabled на клиенте дёргают рестарт
+     * сервера (текущее поведение). Если false — флаги меняются только у клиента,
+     * серверный процесс не трогается. (bond — client-only, сервер не трогает.)
      */
     val syncServerSwitches: Boolean = true,
     val magicSwitch: Boolean = false,
@@ -81,8 +98,7 @@ class AppPreferences(context: Context) {
         val ONBOARDING_DONE = booleanPreferencesKey("onboarding_done")
         val CLIENT_SERVER_ADDR = stringPreferencesKey("client_server_addr")
         val CLIENT_VK_LINK = stringPreferencesKey("client_vk_link")
-        // Устаревший ключ из мультиссылочной фичи — используется для очистки.
-        private val CLIENT_VK_LINKS_LEGACY = stringPreferencesKey("client_vk_links")
+        val CLIENT_PROVIDER = stringPreferencesKey("client_provider")
         val CLIENT_THREADS = intPreferencesKey("client_threads")
         val CLIENT_STREAMS_PER_CRED = intPreferencesKey("client_streams_per_cred")
         val CLIENT_UDP = booleanPreferencesKey("client_udp")
@@ -90,30 +106,18 @@ class AppPreferences(context: Context) {
         val CLIENT_LOCAL_PORT = stringPreferencesKey("client_local_port")
         val CLIENT_IS_RAW = booleanPreferencesKey("client_is_raw")
         val CLIENT_RAW_CMD = stringPreferencesKey("client_raw_cmd")
-        val CLIENT_VLESS = booleanPreferencesKey("client_vless")
-        private val CLIENT_CAPTCHA_SOLVER_LEGACY = stringPreferencesKey("client_captcha_solver")
+        val CLIENT_TCP_FORWARD = booleanPreferencesKey("client_tcp_forward")
+        val CLIENT_BOND = booleanPreferencesKey("client_bond")
         val CLIENT_DEBUG = booleanPreferencesKey("client_debug")
         val CLIENT_USE_CARRIER_DNS = booleanPreferencesKey("client_use_carrier_dns")
         val CLIENT_DNS_MODE = stringPreferencesKey("client_dns_mode")
-        val CLIENT_FORCE_PORT_443 = booleanPreferencesKey("client_force_port_443")
         val CLIENT_SYNC_SERVER = booleanPreferencesKey("client_sync_server")
         val CLIENT_MAGIC_SWITCH = booleanPreferencesKey("client_magic_switch")
         val CLIENT_MAGIC_TURN = stringPreferencesKey("client_magic_turn")
-        // Устаревшие ключи — не пишутся, но молча удаляются при saveClientConfig.
-        private val CLIENT_ALLOCS_PER_STREAM_LEGACY = intPreferencesKey("client_allocs_per_stream")
-        private val CLIENT_TURN_PORT_443_LEGACY = booleanPreferencesKey("client_turn_port_443")
         val PROXY_LISTEN = stringPreferencesKey("proxy_listen")
         val PROXY_CONNECT = stringPreferencesKey("proxy_connect")
-        // Серверные параметры (управляются на ServerManagementScreen).
-        val SERVER_VLESS_BOND = booleanPreferencesKey("server_vless_bond")
-        val SERVER_WRAP_ENABLED = booleanPreferencesKey("server_wrap_enabled")
-        val SERVER_KCP_FEC = booleanPreferencesKey("server_kcp_fec")
-        // Ревизия — инкрементится при saveServerOpts. Нужна, чтобы Flow эмитил
-        // обновление, когда меняется только wrap-key в EncryptedSharedPreferences
-        // (DataStore сам по себе не видит этого изменения).
+        val SERVER_OBF_PROFILE = stringPreferencesKey("server_obf_profile")
         val SERVER_OPTS_REV = intPreferencesKey("server_opts_rev")
-        // Wrap-ключ хранится в EncryptedSharedPreferences (key: "server_wrap_key"),
-        // не в DataStore. См. encryptedPrefs ниже.
         val DYNAMIC_THEME = booleanPreferencesKey("dynamic_theme")
         val TG_SUBSCRIBE_SHOWN = booleanPreferencesKey("tg_subscribe_shown")
         val PROFILES_JSON = stringPreferencesKey("profiles_json")
@@ -163,6 +167,9 @@ class AppPreferences(context: Context) {
             ClientConfig(
                 serverAddress = prefs[CLIENT_SERVER_ADDR] ?: "",
                 vkLink = prefs[CLIENT_VK_LINK] ?: "",
+                provider = (prefs[CLIENT_PROVIDER] ?: Provider.VK).let {
+                    if (it in Provider.ALL) it else Provider.VK
+                },
                 threads = prefs[CLIENT_THREADS] ?: 4,
                 streamsPerCred = prefs[CLIENT_STREAMS_PER_CRED] ?: 10,
                 useUdp = prefs[CLIENT_UDP] ?: true,
@@ -170,14 +177,14 @@ class AppPreferences(context: Context) {
                 localPort = prefs[CLIENT_LOCAL_PORT] ?: "127.0.0.1:9000",
                 isRawMode = prefs[CLIENT_IS_RAW] ?: false,
                 rawCommand = prefs[CLIENT_RAW_CMD] ?: "",
-                vlessMode = prefs[CLIENT_VLESS] ?: false,
+                tcpForward = prefs[CLIENT_TCP_FORWARD] ?: false,
+                bond = prefs[CLIENT_BOND] ?: false,
 
                 debugMode = prefs[CLIENT_DEBUG] ?: false,
                 useCarrierDns = prefs[CLIENT_USE_CARRIER_DNS] ?: false,
                 dnsMode = (prefs[CLIENT_DNS_MODE] ?: DnsMode.AUTO).let {
                     if (it in DnsMode.ALL) it else DnsMode.AUTO
                 },
-                forcePort443 = prefs[CLIENT_FORCE_PORT_443] ?: false,
                 syncServerSwitches = prefs[CLIENT_SYNC_SERVER] ?: true,
                 magicSwitch = prefs[CLIENT_MAGIC_SWITCH] ?: false,
                 magicTurn = prefs[CLIENT_MAGIC_TURN] ?: ""
@@ -196,33 +203,34 @@ class AppPreferences(context: Context) {
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { prefs -> prefs[PROXY_CONNECT] ?: "127.0.0.1:40537" }
 
-    /** Снимок серверных опций. wrapKey читается из шифрованного хранилища. */
+    /** Снимок серверных obf-опций. obfKey читается из шифрованного хранилища. */
     data class ServerOpts(
-        val vlessBond: Boolean = false,
-        val wrapEnabled: Boolean = false,
-        val wrapKey: String = "",
-        val kcpFec: Boolean = false
-    )
+        /** Wire-профиль обфускации: none | rtpopus (-obf-profile). */
+        val obfProfile: String = ObfProfile.NONE,
+        /** 64-hex obf-ключ (-obf-key). Должен совпадать на клиенте и сервере. */
+        val obfKey: String = ""
+    ) {
+        /** Обфускация включена, когда выбран реальный профиль. */
+        val obfEnabled: Boolean get() = obfProfile != ObfProfile.NONE
+    }
 
     val serverOptsFlow: Flow<ServerOpts> = context.dataStore.data
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { prefs ->
             ServerOpts(
-                vlessBond = prefs[SERVER_VLESS_BOND] ?: false,
-                wrapEnabled = prefs[SERVER_WRAP_ENABLED] ?: false,
-                wrapKey = encryptedPrefs.getString("server_wrap_key", null) ?: "",
-                kcpFec = prefs[SERVER_KCP_FEC] ?: false
+                obfProfile = (prefs[SERVER_OBF_PROFILE] ?: ObfProfile.NONE).let {
+                    if (it in ObfProfile.ALL) it else ObfProfile.NONE
+                },
+                obfKey = encryptedPrefs.getString("server_obf_key", null) ?: ""
             )
         }
 
     suspend fun saveServerOpts(opts: ServerOpts) {
         withContext(Dispatchers.IO) {
-            encryptedPrefs.edit { putString("server_wrap_key", opts.wrapKey) }
+            encryptedPrefs.edit { putString("server_obf_key", opts.obfKey) }
         }
         context.dataStore.edit { prefs ->
-            prefs[SERVER_VLESS_BOND] = opts.vlessBond
-            prefs[SERVER_WRAP_ENABLED] = opts.wrapEnabled
-            prefs[SERVER_KCP_FEC] = opts.kcpFec
+            prefs[SERVER_OBF_PROFILE] = opts.obfProfile
             prefs[SERVER_OPTS_REV] = (prefs[SERVER_OPTS_REV] ?: 0) + 1
         }
     }
@@ -285,28 +293,22 @@ class AppPreferences(context: Context) {
         context.dataStore.edit { prefs ->
             prefs[CLIENT_SERVER_ADDR] = config.serverAddress
             prefs[CLIENT_VK_LINK] = config.vkLink
-            prefs.remove(CLIENT_VK_LINKS_LEGACY)
+            prefs[CLIENT_PROVIDER] = config.provider
             prefs[CLIENT_THREADS] = config.threads
             prefs[CLIENT_STREAMS_PER_CRED] = config.streamsPerCred
             prefs[CLIENT_UDP] = config.useUdp
             prefs[CLIENT_MANUAL_CAPTCHA] = config.manualCaptcha
-            // Мигрируем старый ключ: noDtls удалён из приложения.
-            prefs.remove(booleanPreferencesKey("client_no_dtls"))
             prefs[CLIENT_LOCAL_PORT] = config.localPort
             prefs[CLIENT_IS_RAW] = config.isRawMode
             prefs[CLIENT_RAW_CMD] = config.rawCommand
-            prefs[CLIENT_VLESS] = config.vlessMode
-            prefs.remove(CLIENT_CAPTCHA_SOLVER_LEGACY)
+            prefs[CLIENT_TCP_FORWARD] = config.tcpForward
+            prefs[CLIENT_BOND] = config.bond
             prefs[CLIENT_DEBUG] = config.debugMode
             prefs[CLIENT_USE_CARRIER_DNS] = config.useCarrierDns
             prefs[CLIENT_DNS_MODE] = if (config.dnsMode in DnsMode.ALL) config.dnsMode else DnsMode.AUTO
-            prefs[CLIENT_FORCE_PORT_443] = config.forcePort443
             prefs[CLIENT_SYNC_SERVER] = config.syncServerSwitches
             prefs[CLIENT_MAGIC_SWITCH] = config.magicSwitch
             prefs[CLIENT_MAGIC_TURN] = config.magicTurn.trim()
-            // Удаляем устаревшие ключи.
-            prefs.remove(CLIENT_TURN_PORT_443_LEGACY)
-            prefs.remove(CLIENT_ALLOCS_PER_STREAM_LEGACY)
         }
     }
 

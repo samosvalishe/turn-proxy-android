@@ -54,6 +54,8 @@ import com.freeturn.app.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.data.ClientConfig
 import com.freeturn.app.data.DnsMode
+import com.freeturn.app.data.ObfProfile
+import com.freeturn.app.data.Provider
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.viewmodel.MainViewModel
 import com.freeturn.app.viewmodel.SshConnectionState
@@ -78,7 +80,7 @@ fun ClientSetupScreen(
     val serverOpts by viewModel.serverOpts.collectAsStateWithLifecycle()
     val proxyListen by viewModel.proxyListen.collectAsStateWithLifecycle()
     val privacyMode by viewModel.privacyMode.collectAsStateWithLifecycle()
-    val isRegeneratingWrapKey by viewModel.isRegeneratingWrapKey.collectAsStateWithLifecycle()
+    val isRegeneratingObfKey by viewModel.isRegeneratingObfKey.collectAsStateWithLifecycle()
 
     val isSshConnected = sshState is SshConnectionState.Connected
     val serverKnown = serverState as? com.freeturn.app.viewmodel.ServerState.Known
@@ -86,21 +88,20 @@ fun ClientSetupScreen(
     // (если запущен), иначе сохранённое. В !sync режиме — всегда сохранённое:
     // серверная и клиентская стороны могут различаться, и UI отражает клиента.
     val syncOn = saved.syncServerSwitches
-    val effectiveVlessMode = if (syncOn) serverKnown?.vlessMode ?: saved.vlessMode else saved.vlessMode
-    val effectiveVlessBond = if (syncOn) serverKnown?.vlessBond ?: serverOpts.vlessBond else serverOpts.vlessBond
-    val effectiveWrap      = if (syncOn) serverKnown?.wrap      ?: serverOpts.wrapEnabled else serverOpts.wrapEnabled
+    val effectiveTcpForward = if (syncOn) serverKnown?.tcpMode ?: saved.tcpForward else saved.tcpForward
+    val effectiveObfProfile = if (syncOn) serverKnown?.obfProfile ?: serverOpts.obfProfile else serverOpts.obfProfile
 
     val context = LocalContext.current
 
     var serverAddress by rememberSaveable(saved.serverAddress) { mutableStateOf(saved.serverAddress) }
     var vkLink       by rememberSaveable(saved.vkLink)         { mutableStateOf(saved.vkLink) }
+    var provider     by rememberSaveable(saved.provider)       { mutableStateOf(saved.provider) }
     var threads      by rememberSaveable(saved.threads)        { mutableFloatStateOf(saved.threads.toFloat()) }
     var streamsPerCred by rememberSaveable(saved.streamsPerCred) { mutableFloatStateOf(saved.streamsPerCred.toFloat()) }
     var useUdp       by rememberSaveable(saved.useUdp)         { mutableStateOf(saved.useUdp) }
     var manualCaptcha by rememberSaveable(saved.manualCaptcha) { mutableStateOf(saved.manualCaptcha) }
     var useCarrierDns by rememberSaveable(saved.useCarrierDns) { mutableStateOf(saved.useCarrierDns) }
     var dnsMode by rememberSaveable(saved.dnsMode) { mutableStateOf(saved.dnsMode) }
-    var forcePort443 by rememberSaveable(saved.forcePort443) { mutableStateOf(saved.forcePort443) }
     var localPort    by rememberSaveable(saved.localPort)      { mutableStateOf(saved.localPort) }
 
     var debugMode by rememberSaveable(saved.debugMode) { mutableStateOf(saved.debugMode) }
@@ -118,24 +119,25 @@ fun ClientSetupScreen(
     }
 
     // Авто-сохранение с дебаунсом 600 мс на каждое изменение поля.
-    // vlessMode исключён — сохраняется через setVlessMode с автоперезапуском сервера.
-    LaunchedEffect(serverAddress, vkLink, threads, streamsPerCred, useUdp, manualCaptcha, useCarrierDns, localPort, dnsMode, forcePort443, debugMode, magicSwitch, magicTurn) {
+    // tcpForward/bond исключены — сохраняются через setTcpForward/setBond с автоперезапуском.
+    LaunchedEffect(serverAddress, vkLink, provider, threads, streamsPerCred, useUdp, manualCaptcha, useCarrierDns, localPort, dnsMode, debugMode, magicSwitch, magicTurn) {
         delay(600)
         viewModel.saveClientConfig(
             ClientConfig(
                 serverAddress = serverAddress.trim(),
                 vkLink        = vkLink.trim(),
+                provider      = provider,
                 threads       = threads.roundToInt(),
                 streamsPerCred = streamsPerCred.roundToInt(),
                 useUdp        = useUdp,
                 manualCaptcha = manualCaptcha,
                 localPort     = localPort.trim(),
-                vlessMode     = saved.vlessMode,
+                tcpForward    = saved.tcpForward,
+                bond          = saved.bond,
 
                 debugMode     = debugMode,
                 useCarrierDns = useCarrierDns,
                 dnsMode       = dnsMode,
-                forcePort443  = forcePort443,
                 syncServerSwitches = saved.syncServerSwitches,
                 magicSwitch   = magicSwitch,
                 magicTurn     = magicTurn.trim()
@@ -180,16 +182,35 @@ fun ClientSetupScreen(
                     supportingText = { Text(stringResource(R.string.server_address_support)) }
                 )
 
-                OutlinedTextField(
-                    value = vkLink.redact(privacyMode),
-                    onValueChange = { if (!privacyMode) vkLink = it },
-                    label = { Text(stringResource(R.string.call_link_label)) },
-                    placeholder = { Text(stringResource(R.string.call_link_placeholder)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    readOnly = privacyMode,
-                    supportingText = { Text(stringResource(R.string.call_link_support)) }
-                )
+                // Провайдер TURN-creds (-provider). Пока только vk; список расширяемый.
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(stringResource(R.string.provider_title), style = MaterialTheme.typography.bodyMedium)
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        Provider.ALL.forEachIndexed { idx, value ->
+                            SegmentedButton(
+                                selected = provider == value,
+                                onClick = {
+                                    HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                                    provider = value
+                                },
+                                shape = SegmentedButtonDefaults.itemShape(index = idx, count = Provider.ALL.size)
+                            ) { Text(providerLabel(value)) }
+                        }
+                    }
+                }
+
+                if (provider == Provider.VK) {
+                    OutlinedTextField(
+                        value = vkLink.redact(privacyMode),
+                        onValueChange = { if (!privacyMode) vkLink = it },
+                        label = { Text(stringResource(R.string.call_link_label)) },
+                        placeholder = { Text(stringResource(R.string.call_link_placeholder)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        readOnly = privacyMode,
+                        supportingText = { Text(stringResource(R.string.call_link_support)) }
+                    )
+                }
 
                 OutlinedTextField(
                     value = localPort.redact(privacyMode),
@@ -274,7 +295,7 @@ fun ClientSetupScreen(
                     }
                     val dnsOptions = listOf(
                         DnsMode.AUTO to stringResource(R.string.dns_mode_auto),
-                        DnsMode.UDP to stringResource(R.string.dns_mode_udp),
+                        DnsMode.PLAIN to stringResource(R.string.dns_mode_udp),
                         DnsMode.DOH to stringResource(R.string.dns_mode_doh)
                     )
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
@@ -291,34 +312,33 @@ fun ClientSetupScreen(
                     }
                 }
 
-                if (!effectiveVlessMode) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Column {
-                            Text(stringResource(R.string.transport_protocol), style = MaterialTheme.typography.bodyMedium)
-                            Text(
-                                stringResource(R.string.transport_protocol_desc),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                            SegmentedButton(
-                                selected = !useUdp,
-                                onClick = {
-                                    HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                    useUdp = false
-                                },
-                                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                            ) { Text(stringResource(R.string.tcp)) }
-                            SegmentedButton(
-                                selected = useUdp,
-                                onClick = {
-                                    HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                    useUdp = true
-                                },
-                                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                            ) { Text(stringResource(R.string.udp)) }
-                        }
+                // TURN-транспорт (-transport tcp|udp) ортогонален режиму туннеля.
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column {
+                        Text(stringResource(R.string.transport_protocol), style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            stringResource(R.string.transport_protocol_desc),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        SegmentedButton(
+                            selected = !useUdp,
+                            onClick = {
+                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                                useUdp = false
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                        ) { Text(stringResource(R.string.tcp)) }
+                        SegmentedButton(
+                            selected = useUdp,
+                            onClick = {
+                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                                useUdp = true
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                        ) { Text(stringResource(R.string.udp)) }
                     }
                 }
 
@@ -341,16 +361,6 @@ fun ClientSetupScreen(
                     onCheckedChange = {
                         HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
                         useCarrierDns = it
-                    }
-                )
-
-                SwitchRow(
-                    label = stringResource(R.string.force_port_443),
-                    description = stringResource(R.string.force_port_443_desc),
-                    checked = forcePort443,
-                    onCheckedChange = {
-                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                        forcePort443 = it
                     }
                 )
 
@@ -411,79 +421,82 @@ fun ClientSetupScreen(
                     stringResource(R.string.locked_disconnect_hint) else null
 
                 SwitchRow(
-                    label = stringResource(R.string.client_kcp_fec),
+                    label = stringResource(R.string.tcp_forward_mode),
                     description = lockedHint?.takeIf { !isSshConnected }
-                        ?: stringResource(R.string.client_kcp_fec_desc),
-                    checked = serverOpts.kcpFec,
+                        ?: stringResource(R.string.tcp_forward_mode_desc),
+                    checked = effectiveTcpForward,
                     enabled = controlsEnabled,
                     onCheckedChange = {
                         HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                        viewModel.setServerKcpFec(it)
+                        viewModel.setTcpForward(it)
                     }
                 )
 
+                // Bond — client-only флаг (сервер детектит сам). SSH не нужен;
+                // активен только в TCP-форвард режиме.
                 SwitchRow(
-                    label = stringResource(R.string.vless_mode),
-                    description = lockedHint?.takeIf { !isSshConnected }
-                        ?: stringResource(R.string.vless_mode_desc),
-                    checked = effectiveVlessMode,
-                    enabled = controlsEnabled,
+                    label = stringResource(R.string.client_bond),
+                    description = stringResource(R.string.client_bond_desc),
+                    checked = saved.bond,
+                    enabled = effectiveTcpForward,
                     onCheckedChange = {
                         HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                        viewModel.setVlessMode(it)
+                        viewModel.setBond(it)
                     }
                 )
 
-                SwitchRow(
-                    label = stringResource(R.string.client_vless_bond),
-                    description = lockedHint?.takeIf { !isSshConnected }
-                        ?: stringResource(R.string.client_vless_bond_desc),
-                    checked = effectiveVlessBond,
-                    enabled = controlsEnabled && effectiveVlessMode,
-                    onCheckedChange = {
-                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                        viewModel.setServerVlessBond(it)
+                // Профиль обфускации — табы (как транспорт). Должен совпадать с сервером.
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column {
+                        Text(stringResource(R.string.obf_profile_title), style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            lockedHint?.takeIf { !isSshConnected }
+                                ?: stringResource(R.string.obf_profile_desc),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-                )
-
-                SwitchRow(
-                    label = stringResource(R.string.client_wrap_enabled),
-                    description = lockedHint?.takeIf { !isSshConnected }
-                        ?: stringResource(R.string.client_wrap_desc),
-                    checked = effectiveWrap,
-                    enabled = controlsEnabled,
-                    onCheckedChange = {
-                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                        viewModel.setServerWrapEnabled(it)
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        ObfProfile.ALL.forEachIndexed { idx, value ->
+                            SegmentedButton(
+                                selected = effectiveObfProfile == value,
+                                enabled = controlsEnabled,
+                                onClick = {
+                                    HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                                    viewModel.setObfProfile(value)
+                                },
+                                shape = SegmentedButtonDefaults.itemShape(index = idx, count = ObfProfile.ALL.size)
+                            ) { Text(obfProfileLabel(value)) }
+                        }
                     }
-                )
+                }
 
-                if (effectiveWrap) {
-                    val wrapKeyRegex = remember { Regex("^[0-9a-fA-F]{64}$") }
+                if (effectiveObfProfile != ObfProfile.NONE) {
+                    val obfKeyRegex = remember { Regex("^[0-9a-fA-F]{64}$") }
                     // Локальный черновик: правки в TextField не дёргают saveServerOpts/restart
                     // на каждом keystroke. Применение — отдельной кнопкой ниже, только когда
                     // ключ валидный (64 hex). Серверный ключ из serverOpts — источник истины:
                     // при внешнем обновлении (regen/probe) черновик пересинхронизируется.
-                    var wrapKeyDraft by rememberSaveable(serverOpts.wrapKey) {
-                        mutableStateOf(serverOpts.wrapKey)
+                    var obfKeyDraft by rememberSaveable(serverOpts.obfKey) {
+                        mutableStateOf(serverOpts.obfKey)
                     }
-                    val draftValid = wrapKeyDraft.matches(wrapKeyRegex)
-                    val draftDirty = wrapKeyDraft != serverOpts.wrapKey
+                    val draftValid = obfKeyDraft.matches(obfKeyRegex)
+                    val draftDirty = obfKeyDraft != serverOpts.obfKey
                     OutlinedTextField(
-                        value = if (privacyMode) serverOpts.wrapKey.redact(true) else wrapKeyDraft,
-                        onValueChange = { if (!privacyMode) wrapKeyDraft = it },
-                        label = { Text(stringResource(R.string.server_wrap_key_label)) },
+                        value = if (privacyMode) serverOpts.obfKey.redact(true) else obfKeyDraft,
+                        onValueChange = { if (!privacyMode) obfKeyDraft = it },
+                        label = { Text(stringResource(R.string.server_obf_key_label)) },
                         modifier = Modifier.fillMaxWidth(),
                         readOnly = privacyMode,
                         singleLine = true,
-                        isError = wrapKeyDraft.isNotBlank() && !draftValid,
+                        isError = obfKeyDraft.isNotBlank() && !draftValid,
                         trailingIcon = {
-                            if (serverOpts.wrapKey.isNotBlank() && !privacyMode) {
+                            if (serverOpts.obfKey.isNotBlank() && !privacyMode) {
                                 IconButton(onClick = {
                                     HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                                     val cm = context.getSystemService(android.content.ClipboardManager::class.java)
                                     cm?.setPrimaryClip(
-                                        android.content.ClipData.newPlainText("wrap-key", serverOpts.wrapKey)
+                                        android.content.ClipData.newPlainText("obf-key", serverOpts.obfKey)
                                     )
                                 }) {
                                     Icon(
@@ -495,7 +508,7 @@ fun ClientSetupScreen(
                         },
                         supportingText = {
                             when {
-                                wrapKeyDraft.isBlank() -> Text(
+                                obfKeyDraft.isBlank() -> Text(
                                     stringResource(R.string.wrap_key_empty_hint),
                                     color = MaterialTheme.colorScheme.error
                                 )
@@ -510,7 +523,7 @@ fun ClientSetupScreen(
                         androidx.compose.material3.TextButton(
                             onClick = {
                                 HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                                viewModel.setWrapKey(wrapKeyDraft)
+                                viewModel.setObfKey(obfKeyDraft)
                             },
                             enabled = draftValid,
                             modifier = Modifier.fillMaxWidth()
@@ -523,12 +536,12 @@ fun ClientSetupScreen(
                             androidx.compose.material3.TextButton(
                                 onClick = {
                                     HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                                    viewModel.regenerateWrapKey()
+                                    viewModel.regenerateObfKey()
                                 },
-                                enabled = !isRegeneratingWrapKey,
+                                enabled = !isRegeneratingObfKey,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                if (isRegeneratingWrapKey) {
+                                if (isRegeneratingObfKey) {
                                     androidx.compose.material3.CircularWavyProgressIndicator(
                                         modifier = Modifier.size(20.dp)
                                     )
@@ -589,4 +602,17 @@ private fun SwitchRow(
         }
         Switch(checked = checked, enabled = enabled, onCheckedChange = onCheckedChange)
     }
+}
+
+@Composable
+private fun providerLabel(value: String): String = when (value) {
+    Provider.VK -> stringResource(R.string.provider_vk)
+    else -> value
+}
+
+@Composable
+private fun obfProfileLabel(value: String): String = when (value) {
+    ObfProfile.NONE -> stringResource(R.string.obf_none)
+    ObfProfile.RTPOPUS -> stringResource(R.string.obf_rtpopus)
+    else -> value
 }

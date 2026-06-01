@@ -12,7 +12,7 @@ set -eu
 
 PREFIX="/opt/vk-turn"
 PIDFILE="$PREFIX/proxy.pid"
-WRAPFILE="$PREFIX/wrap.key"
+OBFFILE="$PREFIX/obf.key"
 LOGFILE="$PREFIX/server.log"
 VERFILE="$PREFIX/version"
 RUNTIMEFILE="$PREFIX/runtime"
@@ -21,7 +21,7 @@ ENVFILE="$PREFIX/run.env"
 LAUNCHER="$PREFIX/launch.sh"
 UNIT_PATH="/etc/systemd/system/vk-turn-proxy.service"
 UNIT_NAME="vk-turn-proxy.service"
-BASE_URL="https://github.com/samosvalishe/vk-turn-proxy/releases/latest/download"
+BASE_URL="https://github.com/samosvalishe/free-turn-proxy/releases/latest/download"
 
 log()  { echo "LOG: $*"; }
 emit() { echo "$1=$2"; }
@@ -146,9 +146,12 @@ cmd_probe() {
         emit RUNNING yes
         local cmdline
         cmdline=$(current_cmdline)
-        if echo "$cmdline" | grep -q -- "-vless"; then emit VLESS yes; else emit VLESS no; fi
-        if echo "$cmdline" | grep -q -- "-vless-bond"; then emit VLESS_BOND yes; else emit VLESS_BOND no; fi
-        if echo "$cmdline" | grep -q -- "-wrap"; then emit WRAP yes; else emit WRAP no; fi
+        # -mode tcp → MODE=tcp, иначе udp-релей (дефолт ядра).
+        if echo "$cmdline" | grep -q -- "-mode tcp"; then emit MODE tcp; else emit MODE udp; fi
+        # OBF=<профиль из cmdline> (rtpopus|none).
+        local obf
+        obf=$(echo "$cmdline" | sed -nE 's/.*-obf-profile[= ]+([a-z]+).*/\1/p')
+        emit OBF "${obf:-none}"
     else
         emit RUNNING no
     fi
@@ -355,10 +358,9 @@ cmd_install() {
 # parse --key=value args into globals
 ARG_LISTEN=""
 ARG_CONNECT=""
-ARG_VLESS=""
-ARG_VLESS_BOND=""
-ARG_WRAP_KEY=""
-ARG_KCP_FEC=""
+ARG_MODE=""
+ARG_OBF_PROFILE="none"
+ARG_OBF_KEY=""
 ARG_TAIL=80
 
 parse_args() {
@@ -372,15 +374,17 @@ parse_args() {
                 ARG_CONNECT="${1#*=}"
                 [[ "$ARG_CONNECT" =~ ^[a-zA-Z0-9.:_-]+$ ]] || die "bad --connect"
                 ;;
-            --vless) ARG_VLESS=1 ;;
-            --vless-bond) ARG_VLESS_BOND=1 ;;
-            --wrap-key=*)
-                ARG_WRAP_KEY="${1#*=}"
-                [[ "$ARG_WRAP_KEY" =~ ^[0-9a-fA-F]{64}$ ]] || die "bad --wrap-key (need 64 hex)"
+            --mode=*)
+                ARG_MODE="${1#*=}"
+                [[ "$ARG_MODE" =~ ^(udp|tcp)$ ]] || die "bad --mode (need udp|tcp)"
                 ;;
-            --kcp-fec=*)
-                ARG_KCP_FEC="${1#*=}"
-                [[ "$ARG_KCP_FEC" =~ ^[0-9]+:[0-9]+$ ]] || die "bad --kcp-fec (need data:parity)"
+            --obf-profile=*)
+                ARG_OBF_PROFILE="${1#*=}"
+                [[ "$ARG_OBF_PROFILE" =~ ^(none|rtpopus)$ ]] || die "bad --obf-profile (need none|rtpopus)"
+                ;;
+            --obf-key=*)
+                ARG_OBF_KEY="${1#*=}"
+                [[ "$ARG_OBF_KEY" =~ ^[0-9a-fA-F]{64}$ ]] || die "bad --obf-key (need 64 hex)"
                 ;;
             --tail=*)
                 ARG_TAIL="${1#*=}"
@@ -393,6 +397,7 @@ parse_args() {
 }
 
 # Записать аргументы в run.args (по одному на строку, mode 600).
+# Bond на сервере не задаётся — ядро детектит его по magic-префиксу стрима.
 _write_args_file() {
     local tmp="$ARGSFILE.tmp"
     : > "$tmp"
@@ -402,12 +407,15 @@ _write_args_file() {
         echo "$ARG_LISTEN"
         echo "-connect"
         echo "$ARG_CONNECT"
-        [ -n "$ARG_VLESS" ]      && echo "-vless"
-        [ -n "$ARG_VLESS_BOND" ] && echo "-vless-bond"
-        if [ -n "$ARG_WRAP_KEY" ]; then
-            echo "-wrap"
-            echo "-wrap-key"
-            echo "$ARG_WRAP_KEY"
+        if [ "$ARG_MODE" = "tcp" ]; then
+            echo "-mode"
+            echo "tcp"
+        fi
+        if [ "$ARG_OBF_PROFILE" != "none" ] && [ -n "$ARG_OBF_KEY" ]; then
+            echo "-obf-profile"
+            echo "$ARG_OBF_PROFILE"
+            echo "-obf-key"
+            echo "$ARG_OBF_KEY"
         fi
     } >> "$tmp"
     mv -f "$tmp" "$ARGSFILE"
@@ -415,12 +423,12 @@ _write_args_file() {
 }
 
 # Записать env-переменные в run.env (KEY=VALUE, mode 600). Используется
-# и systemd (EnvironmentFile), и nohup (source перед exec).
+# и systemd (EnvironmentFile), и nohup (source перед exec). Сейчас env пуст
+# (KCP FEC выпилен из ядра), файл оставлен для совместимости unit-а.
 _write_env_file() {
     local tmp="$ENVFILE.tmp"
     : > "$tmp"
     chmod 600 "$tmp"
-    [ -n "$ARG_KCP_FEC" ] && echo "VK_TURN_KCP_FEC=$ARG_KCP_FEC" >> "$tmp"
     mv -f "$tmp" "$ENVFILE"
     chmod 600 "$ENVFILE"
 }
@@ -475,13 +483,12 @@ cmd_start_nohup() {
         set +a
     fi
     local args=(-listen "$ARG_LISTEN" -connect "$ARG_CONNECT")
-    [ -n "$ARG_VLESS" ]      && args+=(-vless)
-    [ -n "$ARG_VLESS_BOND" ] && args+=(-vless-bond)
-    if [ -n "$ARG_WRAP_KEY" ]; then
+    [ "$ARG_MODE" = "tcp" ] && args+=(-mode tcp)
+    if [ "$ARG_OBF_PROFILE" != "none" ] && [ -n "$ARG_OBF_KEY" ]; then
         umask 077
-        printf '%s' "$ARG_WRAP_KEY" > "$WRAPFILE"
-        chmod 600 "$WRAPFILE"
-        args+=(-wrap -wrap-key "$(cat "$WRAPFILE")")
+        printf '%s' "$ARG_OBF_KEY" > "$OBFFILE"
+        chmod 600 "$OBFFILE"
+        args+=(-obf-profile "$ARG_OBF_PROFILE" -obf-key "$(cat "$OBFFILE")")
     fi
 
     nohup "$bin" "${args[@]}" >"$LOGFILE" 2>&1 &
@@ -525,7 +532,7 @@ _stop_nohup() {
         rm -f "$PIDFILE"
     fi
     pkill -9 -f "^$PREFIX/server-linux-" 2>/dev/null || true
-    rm -f "$WRAPFILE"
+    rm -f "$OBFFILE"
     rm -f "$ENVFILE"
 }
 
@@ -568,13 +575,13 @@ cmd_logs() {
     trap - EXIT
 }
 
-cmd_gen_wrap_key() {
+cmd_gen_obf_key() {
     local bin key
     bin=$(binpath)
     [ -x "$bin" ] || die "server binary not installed"
-    key=$("$bin" -gen-wrap-key 2>/dev/null | grep -oE '[0-9a-fA-F]{64}' | head -n1)
-    [ -n "$key" ] || die "binary did not return wrap-key"
-    emit WRAPKEY "$key"
+    key=$("$bin" -gen-obf-key 2>/dev/null | grep -oE '[0-9a-fA-F]{64}' | head -n1)
+    [ -n "$key" ] || die "binary did not return obf-key"
+    emit OBFKEY "$key"
     echo "RESULT=ok"
     trap - EXIT
 }
@@ -589,7 +596,7 @@ main() {
         start)        cmd_start "$@" ;;
         stop)         cmd_stop ;;
         logs)         cmd_logs "$@" ;;
-        gen-wrap-key) cmd_gen_wrap_key ;;
+        gen-obf-key)  cmd_gen_obf_key ;;
         *) die "unknown subcommand: $sub" ;;
     esac
 }

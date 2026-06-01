@@ -9,6 +9,7 @@ import com.freeturn.app.ProxyService
 import com.freeturn.app.ProxyServiceState
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.ClientConfig
+import com.freeturn.app.data.ObfProfile
 import com.freeturn.app.data.Profile
 import com.freeturn.app.data.ProfilesSnapshot
 import com.freeturn.app.data.SshConfig
@@ -326,9 +327,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** Последний результат install: "cached" | "downloaded" | null. */
     val serverInstallStage: StateFlow<String?> = _serverInstallStage.asStateFlow()
 
-    private val _isRegeneratingWrapKey = MutableStateFlow(false)
-    /** true — пока крутится gen-wrap-key + последующий рестарт сервера/клиента. */
-    val isRegeneratingWrapKey: StateFlow<Boolean> = _isRegeneratingWrapKey.asStateFlow()
+    private val _isRegeneratingObfKey = MutableStateFlow(false)
+    /** true — пока крутится gen-obf-key + последующий рестарт сервера/клиента. */
+    val isRegeneratingObfKey: StateFlow<Boolean> = _isRegeneratingObfKey.asStateFlow()
 
     fun installServer() {
         viewModelScope.launch {
@@ -336,13 +337,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val outcome = sshRepository.installServer()
             if (outcome is com.freeturn.app.domain.InstallOutcome.Success) {
                 _serverInstallStage.value = outcome.stage
-                // Авто-генерация wrap-key после первого скачивания, если ещё нет.
+                // Авто-генерация obf-key после первого скачивания, если ещё нет.
                 if (outcome.stage == "downloaded") {
                     val current = prefs.serverOptsFlow.first()
-                    if (current.wrapKey.isBlank()) {
-                        val key = sshRepository.generateWrapKey()
+                    if (current.obfKey.isBlank()) {
+                        val key = sshRepository.generateObfKey()
                         if (!key.isNullOrBlank()) {
-                            val next = current.copy(wrapKey = key)
+                            val next = current.copy(obfKey = key)
                             profileMutex.withLock { prefs.saveServerOpts(next) }
                         }
                     }
@@ -367,73 +368,49 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             sshRepository.updateServerState(ServerState.Error("Неверный формат адреса (ожидается host:port)"))
             return
         }
-        val vless = clientConfig.value.vlessMode
+        val tcpMode = clientConfig.value.tcpForward
         val opts = serverOpts.value
-        val wrapKey = if (opts.wrapEnabled) opts.wrapKey else ""
         viewModelScope.launch {
             sshRepository.startServer(
                 listen = l, connect = c,
-                vlessMode = vless,
-                vlessBond = opts.vlessBond,
-                wrapKey = wrapKey,
-                kcpFec = opts.kcpFec
+                tcpMode = tcpMode,
+                obfProfile = if (opts.obfEnabled) opts.obfProfile else "none",
+                obfKey = if (opts.obfEnabled) opts.obfKey else ""
             )
         }
     }
 
-    fun setServerKcpFec(enabled: Boolean) {
+    /**
+     * Bond — client-only флаг в новом ядре (сервер детектит его сам). Пишем
+     * только в ClientConfig и перезапускаем локальный клиент; сервер не трогаем.
+     */
+    fun setBond(enabled: Boolean) {
         viewModelScope.launch {
-            val current = prefs.serverOptsFlow.first()
-            val known = serverState.value as? ServerState.Known
-            // KCP FEC не публикуется в probe — сверяем только stored. Тогглы wrap/vless
-            // должны учитывать ещё и фактическое состояние сервера, иначе после рестарта
-            // ядра probed может разойтись со stored и тоггл "висит" из-за early-return.
-            if (current.kcpFec == enabled && known?.running != true) return@launch
-            if (current.kcpFec == enabled && known?.running == true) {
-                // stored уже совпадает, перезапускаем сервер чтобы выровнять реальное состояние
-                if (clientConfig.value.syncServerSwitches) restartServerIfRunning()
-                restartProxyIfRunning()
-                return@launch
-            }
-            val next = current.copy(kcpFec = enabled)
-            profileMutex.withLock { prefs.saveServerOpts(next) }
-            if (clientConfig.value.syncServerSwitches) restartServerIfRunning()
+            val current = prefs.clientConfigFlow.first()
+            if (current.bond == enabled) return@launch
+            val next = current.copy(bond = enabled)
+            profileMutex.withLock { prefs.saveClientConfig(next) }
             restartProxyIfRunning()
         }
     }
 
-    fun setServerVlessBond(enabled: Boolean) {
+    /** Выбор профиля обфускации (none|rtpopus). При sync ON — рестарт сервера. */
+    fun setObfProfile(profile: String) {
         viewModelScope.launch {
             val current = prefs.serverOptsFlow.first()
             val known = serverState.value as? ServerState.Known
-            val storedMatches = current.vlessBond == enabled
-            val effectiveMatches = known?.vlessBond?.let { it == enabled } ?: true
-            if (storedMatches && effectiveMatches) return@launch
-            val next = current.copy(vlessBond = enabled)
-            if (!storedMatches) {
-                profileMutex.withLock { prefs.saveServerOpts(next) }
-            }
-            if (clientConfig.value.syncServerSwitches) restartServerIfRunning()
-            restartProxyIfRunning()
-        }
-    }
-
-    fun setServerWrapEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            val current = prefs.serverOptsFlow.first()
-            val known = serverState.value as? ServerState.Known
-            val storedMatches = current.wrapEnabled == enabled
-            val effectiveMatches = known?.wrap?.let { it == enabled } ?: true
+            val storedMatches = current.obfProfile == profile
+            val effectiveMatches = known?.obfProfile?.let { it == profile } ?: true
             if (storedMatches && effectiveMatches) return@launch
             val sync = clientConfig.value.syncServerSwitches
-            var next = current.copy(wrapEnabled = enabled)
-            // При первом включении wrap, если ключа ещё нет и sync включён —
+            var next = current.copy(obfProfile = profile)
+            // При включении реального профиля, если ключа ещё нет и sync включён —
             // пробуем взять с сервера. В !sync режиме сервер не трогаем.
-            if (enabled && next.wrapKey.isBlank() && sync) {
-                val key = sshRepository.generateWrapKey()
-                if (!key.isNullOrBlank()) next = next.copy(wrapKey = key)
+            if (profile != ObfProfile.NONE && next.obfKey.isBlank() && sync) {
+                val key = sshRepository.generateObfKey()
+                if (!key.isNullOrBlank()) next = next.copy(obfKey = key)
             }
-            if (!storedMatches || next.wrapKey != current.wrapKey) {
+            if (!storedMatches || next.obfKey != current.obfKey) {
                 profileMutex.withLock { prefs.saveServerOpts(next) }
             }
             if (sync) restartServerIfRunning()
@@ -460,35 +437,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Прямое редактирование wrap-key пользователем. Принимает любую строку
+     * Прямое редактирование obf-key пользователем. Принимает любую строку
      * (валидация формата — на стороне ProxyService/скрипта); если ключ
      * меняется в sync-режиме, перезапускаем сервер.
      */
-    fun setWrapKey(key: String) {
+    fun setObfKey(key: String) {
         viewModelScope.launch {
             val current = prefs.serverOptsFlow.first()
             val trimmed = key.trim()
-            if (current.wrapKey == trimmed) return@launch
-            val next = current.copy(wrapKey = trimmed)
+            if (current.obfKey == trimmed) return@launch
+            val next = current.copy(obfKey = trimmed)
             profileMutex.withLock { prefs.saveServerOpts(next) }
             if (clientConfig.value.syncServerSwitches) restartServerIfRunning()
             restartProxyIfRunning()
         }
     }
 
-    fun regenerateWrapKey() {
+    fun regenerateObfKey() {
         viewModelScope.launch {
-            if (_isRegeneratingWrapKey.value) return@launch
-            _isRegeneratingWrapKey.value = true
+            if (_isRegeneratingObfKey.value) return@launch
+            _isRegeneratingObfKey.value = true
             try {
-                val key = sshRepository.generateWrapKey() ?: return@launch
+                val key = sshRepository.generateObfKey() ?: return@launch
                 val current = prefs.serverOptsFlow.first()
-                val next = current.copy(wrapKey = key)
+                val next = current.copy(obfKey = key)
                 profileMutex.withLock { prefs.saveServerOpts(next) }
                 if (clientConfig.value.syncServerSwitches) restartServerIfRunning()
                 restartProxyIfRunning()
             } finally {
-                _isRegeneratingWrapKey.value = false
+                _isRegeneratingObfKey.value = false
             }
         }
     }
@@ -502,22 +479,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (!l.matches(Regex("""^[\w.\-]+:\d{1,5}$""")) ||
             !c.matches(Regex("""^[\w.\-]+:\d{1,5}$"""))) return
         val opts = prefs.serverOptsFlow.first()
-        val vless = clientConfig.value.vlessMode
+        val tcpMode = clientConfig.value.tcpForward
         sshRepository.stopServer()
         sshRepository.startServer(
             listen = l, connect = c,
-            vlessMode = vless,
-            vlessBond = opts.vlessBond,
-            wrapKey = if (opts.wrapEnabled) opts.wrapKey else "",
-            kcpFec = opts.kcpFec
+            tcpMode = tcpMode,
+            obfProfile = if (opts.obfEnabled) opts.obfProfile else "none",
+            obfKey = if (opts.obfEnabled) opts.obfKey else ""
         )
     }
 
     /**
      * Перезапускает локальный клиент с актуальным ClientConfig + serverOpts,
      * если он сейчас работает. Используется после изменения sync-флагов
-     * (vlessMode/vlessBond/wrap*), чтобы клиент и сервер не разъехались по
-     * параметрам после отдельного рестарта сервера.
+     * (tcpForward/obf*) и client-only bond, чтобы клиент и сервер не разъехались
+     * по параметрам после отдельного рестарта сервера.
      */
     private suspend fun restartProxyIfRunning() {
         if (!ProxyServiceState.isRunning.value) return
@@ -540,16 +516,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         sshRepository.clearServerLogs()
     }
 
-    /** Переключает VLESS-режим. Если sync ON и сервер запущен — автоперезапуск. */
-    fun setVlessMode(enabled: Boolean) {
+    /** Переключает TCP-форвард режим (-mode tcp). Если sync ON и сервер запущен — автоперезапуск. */
+    fun setTcpForward(enabled: Boolean) {
         val current = clientConfig.value
         val known = serverState.value as? ServerState.Known
-        val storedMatches = current.vlessMode == enabled
-        val effectiveMatches = known?.vlessMode?.let { it == enabled } ?: true
+        val storedMatches = current.tcpForward == enabled
+        val effectiveMatches = known?.tcpMode?.let { it == enabled } ?: true
         if (storedMatches && effectiveMatches) return
         viewModelScope.launch {
             if (!storedMatches) {
-                val next = current.copy(vlessMode = enabled)
+                val next = current.copy(tcpForward = enabled)
                 profileMutex.withLock { prefs.saveClientConfig(next) }
             }
             if (current.syncServerSwitches) {

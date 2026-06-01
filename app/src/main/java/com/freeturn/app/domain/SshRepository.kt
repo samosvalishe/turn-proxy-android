@@ -116,16 +116,15 @@ class SshRepository(
             is CmdResult.Ok -> {
                 val running = r.kv["RUNNING"] == "yes"
                 val installed = r.kv["INSTALLED"] == "yes"
-                val vlessMode = if (running) r.kv["VLESS"] == "yes" else null
-                val vlessBond = if (running) r.kv["VLESS_BOND"] == "yes" else null
-                val wrap      = if (running) r.kv["WRAP"] == "yes" else null
+                val tcpMode = if (running) r.kv["MODE"] == "tcp" else null
+                // OBF=<profile> (none|rtpopus); null если сервер не запущен.
+                val obfProfile = if (running) r.kv["OBF"] else null
                 val version   = r.kv["VERSION"]
                 _serverState.value = ServerState.Known(
                     installed = installed,
                     running = running,
-                    vlessMode = vlessMode,
-                    vlessBond = vlessBond,
-                    wrap = wrap,
+                    tcpMode = tcpMode,
+                    obfProfile = obfProfile,
                     version = version
                 )
             }
@@ -134,8 +133,8 @@ class SshRepository(
 
     /**
      * Идемпотентная установка: скрипт сам решает, скачивать или нет (по sha256).
-     * После downloaded автоматически генерим wrap-ключ — он понадобится при
-     * первом start с включённым WRAP. Возвращаемое значение — true при успехе.
+     * После downloaded автоматически генерим obf-ключ — он понадобится при
+     * первом start с включённой обфускацией. Возвращаемое значение — true при успехе.
      */
     suspend fun installServer(): InstallOutcome {
         val cfg = activeSshConfig ?: return InstallOutcome.Failed("not connected")
@@ -172,10 +171,9 @@ class SshRepository(
     suspend fun startServer(
         listen: String,
         connect: String,
-        vlessMode: Boolean = false,
-        vlessBond: Boolean = false,
-        wrapKey: String = "",
-        kcpFec: Boolean = false
+        tcpMode: Boolean = false,
+        obfProfile: String = "none",
+        obfKey: String = ""
     ): Boolean {
         val cfg = activeSshConfig ?: return false
         if (cfg.ip.isEmpty()) return false
@@ -187,10 +185,9 @@ class SshRepository(
                 ServerOptions(
                     listen = listen,
                     connect = connect,
-                    vless = vlessMode,
-                    vlessBond = vlessBond && vlessMode,
-                    wrapKey = wrapKey,
-                    kcpFec = kcpFec
+                    tcpMode = tcpMode,
+                    obfProfile = obfProfile,
+                    obfKey = obfKey
                 )
             )
         )
@@ -232,13 +229,13 @@ class SshRepository(
         }
     }
 
-    /** Просит сервер сгенерировать новый wrap-key. Возвращает hex или null. */
-    suspend fun generateWrapKey(): String? {
+    /** Просит сервер сгенерировать новый obf-key. Возвращает hex или null. */
+    suspend fun generateObfKey(): String? {
         val cfg = activeSshConfig ?: return null
         if (cfg.ip.isEmpty()) return null
-        return when (val r = runCmd(cfg, "Генерация wrap-key", ServerCommand.GenWrapKey)) {
+        return when (val r = runCmd(cfg, "Генерация obf-key", ServerCommand.GenObfKey)) {
             is CmdResult.Err -> null
-            is CmdResult.Ok -> r.kv["WRAPKEY"]?.takeIf {
+            is CmdResult.Ok -> r.kv["OBFKEY"]?.takeIf {
                 it.matches(Regex("^[0-9a-fA-F]{64}$"))
             }
         }
