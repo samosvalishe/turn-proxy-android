@@ -30,13 +30,21 @@ class LocalProxyManager(private val context: Context) {
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var resetJob: kotlinx.coroutines.Job? = null
 
-    suspend fun observeProxyLifecycle() {
+    init {
+        scope.launch { observeProxyLifecycle() }
+        scope.launch { observeProxyServiceStatus() }
+        scope.launch { observeConnectionStats() }
+        scope.launch { observeCaptchaEvents() }
+        syncInitialState()
+    }
+
+    private suspend fun observeProxyLifecycle() {
         ProxyServiceState.proxyFailed.collect {
             setErrorWithAutoReset("Прокси упал ${ProxyService.MAX_RESTARTS} раз — проверьте настройки")
         }
     }
 
-    suspend fun observeCaptchaEvents() {
+    private suspend fun observeCaptchaEvents() {
         ProxyServiceState.captchaSession.collect { session ->
             if (session != null) {
                 _proxyState.value = ProxyState.CaptchaRequired(session.url, session.sessionId)
@@ -51,7 +59,7 @@ class LocalProxyManager(private val context: Context) {
         }
     }
 
-    suspend fun observeProxyServiceStatus() {
+    private suspend fun observeProxyServiceStatus() {
         ProxyServiceState.isRunning.collect { running ->
             val current = _proxyState.value
             if (running) {
@@ -79,7 +87,7 @@ class LocalProxyManager(private val context: Context) {
      * Captcha и Error имеют приоритет и не перезаписываются, пока активны.
      * Starting тоже не трогаем: он снимается StartupResult-логикой в startProxy.
      */
-    suspend fun observeConnectionStats() {
+    private suspend fun observeConnectionStats() {
         ProxyServiceState.connectionStats.collect { stats ->
             val current = _proxyState.value
             if (current is ProxyState.Error || current is ProxyState.CaptchaRequired) return@collect
@@ -96,7 +104,7 @@ class LocalProxyManager(private val context: Context) {
         }
     }
 
-    fun syncInitialState() {
+    private fun syncInitialState() {
         if (ProxyServiceState.isRunning.value) {
             val s = ProxyServiceState.connectionStats.value
             _proxyState.value = if (s.active > 0) {

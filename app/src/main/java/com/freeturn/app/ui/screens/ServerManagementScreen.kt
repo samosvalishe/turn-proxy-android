@@ -66,26 +66,28 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.ui.theme.extendedColorScheme
-import com.freeturn.app.viewmodel.MainViewModel
 import com.freeturn.app.viewmodel.ServerState
 import com.freeturn.app.viewmodel.SshConnectionState
+import com.freeturn.app.viewmodel.ServerViewModel
+import com.freeturn.app.viewmodel.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ServerManagementScreen(
-    viewModel: MainViewModel,
+    serverViewModel: ServerViewModel,
+    settingsViewModel: SettingsViewModel,
     onContinue: () -> Unit
 ) {
-    val sshState by viewModel.sshState.collectAsStateWithLifecycle()
-    val serverState by viewModel.serverState.collectAsStateWithLifecycle()
-    val sshConfig by viewModel.sshConfig.collectAsStateWithLifecycle()
-    val savedListen by viewModel.proxyListen.collectAsStateWithLifecycle()
-    val savedConnect by viewModel.proxyConnect.collectAsStateWithLifecycle()
-    val sshLog by viewModel.sshLog.collectAsStateWithLifecycle()
-    val privacyMode by viewModel.privacyMode.collectAsStateWithLifecycle()
-    val installStage by viewModel.serverInstallStage.collectAsStateWithLifecycle()
-    val clientCfg by viewModel.clientConfig.collectAsStateWithLifecycle()
-    val serverLogs by viewModel.serverLogs.collectAsStateWithLifecycle()
+    val sshState by serverViewModel.sshState.collectAsStateWithLifecycle()
+    val serverState by serverViewModel.serverState.collectAsStateWithLifecycle()
+    val sshConfig by serverViewModel.sshConfig.collectAsStateWithLifecycle()
+    val savedListen by settingsViewModel.proxyListen.collectAsStateWithLifecycle()
+    val savedConnect by settingsViewModel.proxyConnect.collectAsStateWithLifecycle()
+    val sshLog by serverViewModel.sshLog.collectAsStateWithLifecycle()
+    val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
+    val installStage by serverViewModel.serverInstallStage.collectAsStateWithLifecycle()
+    val clientCfg by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
+    val serverLogs by serverViewModel.serverLogs.collectAsStateWithLifecycle()
 
     var proxyListenIp by rememberSaveable(savedListen) {
         mutableStateOf(savedListen.substringBeforeLast(":", "0.0.0.0").ifBlank { "0.0.0.0" })
@@ -98,7 +100,7 @@ fun ServerManagementScreen(
         val ip = proxyListenIp.ifBlank { "0.0.0.0" }
         val listen = "$ip:$proxyListenPort"
         if (listen != savedListen || proxyConnect != savedConnect) {
-            viewModel.saveProxyServerConfig(listen, proxyConnect)
+            settingsViewModel.saveProxyServerConfig(listen, proxyConnect)
         }
     }
 
@@ -271,8 +273,8 @@ fun ServerManagementScreen(
                 FilledTonalButton(
                     onClick = {
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                        viewModel.saveProxyServerConfig("${proxyListenIp.ifBlank { "0.0.0.0" }}:$proxyListenPort", proxyConnect)
-                        viewModel.installServer()
+                        settingsViewModel.saveProxyServerConfig("${proxyListenIp.ifBlank { "0.0.0.0" }}:$proxyListenPort", proxyConnect)
+                        serverViewModel.installServer()
                     },
                     enabled = isConnected && !isWorking,
                     modifier = Modifier.fillMaxWidth(),
@@ -286,8 +288,8 @@ fun ServerManagementScreen(
                 Button(
                     onClick = {
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                        viewModel.saveProxyServerConfig("${proxyListenIp.ifBlank { "0.0.0.0" }}:$proxyListenPort", proxyConnect)
-                        viewModel.startServer()
+                        settingsViewModel.saveProxyServerConfig("${proxyListenIp.ifBlank { "0.0.0.0" }}:$proxyListenPort", proxyConnect)
+                        serverViewModel.startServer()
                     },
                     enabled = (isConnected && !isWorking
                             && serverKnown?.installed == true) && !serverKnown.running,
@@ -302,7 +304,7 @@ fun ServerManagementScreen(
                 OutlinedButton(
                     onClick = {
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                        viewModel.stopServer()
+                        serverViewModel.stopServer()
                     },
                     enabled = isConnected && !isWorking && serverKnown?.running == true,
                     modifier = Modifier.fillMaxWidth(),
@@ -349,7 +351,7 @@ fun ServerManagementScreen(
                             androidx.compose.material3.IconButton(
                                 onClick = {
                                     HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                                    viewModel.fetchServerLogs()
+                                    serverViewModel.fetchServerLogs()
                                 },
                                 enabled = isConnected && serverLogs != "…"
                             ) {
@@ -362,7 +364,7 @@ fun ServerManagementScreen(
                                 androidx.compose.material3.IconButton(
                                     onClick = {
                                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                                        viewModel.clearServerLogs()
+                                        serverViewModel.clearServerLogs()
                                     },
                                     enabled = serverLogs != "…"
                                 ) {

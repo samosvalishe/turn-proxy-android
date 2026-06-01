@@ -54,18 +54,19 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.data.SshConfig
 import com.freeturn.app.ui.HapticUtil
-import com.freeturn.app.viewmodel.MainViewModel
+import com.freeturn.app.viewmodel.ServerViewModel
 import com.freeturn.app.viewmodel.SshConnectionState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SshSetupScreen(
-    viewModel: MainViewModel,
+    serverViewModel: ServerViewModel,
+    settingsViewModel: com.freeturn.app.viewmodel.SettingsViewModel,
     onConnected: () -> Unit,
     onBack: () -> Unit
 ) {
-    val sshState by viewModel.sshState.collectAsStateWithLifecycle()
-    val savedConfig by viewModel.sshConfig.collectAsStateWithLifecycle()
+    val sshState by serverViewModel.sshState.collectAsStateWithLifecycle()
+    val savedConfig by serverViewModel.sshConfig.collectAsStateWithLifecycle()
 
     var ip by rememberSaveable(savedConfig.ip) { mutableStateOf(savedConfig.ip) }
     var port by rememberSaveable(savedConfig.port) { mutableStateOf(savedConfig.port.toString()) }
@@ -128,7 +129,7 @@ fun SshSetupScreen(
                     onAuthDropdownChange = { authDropdownExpanded = it },
                     sshState = sshState,
                     onConnect = {
-                        viewModel.connectSsh(
+                        serverViewModel.connectSsh(
                             SshConfig(
                                 ip = ip.trim(),
                                 port = port.toIntOrNull() ?: 22,

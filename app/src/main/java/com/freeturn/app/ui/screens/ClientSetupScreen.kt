@@ -57,7 +57,7 @@ import com.freeturn.app.data.DnsMode
 import com.freeturn.app.data.ObfProfile
 import com.freeturn.app.data.Provider
 import com.freeturn.app.ui.HapticUtil
-import com.freeturn.app.viewmodel.MainViewModel
+import com.freeturn.app.viewmodel.SettingsViewModel
 import com.freeturn.app.viewmodel.SshConnectionState
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -69,7 +69,7 @@ import kotlinx.coroutines.delay
  */
 @Composable
 fun ClientSetupScreen(
-    viewModel: MainViewModel,
+    viewModel: SettingsViewModel,
     showFinishButton: Boolean = false,
     onFinish: (() -> Unit)? = null
 ) {

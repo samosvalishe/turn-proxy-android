@@ -56,11 +56,11 @@ import com.freeturn.app.data.ProfilesSnapshot
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.ui.components.ProfileNameDialog
 import com.freeturn.app.ui.util.hapticClickable
-import com.freeturn.app.viewmodel.MainViewModel
+import com.freeturn.app.viewmodel.SettingsViewModel
 
 @Composable
 fun ProfilesSheetContent(
-    viewModel: MainViewModel,
+    settingsViewModel: SettingsViewModel,
     snapshot: ProfilesSnapshot,
     containerColor: Color,
     @Suppress("UNUSED_PARAMETER") onClose: () -> Unit
@@ -96,7 +96,7 @@ fun ProfilesSheetContent(
                 leadingContent = { Icon(painterResource(R.drawable.cached_24px), null) },
                 colors = listColors,
                 modifier = Modifier.hapticClickable(HapticUtil.Pattern.SUCCESS) {
-                    viewModel.updateActiveProfileFromCurrent()
+                    settingsViewModel.updateActiveProfileFromCurrent()
                     android.widget.Toast.makeText(context, updatedMsg, android.widget.Toast.LENGTH_SHORT).show()
                 }
             )
@@ -140,7 +140,7 @@ fun ProfilesSheetContent(
                         isActive = snapshot.activeId == p.id,
                         menuExpanded = menuTarget == p.id,
                         onApply = {
-                            if (snapshot.activeId != p.id) viewModel.applyProfile(p.id)
+                            if (snapshot.activeId != p.id) settingsViewModel.applyProfile(p.id)
                         },
                         onMenuToggle = { menuTarget = if (menuTarget == p.id) null else p.id },
                         onMenuDismiss = { menuTarget = null },
@@ -165,7 +165,7 @@ fun ProfilesSheetContent(
             takenNames = takenNames,
             onDismiss = { showSaveDialog = false },
             onConfirm = { name ->
-                viewModel.saveCurrentAsProfile(name)
+                settingsViewModel.saveCurrentAsProfile(name)
                 showSaveDialog = false
             }
         )
@@ -182,7 +182,7 @@ fun ProfilesSheetContent(
                 takenNames = takenNames,
                 onDismiss = { renameTarget = null },
                 onConfirm = { name ->
-                    viewModel.renameProfile(id, name)
+                    settingsViewModel.renameProfile(id, name)
                     renameTarget = null
                 }
             )
@@ -202,7 +202,7 @@ fun ProfilesSheetContent(
                     TextButton(
                         onClick = {
                             HapticUtil.perform(context, HapticUtil.Pattern.ERROR)
-                            viewModel.deleteProfile(id)
+                            settingsViewModel.deleteProfile(id)
                             deleteTarget = null
                         },
                         colors = ButtonDefaults.textButtonColors(

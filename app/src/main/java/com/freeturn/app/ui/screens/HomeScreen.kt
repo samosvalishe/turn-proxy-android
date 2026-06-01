@@ -86,8 +86,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.ui.theme.extendedColorScheme
-import com.freeturn.app.viewmodel.MainViewModel
 import com.freeturn.app.viewmodel.ProxyState
+import com.freeturn.app.viewmodel.SshConnectionState
+import com.freeturn.app.viewmodel.UpdateState
+import com.freeturn.app.viewmodel.SettingsViewModel
+import com.freeturn.app.viewmodel.ProxyViewModel
+import com.freeturn.app.viewmodel.ServerViewModel
+
 import com.freeturn.app.viewmodel.SshConnectionState
 import com.freeturn.app.viewmodel.UpdateState
 import androidx.core.net.toUri
@@ -95,16 +100,18 @@ import androidx.core.net.toUri
 @SuppressLint("BatteryLife")
 @Composable
 fun HomeScreen(
-    viewModel: MainViewModel,
+    settingsViewModel: SettingsViewModel,
+    proxyViewModel: ProxyViewModel,
+    serverViewModel: ServerViewModel,
     onNavigateToSshSetup: () -> Unit
 ) {
     val context = LocalContext.current
-    val proxyState by viewModel.proxyState.collectAsStateWithLifecycle()
-    val connectedSince by viewModel.connectedSince.collectAsStateWithLifecycle()
+    val proxyState by proxyViewModel.proxyState.collectAsStateWithLifecycle()
+    val connectedSince by proxyViewModel.connectedSince.collectAsStateWithLifecycle()
     val uptimeText = rememberProxyUptime(connectedSince)
-    val sshState by viewModel.sshState.collectAsStateWithLifecycle()
-    val sshConfig by viewModel.sshConfig.collectAsStateWithLifecycle()
-    val clientConfig by viewModel.clientConfig.collectAsStateWithLifecycle()
+    val sshState by serverViewModel.sshState.collectAsStateWithLifecycle()
+    val sshConfig by serverViewModel.sshConfig.collectAsStateWithLifecycle()
+    val clientConfig by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
     val isConfigured = sshConfig.ip.isNotBlank()
 
     // Запрос разрешений при первом открытии главного экрана
@@ -148,8 +155,8 @@ fun HomeScreen(
         }
     }
 
-    val privacyMode by viewModel.privacyMode.collectAsStateWithLifecycle()
-    val profilesSnapshot by viewModel.profilesSnapshot.collectAsStateWithLifecycle()
+    val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
+    val profilesSnapshot by settingsViewModel.profilesSnapshot.collectAsStateWithLifecycle()
     val showBottomSheet = rememberSaveable { mutableStateOf(false) }
     val showProfilesSheet = rememberSaveable { mutableStateOf(false) }
     var showEasterEgg by rememberSaveable { mutableStateOf(false) }
@@ -196,11 +203,11 @@ fun HomeScreen(
                     when (proxyState) {
                         is ProxyState.Idle, is ProxyState.Error -> {
                             HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                            viewModel.startProxy()
+                            proxyViewModel.startProxy()
                         }
                         is ProxyState.Running, is ProxyState.Connecting, is ProxyState.Starting -> {
                             HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_OFF)
-                            viewModel.stopProxy()
+                            proxyViewModel.stopProxy()
                         }
                         else -> {}
                     }
@@ -304,7 +311,7 @@ fun HomeScreen(
                         TextButton(
                             onClick = {
                                 HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                                viewModel.reconnectSsh()
+                                serverViewModel.reconnectSsh()
                             },
                             enabled = sshState !is SshConnectionState.Connecting
                         ) {
@@ -343,10 +350,10 @@ fun HomeScreen(
             containerColor = sheetColor
         ) {
             InfoBottomSheet(
-                viewModel = viewModel,
+                settingsViewModel = settingsViewModel,
                 containerColor = sheetColor,
                 privacyMode = privacyMode,
-                onPrivacyModeChange = { viewModel.setPrivacyMode(it) },
+                onPrivacyModeChange = { settingsViewModel.setPrivacyMode(it) },
                 onEasterEgg = {
                     showBottomSheet.value = false
                     showEasterEgg = true
@@ -363,7 +370,7 @@ fun HomeScreen(
             containerColor = sheetColor
         ) {
             com.freeturn.app.ui.screens.ProfilesSheetContent(
-                viewModel = viewModel,
+                settingsViewModel = settingsViewModel,
                 snapshot = profilesSnapshot,
                 containerColor = sheetColor,
                 onClose = { showProfilesSheet.value = false }
@@ -371,7 +378,7 @@ fun HomeScreen(
         }
     }
 
-    UpdateDialogs(viewModel)
+    UpdateDialogs(settingsViewModel)
 
     if (showEasterEgg) {
         com.freeturn.app.ui.screens.easteregg.EasterEggDialog(
@@ -384,9 +391,9 @@ fun HomeScreen(
 
 @Suppress("AssignedValueIsNeverRead")
 @Composable
-private fun UpdateDialogs(viewModel: MainViewModel) {
+private fun UpdateDialogs(settingsViewModel: SettingsViewModel) {
     val context = LocalContext.current
-    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+    val updateState by settingsViewModel.updateState.collectAsStateWithLifecycle()
     var dismissed by rememberSaveable { mutableStateOf(false) }
 
     when (val state = updateState) {
@@ -417,7 +424,7 @@ private fun UpdateDialogs(viewModel: MainViewModel) {
                     TextButton(onClick = {
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                         dismissed = true
-                        viewModel.downloadUpdate()
+                        settingsViewModel.downloadUpdate()
                     }) { Text(stringResource(R.string.update_download)) }
                 },
                 dismissButton = {
@@ -448,17 +455,17 @@ private fun UpdateDialogs(viewModel: MainViewModel) {
 
         is UpdateState.ReadyToInstall -> {
             AlertDialog(
-                onDismissRequest = { viewModel.resetUpdateState() },
+                onDismissRequest = { settingsViewModel.resetUpdateState() },
                 title = { Text(stringResource(R.string.update_ready_title)) },
                 text = { Text(stringResource(R.string.update_ready_desc)) },
                 confirmButton = {
                     TextButton(onClick = {
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                        viewModel.installUpdate()
+                        settingsViewModel.installUpdate()
                     }) { Text(stringResource(R.string.update_install)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { viewModel.resetUpdateState() }) {
+                    TextButton(onClick = { settingsViewModel.resetUpdateState() }) {
                         Text(stringResource(R.string.cancel))
                     }
                 }
@@ -549,7 +556,7 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
 @Suppress("AssignedValueIsNeverRead")
 @Composable
 private fun InfoBottomSheet(
-    viewModel: MainViewModel,
+    settingsViewModel: SettingsViewModel,
     containerColor: Color,
     privacyMode: Boolean,
     onPrivacyModeChange: (Boolean) -> Unit,
@@ -557,8 +564,8 @@ private fun InfoBottomSheet(
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
-    val dynamicTheme by viewModel.dynamicTheme.collectAsStateWithLifecycle()
-    val updateState by viewModel.updateState.collectAsStateWithLifecycle()
+    val dynamicTheme by settingsViewModel.dynamicTheme.collectAsStateWithLifecycle()
+    val updateState by settingsViewModel.updateState.collectAsStateWithLifecycle()
     var showResetDialog by rememberSaveable { mutableStateOf(false) }
 
     val appVersion = remember {
@@ -580,15 +587,15 @@ private fun InfoBottomSheet(
                 colors = listColors,
                 onCheck = {
                     HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                    viewModel.checkForUpdate()
+                    settingsViewModel.checkForUpdate()
                 },
                 onDownload = {
                     HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                    viewModel.downloadUpdate()
+                    settingsViewModel.downloadUpdate()
                 },
                 onInstall = {
                     HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                    viewModel.installUpdate()
+                    settingsViewModel.installUpdate()
                 }
             )
         }
@@ -665,7 +672,7 @@ private fun InfoBottomSheet(
                                 context,
                                 if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF
                             )
-                            viewModel.setDynamicTheme(it)
+                            settingsViewModel.setDynamicTheme(it)
                         }
                     )
                 }
@@ -737,7 +744,7 @@ private fun InfoBottomSheet(
                 TextButton(
                     onClick = {
                         showResetDialog = false
-                        viewModel.resetAllSettings(context)
+                        settingsViewModel.resetAllSettings()
                     },
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.error

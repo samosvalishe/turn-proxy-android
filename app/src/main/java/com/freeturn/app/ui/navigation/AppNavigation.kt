@@ -40,7 +40,10 @@ import com.freeturn.app.ui.screens.OnboardingScreen
 import com.freeturn.app.ui.screens.ServerManagementScreen
 import com.freeturn.app.ui.screens.SshSetupScreen
 import com.freeturn.app.viewmodel.ProxyState
-import com.freeturn.app.viewmodel.MainViewModel
+import com.freeturn.app.viewmodel.SettingsViewModel
+import com.freeturn.app.viewmodel.ProxyViewModel
+import com.freeturn.app.viewmodel.ServerViewModel
+import org.koin.androidx.compose.koinViewModel
 
 object Routes {
     const val ONBOARDING = "onboarding"
@@ -58,16 +61,20 @@ object Routes {
 private val BOTTOM_NAV_ROUTES = setOf(Routes.HOME, Routes.LOGS, Routes.SERVER_MANAGEMENT, Routes.CLIENT_SETUP)
 
 @Composable
-fun AppNavigation(viewModel: MainViewModel) {
-    val isInitialized by viewModel.isInitialized.collectAsStateWithLifecycle()
+fun AppNavigation(
+    settingsViewModel: SettingsViewModel = koinViewModel(),
+    proxyViewModel: ProxyViewModel = koinViewModel(),
+    serverViewModel: ServerViewModel = koinViewModel()
+) {
+    val isInitialized by settingsViewModel.isInitialized.collectAsStateWithLifecycle()
 
     // Не строим NavHost пока DataStore не загружен — иначе startDestination
     // захватит дефолтный onboardingDone=false и всегда покажет онбординг
     if (!isInitialized) return
 
-    val proxyState by viewModel.proxyState.collectAsStateWithLifecycle()
-    val initialOnboardingDone by viewModel.initialOnboardingDone.collectAsStateWithLifecycle()
-    val initialTgSubscribeShown by viewModel.initialTgSubscribeShown.collectAsStateWithLifecycle()
+    val proxyState by proxyViewModel.proxyState.collectAsStateWithLifecycle()
+    val initialOnboardingDone by settingsViewModel.initialOnboardingDone.collectAsStateWithLifecycle()
+    val initialTgSubscribeShown by settingsViewModel.initialTgSubscribeShown.collectAsStateWithLifecycle()
     val startDestination = remember { if (initialOnboardingDone) Routes.HOME else Routes.ONBOARDING }
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -114,7 +121,9 @@ fun AppNavigation(viewModel: MainViewModel) {
     ) {
         AppNavHost(
             navController = navController,
-            viewModel = viewModel,
+            settingsViewModel = settingsViewModel,
+            proxyViewModel = proxyViewModel,
+            serverViewModel = serverViewModel,
             startDestination = startDestination
         )
     }
@@ -127,7 +136,7 @@ fun AppNavigation(viewModel: MainViewModel) {
         androidx.compose.runtime.key(captchaState.sessionId) {
             CaptchaWebViewDialog(
                 captchaUrl = captchaState.url,
-                onDismiss = { viewModel.dismissCaptcha() }
+                onDismiss = { proxyViewModel.dismissCaptcha() }
             )
         }
     }
@@ -137,11 +146,11 @@ fun AppNavigation(viewModel: MainViewModel) {
         TelegramSubscribeDialog(
             onSubscribe = {
                 uriHandler.openUri("https://t.me/+53nh4UNiSv5lNTgy")
-                viewModel.setTgSubscribeShown()
+                settingsViewModel.setTgSubscribeShown()
                 showTgDialog = false
             },
             onDismiss = {
-                viewModel.setTgSubscribeShown()
+                settingsViewModel.setTgSubscribeShown()
                 showTgDialog = false
             }
         )
@@ -151,7 +160,9 @@ fun AppNavigation(viewModel: MainViewModel) {
 @Composable
 private fun AppNavHost(
     navController: NavHostController,
-    viewModel: MainViewModel,
+    settingsViewModel: SettingsViewModel,
+    proxyViewModel: ProxyViewModel,
+    serverViewModel: ServerViewModel,
     startDestination: String
 ) {
     NavHost(
@@ -166,7 +177,7 @@ private fun AppNavHost(
             OnboardingScreen(
                 onSetupServer = { navController.navigate(Routes.SSH_SETUP_OB) },
                 onSkip = {
-                    viewModel.setOnboardingDone()
+                    settingsViewModel.setOnboardingDone()
                     navController.navigate(Routes.HOME) {
                         popUpTo(navController.graph.startDestinationId) { inclusive = true }
                         launchSingleTop = true
@@ -177,7 +188,8 @@ private fun AppNavHost(
 
         composable(Routes.SSH_SETUP_OB) {
             SshSetupScreen(
-                viewModel = viewModel,
+                serverViewModel = serverViewModel,
+                settingsViewModel = settingsViewModel,
                 onConnected = {
                     navController.navigate(Routes.SERVER_MANAGEMENT_OB) {
                         popUpTo(Routes.SSH_SETUP_OB) { inclusive = true }
@@ -190,7 +202,8 @@ private fun AppNavHost(
 
         composable(Routes.SERVER_MANAGEMENT_OB) {
             ServerManagementScreen(
-                viewModel = viewModel,
+                serverViewModel = serverViewModel,
+                settingsViewModel = settingsViewModel,
                 onContinue = {
                     navController.navigate(Routes.CLIENT_SETUP_OB) {
                         launchSingleTop = true
@@ -201,10 +214,10 @@ private fun AppNavHost(
 
         composable(Routes.CLIENT_SETUP_OB) {
             ClientSetupScreen(
-                viewModel = viewModel,
+                settingsViewModel = settingsViewModel,
                 showFinishButton = true,
                 onFinish = {
-                    viewModel.setOnboardingDone()
+                    settingsViewModel.setOnboardingDone()
                     navController.navigate(Routes.HOME) {
                         popUpTo(navController.graph.startDestinationId) { inclusive = true }
                         launchSingleTop = true
@@ -216,7 +229,8 @@ private fun AppNavHost(
         // Основной поток (с навигацией)
         composable(Routes.SSH_SETUP) {
             SshSetupScreen(
-                viewModel = viewModel,
+                serverViewModel = serverViewModel,
+                settingsViewModel = settingsViewModel,
                 onConnected = {
                     navController.navigate(Routes.SERVER_MANAGEMENT) {
                         popUpTo(Routes.SSH_SETUP) { inclusive = true }
@@ -229,7 +243,8 @@ private fun AppNavHost(
 
         composable(Routes.SERVER_MANAGEMENT) {
             ServerManagementScreen(
-                viewModel = viewModel,
+                serverViewModel = serverViewModel,
+                settingsViewModel = settingsViewModel,
                 onContinue = {
                     navController.navigate(Routes.CLIENT_SETUP) {
                         // Убираем SERVER_MANAGEMENT из back stack,
@@ -243,20 +258,22 @@ private fun AppNavHost(
 
         composable(Routes.CLIENT_SETUP) {
             ClientSetupScreen(
-                viewModel = viewModel,
+                settingsViewModel = settingsViewModel,
                 showFinishButton = false
             )
         }
 
         composable(Routes.HOME) {
             HomeScreen(
-                viewModel = viewModel,
+                settingsViewModel = settingsViewModel,
+                proxyViewModel = proxyViewModel,
+                serverViewModel = serverViewModel,
                 onNavigateToSshSetup = { navController.navigate(Routes.SSH_SETUP) }
             )
         }
 
         composable(Routes.LOGS) {
-            LogsScreen(viewModel = viewModel)
+            LogsScreen(proxyViewModel = proxyViewModel)
         }
     }
 }

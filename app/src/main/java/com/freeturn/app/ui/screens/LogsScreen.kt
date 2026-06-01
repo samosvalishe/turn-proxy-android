@@ -39,12 +39,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.ui.theme.extendedColorScheme
-import com.freeturn.app.viewmodel.MainViewModel
+import com.freeturn.app.viewmodel.ProxyViewModel
 
 @Composable
-fun LogsScreen(viewModel: MainViewModel) {
+fun LogsScreen(proxyViewModel: ProxyViewModel) {
     val context = LocalContext.current
-    val logs by viewModel.logs.collectAsStateWithLifecycle()
+    val logs by proxyViewModel.logs.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
     LaunchedEffect(logs.size) {
@@ -72,7 +72,7 @@ fun LogsScreen(viewModel: MainViewModel) {
                     IconButton(
                         onClick = {
                             HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                            viewModel.clearLogs()
+                            proxyViewModel.clearLogs()
                         },
                         enabled = logs.isNotEmpty()
                     ) {
