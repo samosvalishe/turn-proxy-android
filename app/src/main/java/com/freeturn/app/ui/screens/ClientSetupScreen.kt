@@ -36,6 +36,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,6 +48,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -90,24 +92,16 @@ fun ClientSetupScreen(
     // (если запущен), иначе сохранённое. В !sync режиме — всегда сохранённое:
     // серверная и клиентская стороны могут различаться, и UI отражает клиента.
     val syncOn = saved.syncServerSwitches
-    val effectiveTcpForward = if (syncOn) serverKnown?.tcpMode ?: saved.tcpForward else saved.tcpForward
-    val effectiveObfProfile = if (syncOn) serverKnown?.obfProfile ?: serverOpts.obfProfile else serverOpts.obfProfile
+    val effectiveTcpForward = if (syncOn && serverKnown?.running == true) serverKnown.tcpMode ?: saved.tcpForward else saved.tcpForward
+    val effectiveObfProfile = if (syncOn && serverKnown?.running == true) serverKnown.obfProfile ?: serverOpts.obfProfile else serverOpts.obfProfile
 
     val context = LocalContext.current
 
     var serverAddress by rememberSaveable(saved.serverAddress) { mutableStateOf(saved.serverAddress) }
     var vkLink       by rememberSaveable(saved.vkLink)         { mutableStateOf(saved.vkLink) }
-    var provider     by rememberSaveable(saved.provider)       { mutableStateOf(saved.provider) }
     var threads      by rememberSaveable(saved.threads)        { mutableFloatStateOf(saved.threads.toFloat()) }
     var streamsPerCred by rememberSaveable(saved.streamsPerCred) { mutableFloatStateOf(saved.streamsPerCred.toFloat()) }
-    var useUdp       by rememberSaveable(saved.useUdp)         { mutableStateOf(saved.useUdp) }
-    var manualCaptcha by rememberSaveable(saved.manualCaptcha) { mutableStateOf(saved.manualCaptcha) }
-    var useCarrierDns by rememberSaveable(saved.useCarrierDns) { mutableStateOf(saved.useCarrierDns) }
-    var dnsMode by rememberSaveable(saved.dnsMode) { mutableStateOf(saved.dnsMode) }
     var localPort    by rememberSaveable(saved.localPort)      { mutableStateOf(saved.localPort) }
-
-    var debugMode by rememberSaveable(saved.debugMode) { mutableStateOf(saved.debugMode) }
-    var magicSwitch by rememberSaveable(saved.magicSwitch) { mutableStateOf(saved.magicSwitch) }
     var magicTurn by rememberSaveable(saved.magicTurn) { mutableStateOf(saved.magicTurn) }
     var lastSliderInt by rememberSaveable { mutableIntStateOf(saved.threads) }
     var lastStreamsInt by rememberSaveable { mutableIntStateOf(saved.streamsPerCred) }
@@ -120,36 +114,31 @@ fun ClientSetupScreen(
         }
     }
 
-    // Авто-сохранение с дебаунсом 600 мс на каждое изменение поля.
-    // tcpForward/bond исключены — сохраняются через setTcpForward/setBond с автоперезапуском.
-    LaunchedEffect(serverAddress, vkLink, provider, threads, streamsPerCred, useUdp, manualCaptcha, useCarrierDns, localPort, dnsMode, debugMode, magicSwitch, magicTurn) {
+    // Авто-сохранение с дебаунсом 600 мс для текстовых полей и ползунков
+    LaunchedEffect(serverAddress, vkLink, threads, streamsPerCred, localPort, magicTurn) {
         delay(600)
+        val current = settingsViewModel.clientConfig.value
         settingsViewModel.saveClientConfig(
-            ClientConfig(
+            current.copy(
                 serverAddress = serverAddress.trim(),
                 vkLink        = vkLink.trim(),
-                provider      = provider,
                 threads       = threads.roundToInt(),
                 streamsPerCred = streamsPerCred.roundToInt(),
-                useUdp        = useUdp,
-                manualCaptcha = manualCaptcha,
                 localPort     = localPort.trim(),
-                tcpForward    = saved.tcpForward,
-                bond          = saved.bond,
-
-                debugMode     = debugMode,
-                useCarrierDns = useCarrierDns,
-                dnsMode       = dnsMode,
-                syncServerSwitches = saved.syncServerSwitches,
-                magicSwitch   = magicSwitch,
                 magicTurn     = magicTurn.trim()
             )
         )
     }
 
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(title = { Text(stringResource(R.string.client_title)) })
+            TopAppBar(
+                title = { Text(stringResource(R.string.client_title)) },
+                scrollBehavior = scrollBehavior
+            )
         },
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
@@ -190,10 +179,10 @@ fun ClientSetupScreen(
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                         Provider.ALL.forEachIndexed { idx, value ->
                             SegmentedButton(
-                                selected = provider == value,
+                                selected = saved.provider == value,
                                 onClick = {
                                     HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                    provider = value
+                                    settingsViewModel.setProvider(value)
                                 },
                                 shape = SegmentedButtonDefaults.itemShape(index = idx, count = Provider.ALL.size)
                             ) { Text(providerLabel(value)) }
@@ -201,7 +190,7 @@ fun ClientSetupScreen(
                     }
                 }
 
-                if (provider == Provider.VK) {
+                if (saved.provider == Provider.VK) {
                     OutlinedTextField(
                         value = vkLink.redact(privacyMode),
                         onValueChange = { if (!privacyMode) vkLink = it },
@@ -303,10 +292,10 @@ fun ClientSetupScreen(
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                         dnsOptions.forEachIndexed { idx, (value, label) ->
                             SegmentedButton(
-                                selected = dnsMode == value,
+                                selected = saved.dnsMode == value,
                                 onClick = {
                                     HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                    dnsMode = value
+                                    settingsViewModel.setDnsMode(value)
                                 },
                                 shape = SegmentedButtonDefaults.itemShape(index = idx, count = dnsOptions.size)
                             ) { Text(label) }
@@ -326,18 +315,18 @@ fun ClientSetupScreen(
                     }
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                         SegmentedButton(
-                            selected = !useUdp,
+                            selected = !saved.useUdp,
                             onClick = {
                                 HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                useUdp = false
+                                settingsViewModel.setUseUdp(false)
                             },
                             shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
                         ) { Text(stringResource(R.string.tcp)) }
                         SegmentedButton(
-                            selected = useUdp,
+                            selected = saved.useUdp,
                             onClick = {
                                 HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                useUdp = true
+                                settingsViewModel.setUseUdp(true)
                             },
                             shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
                         ) { Text(stringResource(R.string.udp)) }
@@ -349,44 +338,44 @@ fun ClientSetupScreen(
                 SwitchRow(
                     label = stringResource(R.string.manual_captcha),
                     description = stringResource(R.string.manual_captcha_desc),
-                    checked = manualCaptcha,
+                    checked = saved.manualCaptcha,
                     onCheckedChange = {
                         HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                        manualCaptcha = it
+                        settingsViewModel.setManualCaptcha(it)
                     }
                 )
 
                 SwitchRow(
                     label = stringResource(R.string.use_carrier_dns),
                     description = stringResource(R.string.use_carrier_dns_desc),
-                    checked = useCarrierDns,
+                    checked = saved.useCarrierDns,
                     onCheckedChange = {
                         HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                        useCarrierDns = it
+                        settingsViewModel.setUseCarrierDns(it)
                     }
                 )
 
                 SwitchRow(
                     label = stringResource(R.string.debug_mode),
                     description = stringResource(R.string.debug_mode_desc),
-                    checked = debugMode,
+                    checked = saved.debugMode,
                     onCheckedChange = {
                         HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                        debugMode = it
+                        settingsViewModel.setDebugMode(it)
                     }
                 )
 
                 SwitchRow(
                     label = stringResource(R.string.magic_switch),
                     description = stringResource(R.string.magic_switch_desc),
-                    checked = magicSwitch,
+                    checked = saved.magicSwitch,
                     onCheckedChange = {
                         HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                        magicSwitch = it
+                        settingsViewModel.setMagicSwitch(it)
                     }
                 )
 
-                if (magicSwitch) {
+                if (saved.magicSwitch) {
                     OutlinedTextField(
                         value = magicTurn.redact(privacyMode),
                         onValueChange = { if (!privacyMode) magicTurn = it },
@@ -511,11 +500,11 @@ fun ClientSetupScreen(
                         supportingText = {
                             when {
                                 obfKeyDraft.isBlank() -> Text(
-                                    stringResource(R.string.wrap_key_empty_hint),
+                                    stringResource(R.string.obf_key_empty_hint),
                                     color = MaterialTheme.colorScheme.error
                                 )
                                 !draftValid -> Text(
-                                    stringResource(R.string.wrap_key_invalid_hint),
+                                    stringResource(R.string.obf_key_invalid_hint),
                                     color = MaterialTheme.colorScheme.error
                                 )
                             }
@@ -530,7 +519,7 @@ fun ClientSetupScreen(
                             enabled = draftValid,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(stringResource(R.string.wrap_key_apply))
+                            Text(stringResource(R.string.obf_key_apply))
                         }
                     }
                     if (isSshConnected) {
@@ -548,9 +537,9 @@ fun ClientSetupScreen(
                                         modifier = Modifier.size(20.dp)
                                     )
                                     Spacer(Modifier.size(8.dp))
-                                    Text(stringResource(R.string.server_wrap_regen_in_progress))
+                                    Text(stringResource(R.string.obf_key_regen_in_progress))
                                 } else {
-                                    Text(stringResource(R.string.server_wrap_regen))
+                                    Text(stringResource(R.string.obf_key_regen))
                                 }
                             }
                         }

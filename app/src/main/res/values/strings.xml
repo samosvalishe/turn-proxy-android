@@ -20,8 +20,8 @@
     <string name="ssh_error">SSH: ошибка</string>
     <string name="ssh_disconnected">SSH: не сопряжено</string>
     <string name="reconnect">Повторить сопряжение</string>
-    <string name="proxy_active_stop">Прокси активен — нажмите для остановки</string>
-    <string name="proxy_error_restart">Ошибка — нажмите для повторного запуска</string>
+    <string name="proxy_active_stop">Прокси активен - нажмите для остановки</string>
+    <string name="proxy_error_restart">Ошибка - нажмите для повторного запуска</string>
     <string name="start_proxy">Запустить прокси</string>
     <string name="connection">Соединение</string>
     <string name="not_connected">Не сопряжено</string>
@@ -49,32 +49,32 @@
     <string name="call_link_support">Звонки → Создать → Скопировать ссылку (не нажимайте «Завершить»)</string>
     <string name="local_listen_address">Локальный адрес прослушивания</string>
     <string name="local_listen_placeholder">127.0.0.1:9000</string>
-    <string name="local_listen_support">Адрес, на котором клиент принимает трафик от WireGuard/Hysteria</string>
+    <string name="local_listen_support">Адрес, на котором клиент принимает трафик от WireGuard/XRay</string>
     <string name="parameters_title">Параметры</string>
     <string name="threads_format">Потоки: %1$d</string>
-    <string name="threads_recommendation">Рекомендуется 4–8</string>
-    <string name="streams_per_cred_recommendation">Сколько TURN-потоков обслуживает один VK-аккаунт. По умолчанию 10.</string>
+    <string name="threads_recommendation">Рекомендуется 8–12</string>
+    <string name="streams_per_cred_recommendation">Сколько TURN-потоков обслуживает один VK-аккаунт</string>
     <string name="streams_per_cred_format">Потоков на аккаунт: %1$d</string>
 
-    <string name="tcp_forward_mode">TCP-форвард (Xray/sing-box)</string>
-    <string name="tcp_forward_mode_desc">Режим -mode tcp для проброса Xray/VLESS/Trojan. Выкл = UDP-релей для WireGuard. Должен совпадать с сервером.</string>
+    <string name="tcp_forward_mode">Режим</string>
+    <string name="tcp_forward_mode_desc">Режим tcp для проброса Xray/VLESS/Trojan</string>
     <string name="client_bond">Bond (стрипинг TCP)</string>
-    <string name="client_bond_desc">Распределяет TCP по smux-сессиям. Только в TCP-режиме. Клиентский флаг — сервер настраивать не нужно.</string>
+    <string name="client_bond_desc">Распределяет TCP по smux-сессиям. Только в TCP-режиме.</string>
     <string name="obf_profile_title">Обфускация</string>
-    <string name="obf_profile_desc">Профиль маскировки payload (обход шейпинга VK). Должен совпадать с сервером. Ключ берётся с сервера.</string>
+    <string name="obf_profile_desc">Профиль маскировки</string>
     <string name="obf_none">Выкл</string>
     <string name="obf_rtpopus">rtpopus</string>
     <string name="provider_title">Провайдер</string>
     <string name="provider_vk">VK Calls</string>
     <string name="locked_disconnect_hint">Подключитесь к серверу, чтобы изменить</string>
-    <string name="wrap_key_empty_hint">Ключ не сгенерирован — нажмите кнопку ниже</string>
-    <string name="wrap_key_invalid_hint">Неверный формат — нужны 64 hex-символа</string>
-    <string name="wrap_key_apply">Применить</string>
-    <string name="server_wrap_regen_in_progress">Генерация ключа…</string>
+    <string name="obf_key_empty_hint">Ключ не сгенерирован - нажмите кнопку ниже</string>
+    <string name="obf_key_invalid_hint">Неверный формат - нужны 64 hex-символа</string>
+    <string name="obf_key_apply">Применить</string>
+    <string name="obf_key_regen_in_progress">Генерация ключа…</string>
     <string name="server_sync_section">Синхронные настройки сервера</string>
     <string name="sync_server_switches">Синхронизировать с сервером</string>
-    <string name="sync_server_switches_desc">При выкл. флаги TCP-режим/обфускация меняются только у клиента, серверный процесс не перезапускается</string>
-    <string name="sync_off_banner">Sync с сервером выключен. Клиентские флаги TCP-режим/обфускация сервер не получает — следите за совпадением вручную.</string>
+    <string name="sync_server_switches_desc">При выкл. флаги меняются только у клиента, серверный процесс не перезапускается</string>
+    <string name="sync_off_banner">Sync с сервером выключен. Cледите за совпадением вручную.</string>
     <string name="server_journal_title">Журнал</string>
     <string name="server_journal_fetch">Показать журнал</string>
     <string name="server_journal_refresh">Обновить</string>
@@ -82,13 +82,13 @@
     <string name="server_journal_empty">Журнал пуст</string>
     <string name="server_journal_clear">Очистить</string>
     <string name="transport_protocol">Транспорт</string>
-    <string name="transport_protocol_desc">UDP снижает задержки, TCP — стабильнее</string>
+    <string name="transport_protocol_desc">UDP снижает задержки, TCP - стабильнее</string>
     <string name="manual_captcha">Ручной ввод капчи</string>
     <string name="manual_captcha_desc">Решать капчу вручную вместо автоматического распознавания</string>
     <string name="use_carrier_dns">DNS оператора связи</string>
     <string name="use_carrier_dns_desc">Использовать DNS текущей сети вместо системного резолвера</string>
     <string name="dns_mode_title">DNS-резолвер</string>
-    <string name="dns_mode_desc">Авто — пробует системный DNS, переключается на DNS-over-HTTPS при блокировке</string>
+    <string name="dns_mode_desc">Авто - пробует системный DNS, переключается на DNS-over-HTTPS при блокировке</string>
     <string name="dns_mode_auto">Авто</string>
     <string name="dns_mode_udp">UDP/53</string>
     <string name="dns_mode_doh">DoH</string>
@@ -111,7 +111,7 @@
     <string name="listen_port_desc">Порт, на котором сервер принимает подключения от клиентов</string>
     <string name="listen_ip">IP прослушивания</string>
     <string name="listen_ip_placeholder">0.0.0.0</string>
-    <string name="listen_ip_desc">IP-адрес, к которому биндится сервер. 0.0.0.0 — все интерфейсы. Укажите конкретный WAN IP, если на хосте несколько адресов.</string>
+    <string name="listen_ip_desc">IP-адрес, к которому биндится сервер. 0.0.0.0 - все интерфейсы. Укажите конкретный WAN IP, если на хосте несколько адресов.</string>
     <string name="turn_client_address">Адрес TURN‑клиента</string>
     <string name="turn_client_placeholder">127.0.0.1:40537</string>
     <string name="turn_client_desc">Локальный WireGuard/Hysteria-клиент на стороне сервера</string>
@@ -120,7 +120,7 @@
     <string name="server_install_downloaded">Обновлено</string>
     <string name="server_version_label">Версия: %1$s</string>
     <string name="server_obf_key_label">Obf-ключ (64 hex)</string>
-    <string name="server_wrap_regen">Сгенерировать новый ключ на сервере</string>
+    <string name="obf_key_regen">Сгенерировать новый ключ на сервере</string>
     <string name="start_server">Запустить сервер</string>
     <string name="stop_server">Остановить сервер</string>
     <string name="continue_client_setup">Продолжить настройку клиента</string>
@@ -152,7 +152,7 @@
 
     <!-- OnboardingScreen -->
     <string name="onboarding_title">Free Turn</string>
-    <string name="onboarding_subtitle">Проксируйте WireGuard и Hysteria‑трафик\nчерез TURN‑серверы VK Calls</string>
+    <string name="onboarding_subtitle">Проксируйте WireGuard/Xray трафик\nчерез TURN‑сервера</string>
     <string name="privacy_notice">Мы не собираем никаких данных. Все настройки (SSH-доступ, параметры прокси) хранятся исключительно на вашем устройстве.</string>
     <string name="setup_server">Настроить сервер</string>
     <string name="skip_setup">Пропустить настройки</string>

@@ -276,7 +276,7 @@ class ProxyService : Service() {
                 ConnectionStats(udpActive, udpTotal)
             }
             ProxyServiceState.setConnectionStats(stats)
-            if (currentBaseStatus == "Прокси активен") {
+            if (currentBaseStatus == getString(R.string.proxy_active)) {
                 buildAndShowNotification()
             }
         }
@@ -415,7 +415,7 @@ class ProxyService : Service() {
                             hasConnection -> {
                                 ProxyServiceState.setStartupResult(StartupResult.Success)
                                 ProxyServiceState.markConnectedIfAbsent(SystemClock.elapsedRealtime())
-                                updateNotification("Прокси активен")
+                                updateNotification(getString(R.string.proxy_active))
                                 startupEmitted = true
                             }
                         }
@@ -611,7 +611,7 @@ class ProxyService : Service() {
             var lastRx = android.net.TrafficStats.getUidRxBytes(uid)
             var lastTx = android.net.TrafficStats.getUidTxBytes(uid)
             while (!userStopped.get()) {
-                kotlinx.coroutines.delay(1000)
+                kotlinx.coroutines.delay(3000)
                 val currentRx = android.net.TrafficStats.getUidRxBytes(uid)
                 val currentTx = android.net.TrafficStats.getUidTxBytes(uid)
                 
@@ -621,7 +621,7 @@ class ProxyService : Service() {
                     currentSpeedText = "↓ ${formatSpeed(rxSpeed)} ↑ ${formatSpeed(txSpeed)}"
                     lastRx = currentRx
                     lastTx = currentTx
-                    if (currentBaseStatus == "Прокси активен") {
+                    if (currentBaseStatus == getString(R.string.proxy_active)) {
                         buildAndShowNotification()
                     }
                 }
@@ -633,7 +633,7 @@ class ProxyService : Service() {
         var text = currentBaseStatus
         val stats = ProxyServiceState.connectionStats.value
         
-        if (currentBaseStatus == "Прокси активен" || currentBaseStatus == getString(R.string.proxy_active)) {
+        if (currentBaseStatus == getString(R.string.proxy_active)) {
             if (stats.total > 0) {
                 text = String.format(
                     java.util.Locale.US,

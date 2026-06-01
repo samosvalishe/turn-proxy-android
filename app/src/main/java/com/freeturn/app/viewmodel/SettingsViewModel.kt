@@ -14,6 +14,7 @@ import com.freeturn.app.data.ProfilesSnapshot
 import com.freeturn.app.data.SshConfig
 import com.freeturn.app.domain.AppUpdater
 import com.freeturn.app.domain.LocalProxyManager
+import com.freeturn.app.domain.ProxyOrchestrator
 import com.freeturn.app.domain.SshRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -32,6 +33,7 @@ class SettingsViewModel(
     private val proxyManager: LocalProxyManager,
     private val sshRepository: SshRepository,
     private val appUpdater: AppUpdater,
+    private val orchestrator: ProxyOrchestrator,
     private val context: Context
 ) : ViewModel() {
 
@@ -102,6 +104,62 @@ class SettingsViewModel(
     fun saveClientConfig(config: ClientConfig) {
         viewModelScope.launch {
             profileMutex.withLock { prefs.saveClientConfig(config) }
+        }
+    }
+
+    fun setProvider(value: String) {
+        viewModelScope.launch {
+            val current = prefs.clientConfigFlow.first()
+            if (current.provider == value) return@launch
+            profileMutex.withLock { prefs.saveClientConfig(current.copy(provider = value)) }
+        }
+    }
+
+    fun setDnsMode(value: String) {
+        viewModelScope.launch {
+            val current = prefs.clientConfigFlow.first()
+            if (current.dnsMode == value) return@launch
+            profileMutex.withLock { prefs.saveClientConfig(current.copy(dnsMode = value)) }
+        }
+    }
+
+    fun setUseUdp(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = prefs.clientConfigFlow.first()
+            if (current.useUdp == enabled) return@launch
+            profileMutex.withLock { prefs.saveClientConfig(current.copy(useUdp = enabled)) }
+        }
+    }
+
+    fun setManualCaptcha(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = prefs.clientConfigFlow.first()
+            if (current.manualCaptcha == enabled) return@launch
+            profileMutex.withLock { prefs.saveClientConfig(current.copy(manualCaptcha = enabled)) }
+        }
+    }
+
+    fun setUseCarrierDns(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = prefs.clientConfigFlow.first()
+            if (current.useCarrierDns == enabled) return@launch
+            profileMutex.withLock { prefs.saveClientConfig(current.copy(useCarrierDns = enabled)) }
+        }
+    }
+
+    fun setDebugMode(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = prefs.clientConfigFlow.first()
+            if (current.debugMode == enabled) return@launch
+            profileMutex.withLock { prefs.saveClientConfig(current.copy(debugMode = enabled)) }
+        }
+    }
+
+    fun setMagicSwitch(enabled: Boolean) {
+        viewModelScope.launch {
+            val current = prefs.clientConfigFlow.first()
+            if (current.magicSwitch == enabled) return@launch
+            profileMutex.withLock { prefs.saveClientConfig(current.copy(magicSwitch = enabled)) }
         }
     }
 
@@ -194,7 +252,7 @@ class SettingsViewModel(
             } ?: return@launch
 
             val serverRunning = (sshRepository.serverState.value as? ServerState.Known)?.running == true
-            if (serverRunning) restartServerIfRunning()
+            if (serverRunning) orchestrator.restartServerIfRunning()
 
             if (ProxyServiceState.isRunning.value) {
                 proxyManager.stopProxy()
@@ -249,7 +307,7 @@ class SettingsViewModel(
             if (current.bond == enabled) return@launch
             val next = current.copy(bond = enabled)
             profileMutex.withLock { prefs.saveClientConfig(next) }
-            restartProxyIfRunning()
+            orchestrator.restartProxyIfRunning()
         }
     }
 
@@ -269,8 +327,8 @@ class SettingsViewModel(
             if (!storedMatches || next.obfKey != current.obfKey) {
                 profileMutex.withLock { prefs.saveServerOpts(next) }
             }
-            if (sync) restartServerIfRunning()
-            restartProxyIfRunning()
+            if (sync) orchestrator.restartServerIfRunning()
+            orchestrator.restartProxyIfRunning()
         }
     }
 
@@ -281,8 +339,8 @@ class SettingsViewModel(
             val next = current.copy(syncServerSwitches = enabled)
             profileMutex.withLock { prefs.saveClientConfig(next) }
             if (enabled) {
-                restartServerIfRunning()
-                restartProxyIfRunning()
+                orchestrator.restartServerIfRunning()
+                orchestrator.restartProxyIfRunning()
             }
         }
     }
@@ -294,8 +352,8 @@ class SettingsViewModel(
             if (current.obfKey == trimmed) return@launch
             val next = current.copy(obfKey = trimmed)
             profileMutex.withLock { prefs.saveServerOpts(next) }
-            if (prefs.clientConfigFlow.first().syncServerSwitches) restartServerIfRunning()
-            restartProxyIfRunning()
+            if (prefs.clientConfigFlow.first().syncServerSwitches) orchestrator.restartServerIfRunning()
+            orchestrator.restartProxyIfRunning()
         }
     }
 
@@ -314,51 +372,11 @@ class SettingsViewModel(
                 val serverRunning = (sshRepository.serverState.value as? ServerState.Known)?.running == true
                 if (serverRunning) {
                     sshRepository.stopServer()
-                    startServerFromPrefs()
+                    orchestrator.startServerFromPrefs()
                 }
             }
-            restartProxyIfRunning()
+            orchestrator.restartProxyIfRunning()
         }
-    }
-
-    private suspend fun startServerFromPrefs() {
-        val l = prefs.proxyListenFlow.first()
-        val c = prefs.proxyConnectFlow.first()
-        val tcpMode = prefs.clientConfigFlow.first().tcpForward
-        val opts = prefs.serverOptsFlow.first()
-        sshRepository.startServer(
-            listen = l, connect = c,
-            tcpMode = tcpMode,
-            obfProfile = if (opts.obfEnabled) opts.obfProfile else "none",
-            obfKey = if (opts.obfEnabled) opts.obfKey else ""
-        )
-    }
-
-    private suspend fun restartServerIfRunning() {
-        val running = (sshRepository.serverState.value as? ServerState.Known)?.running == true
-        if (!running) return
-        val l = prefs.proxyListenFlow.first()
-        val c = prefs.proxyConnectFlow.first()
-        if (!l.matches(Regex("""^[\w.\-]+:\d{1,5}$""")) ||
-            !c.matches(Regex("""^[\w.\-]+:\d{1,5}$"""))) return
-        val opts = prefs.serverOptsFlow.first()
-        val tcpMode = prefs.clientConfigFlow.first().tcpForward
-        sshRepository.stopServer()
-        sshRepository.startServer(
-            listen = l, connect = c,
-            tcpMode = tcpMode,
-            obfProfile = if (opts.obfEnabled) opts.obfProfile else "none",
-            obfKey = if (opts.obfEnabled) opts.obfKey else ""
-        )
-    }
-
-    private suspend fun restartProxyIfRunning() {
-        if (!ProxyServiceState.isRunning.value) return
-        proxyManager.stopProxy()
-        withTimeoutOrNull(2_000) {
-            ProxyServiceState.isRunning.first { !it }
-        }
-        proxyManager.startProxy(prefs.clientConfigFlow.first())
     }
 
     // --- Updates ---

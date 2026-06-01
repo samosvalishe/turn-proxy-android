@@ -17,8 +17,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.res.painterResource
 import com.freeturn.app.R
 import androidx.compose.material3.Button
@@ -57,7 +61,7 @@ fun OnboardingScreen(
         label = "pulse"
     )
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(
@@ -69,16 +73,22 @@ fun OnboardingScreen(
                 )
             )
     ) {
+        val minHeight = maxHeight
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Spacer(Modifier.height(56.dp))
+            Column(
+                modifier = Modifier.heightIn(min = minHeight - 64.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Spacer(Modifier.height(16.dp))
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(
                     modifier = Modifier
                         .size(148.dp)
@@ -167,6 +177,7 @@ fun OnboardingScreen(
                 }
 
                 Spacer(Modifier.height(24.dp))
+            }
             }
         }
     }

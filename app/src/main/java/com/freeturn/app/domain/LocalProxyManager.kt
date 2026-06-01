@@ -22,6 +22,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
+/**
+ * Управляет жизненным циклом прокси-сервиса: старт, стоп, отслеживание состояния.
+ * Создаётся как Koin `single` и живёт в Application scope — `destroy()` не вызывается
+ * намеренно, так как scope привязан к процессу приложения.
+ */
 class LocalProxyManager(private val context: Context) {
 
     private val _proxyState = MutableStateFlow<ProxyState>(ProxyState.Idle)

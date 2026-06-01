@@ -50,11 +50,9 @@ class ProxyTileService : TileService() {
 
     private fun updateTileState() {
         val tile = qsTile ?: return
-        if (isProxyRunning) {
-            tile.state = Tile.STATE_ACTIVE
-        } else {
-            tile.state = Tile.STATE_INACTIVE
-        }
+        tile.state = if (isProxyRunning) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
+        tile.label = getString(R.string.tile_service_label)
+        tile.contentDescription = getString(R.string.tile_service_label)
         tile.icon = android.graphics.drawable.Icon.createWithResource(this, R.drawable.ic_qs_tile_nearby)
         tile.updateTile()
     }

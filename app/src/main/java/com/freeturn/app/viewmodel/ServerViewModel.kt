@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.freeturn.app.ProxyServiceState
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.SshConfig
-import com.freeturn.app.domain.LocalProxyManager
+import com.freeturn.app.domain.ProxyOrchestrator
 import com.freeturn.app.domain.SshRepository
 import com.freeturn.app.ui.HapticUtil
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,8 +20,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 class ServerViewModel(
     private val sshRepository: SshRepository,
-    private val proxyManager: LocalProxyManager,
     private val prefs: AppPreferences,
+    private val orchestrator: ProxyOrchestrator,
     private val context: Context
 ) : ViewModel() {
 
@@ -83,7 +83,7 @@ class ServerViewModel(
                 }
                 if (outcome.needsRestart) {
                     startServer()
-                    restartProxyIfRunning()
+                    orchestrator.restartProxyIfRunning()
                 }
             }
         }
@@ -133,39 +133,11 @@ class ServerViewModel(
                 prefs.saveServerOpts(next)
                 
                 val clientConfig = prefs.clientConfigFlow.first()
-                if (clientConfig.syncServerSwitches) restartServerIfRunning()
-                restartProxyIfRunning()
+                if (clientConfig.syncServerSwitches) orchestrator.restartServerIfRunning()
+                orchestrator.restartProxyIfRunning()
             } finally {
                 _isRegeneratingObfKey.value = false
             }
         }
-    }
-
-    private suspend fun restartServerIfRunning() {
-        val running = (serverState.value as? ServerState.Known)?.running == true
-        if (!running) return
-        val l = prefs.proxyListenFlow.first()
-        val c = prefs.proxyConnectFlow.first()
-        if (!l.matches(Regex("""^[\w.\-]+:\d{1,5}$""")) ||
-            !c.matches(Regex("""^[\w.\-]+:\d{1,5}$"""))) return
-        val opts = prefs.serverOptsFlow.first()
-        val tcpMode = prefs.clientConfigFlow.first().tcpForward
-        sshRepository.stopServer()
-        sshRepository.startServer(
-            listen = l, connect = c,
-            tcpMode = tcpMode,
-            obfProfile = if (opts.obfEnabled) opts.obfProfile else "none",
-            obfKey = if (opts.obfEnabled) opts.obfKey else ""
-        )
-    }
-
-    private suspend fun restartProxyIfRunning() {
-        if (!ProxyServiceState.isRunning.value) return
-        proxyManager.stopProxy()
-        withTimeoutOrNull(2_000) {
-            ProxyServiceState.isRunning.first { !it }
-        }
-        val clientConfig = prefs.clientConfigFlow.first()
-        proxyManager.startProxy(clientConfig)
     }
 }

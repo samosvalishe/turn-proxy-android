@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -33,6 +34,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.freeturn.app.R
@@ -45,6 +47,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -56,12 +59,13 @@ import com.freeturn.app.data.SshConfig
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.viewmodel.ServerViewModel
 import com.freeturn.app.viewmodel.SshConnectionState
+import com.freeturn.app.viewmodel.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SshSetupScreen(
     serverViewModel: ServerViewModel,
-    settingsViewModel: com.freeturn.app.viewmodel.SettingsViewModel,
+    settingsViewModel: SettingsViewModel,
     onConnected: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -88,11 +92,14 @@ fun SshSetupScreen(
 
     val isConnecting = sshState is SshConnectionState.Connecting
     val context = LocalContext.current
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.connect_to_server)) },
+                scrollBehavior = scrollBehavior,
                 navigationIcon = {
                     IconButton(onClick = {
                         HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
@@ -110,10 +117,16 @@ fun SshSetupScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .imePadding()
-                .padding(horizontal = 24.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+          Column(
+            modifier = Modifier
+                .widthIn(max = 840.dp)
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+          ) {
             Spacer(Modifier.height(4.dp))
 
             if (!isConnecting) {
@@ -147,6 +160,7 @@ fun SshSetupScreen(
             }
 
             Spacer(Modifier.height(24.dp))
+          }
         }
     }
 }
