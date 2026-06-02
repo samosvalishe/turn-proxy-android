@@ -198,6 +198,17 @@ class SettingsViewModel(
         }
     }
 
+    fun setSplitTunnelApps(value: String) {
+        viewModelScope.launch {
+            profileMutex.withLock {
+                val current = prefs.clientConfigFlow.first()
+                val trimmed = value.trim()
+                if (current.splitTunnelApps == trimmed) return@withLock
+                prefs.saveClientConfig(current.copy(splitTunnelApps = trimmed))
+            }
+        }
+    }
+
     fun setLogsEnabled(enabled: Boolean) {
         viewModelScope.launch {
             profileMutex.withLock {

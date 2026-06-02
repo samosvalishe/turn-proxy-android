@@ -9,13 +9,9 @@
     <string name="proxy_connecting">Подключение…</string>
     <string name="proxy_press_to_start">Нажмите для запуска</string>
     <string name="proxy_captcha_required">Требуется прохождение капчи</string>
-    <string name="current_settings">Текущие настройки</string>
     <string name="server">Сервер</string>
-    <string name="threads">Потоки</string>
-    <string name="streams_per_cred_label">Потоков на аккаунт</string>
     <string name="tcp">TCP</string>
     <string name="udp">UDP</string>
-    <string name="local_port">Локальный порт</string>
     <string name="ssh_connecting">SSH: сопряжение…</string>
     <string name="ssh_error">SSH: ошибка</string>
     <string name="ssh_disconnected">SSH: не сопряжено</string>
@@ -64,7 +60,6 @@
     <string name="obf_profile_desc">Профиль маскировки</string>
     <string name="obf_none">Выкл</string>
     <string name="obf_rtpopus">rtpopus</string>
-    <string name="provider_title">Провайдер</string>
     <string name="provider_vk">VK Calls</string>
     <string name="locked_disconnect_hint">Подключитесь к серверу, чтобы изменить</string>
     <string name="obf_key_empty_hint">Ключ не сгенерирован - нажмите кнопку ниже</string>
@@ -225,8 +220,6 @@
     <string name="profile_manage">Управлять профилями</string>
     <string name="nav_profiles">Профили</string>
     <string name="profile_actions_title">Профили</string>
-    <string name="profile_active_label">Активный профиль</string>
-    <string name="profile_switch_action">Сменить</string>
     <string name="profile_save_current_hint">Создаст новый профиль с текущими SSH и клиентскими настройками</string>
     <string name="profile_more">Ещё</string>
     <string name="profile_default_name">Новый профиль</string>
@@ -247,7 +240,6 @@
     <!-- Туннельное приложение (WireGuard) -->
     <string name="tunnel_transport_title">Туннельное приложение</string>
     <string name="tunnel_transport_desc">Поднимает VPN-туннель поверх локального прокси: трафик устройства заворачивается через TURN-релей. Оставьте конфиг пустым, чтобы не использовать туннель.</string>
-    <string name="transport_wireguard">WireGuard</string>
     <string name="wireguard_section">WireGuard</string>
     <string name="wireguard_tunnel_name">Имя туннеля</string>
     <string name="wireguard_config_label">Конфигурация WireGuard (.conf)</string>
@@ -266,6 +258,12 @@
     <string name="split_tunnel_apps_support">По одному package-имени в строке (или через запятую).</string>
     <string name="split_tunnel_pick_title">Выберите приложения</string>
     <string name="split_tunnel_done">Готово</string>
+    <string name="split_tunnel_status_off">Раздельное туннелирование выключено</string>
+    <string name="split_tunnel_status_on">Раздельное туннелирование включено</string>
+
+    <!-- Profiles sheet (servers) -->
+    <string name="profiles_servers_title">Серверы</string>
+    <string name="profiles_provider_label">Провайдер</string>
 
     <!-- Логи -->
     <string name="logs_enabled">Сбор логов</string>

@@ -15,17 +15,12 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DividerDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -40,7 +35,6 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -64,7 +58,7 @@ import com.freeturn.app.data.ClientConfig
 import com.freeturn.app.data.DnsMode
 import com.freeturn.app.data.ObfProfile
 import com.freeturn.app.data.Provider
-import com.freeturn.app.data.SplitTunnelMode
+import com.freeturn.app.data.TunnelTransport
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.viewmodel.ServerViewModel
 import com.freeturn.app.viewmodel.SettingsViewModel
@@ -112,8 +106,6 @@ fun ClientSetupScreen(
     var magicTurn by rememberSaveable(saved.magicTurn) { mutableStateOf(saved.magicTurn) }
     var wireGuardTunnelName by rememberSaveable(saved.wireGuardTunnelName) { mutableStateOf(saved.wireGuardTunnelName) }
     var wireGuardConfig by rememberSaveable(saved.wireGuardConfig) { mutableStateOf(saved.wireGuardConfig) }
-    var splitTunnelApps by rememberSaveable(saved.splitTunnelApps) { mutableStateOf(saved.splitTunnelApps) }
-    var showSplitAppPicker by rememberSaveable { mutableStateOf(false) }
     var lastSliderInt by rememberSaveable { mutableIntStateOf(saved.threads) }
     var lastStreamsInt by rememberSaveable { mutableIntStateOf(saved.streamsPerCred) }
 
@@ -128,7 +120,7 @@ fun ClientSetupScreen(
     // Авто-сохранение с дебаунсом 600 мс для текстовых полей и ползунков
     LaunchedEffect(
         serverAddress, vkLink, threads, streamsPerCred, localPort, magicTurn,
-        wireGuardTunnelName, wireGuardConfig, splitTunnelApps
+        wireGuardTunnelName, wireGuardConfig
     ) {
         delay(600)
         val current = settingsViewModel.clientConfig.value
@@ -140,9 +132,8 @@ fun ClientSetupScreen(
                 streamsPerCred = streamsPerCred.roundToInt(),
                 localPort     = localPort.trim(),
                 magicTurn     = magicTurn.trim(),
-                wireGuardTunnelName = wireGuardTunnelName.trim().ifBlank { "freeturn-wg" },
-                wireGuardConfig = wireGuardConfig.trim(),
-                splitTunnelApps = splitTunnelApps.trim()
+                wireGuardTunnelName = wireGuardTunnelName.trim().ifBlank { TunnelTransport.DEFAULT_TUNNEL_NAME },
+                wireGuardConfig = wireGuardConfig.trim()
             )
         )
     }
@@ -189,23 +180,6 @@ fun ClientSetupScreen(
                     readOnly = privacyMode,
                     supportingText = { Text(stringResource(R.string.server_address_support)) }
                 )
-
-                // Провайдер TURN-creds (-provider). Пока только vk; список расширяемый.
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(stringResource(R.string.provider_title), style = MaterialTheme.typography.bodyMedium)
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        Provider.ALL.forEachIndexed { idx, value ->
-                            SegmentedButton(
-                                selected = saved.provider == value,
-                                onClick = {
-                                    HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                    settingsViewModel.setProvider(value)
-                                },
-                                shape = SegmentedButtonDefaults.itemShape(index = idx, count = Provider.ALL.size)
-                            ) { Text(providerLabel(value)) }
-                        }
-                    }
-                }
 
                 if (saved.provider == Provider.VK) {
                     OutlinedTextField(
@@ -449,17 +423,8 @@ fun ClientSetupScreen(
                     supportingText = { Text(stringResource(R.string.wireguard_config_support)) }
                 )
 
-                SplitTunnelSettings(
-                    mode = saved.splitTunnelMode,
-                    apps = splitTunnelApps,
-                    privacyMode = privacyMode,
-                    onModeChange = {
-                        HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                        settingsViewModel.setSplitTunnelMode(it)
-                    },
-                    onAppsChange = { splitTunnelApps = it },
-                    onPickApps = { showSplitAppPicker = true }
-                )
+                // Split-tunneling настраивается на главном экране (SplitTunnelSheet),
+                // здесь — только WG-конфиг и тоггл логов.
 
                 SwitchRow(
                     label = stringResource(R.string.logs_enabled),
@@ -654,163 +619,7 @@ fun ClientSetupScreen(
             }
         }
     }
-
-    if (showSplitAppPicker) {
-        SplitTunnelAppPickerDialog(
-            selected = splitTunnelApps.toPackageSet(),
-            onDismiss = { showSplitAppPicker = false },
-            onApply = { selected ->
-                splitTunnelApps = selected.sorted().joinToString("\n")
-                showSplitAppPicker = false
-            }
-        )
-    }
 }
-
-@Composable
-private fun SplitTunnelSettings(
-    mode: String,
-    apps: String,
-    privacyMode: Boolean,
-    onModeChange: (String) -> Unit,
-    onAppsChange: (String) -> Unit,
-    onPickApps: () -> Unit
-) {
-    val context = LocalContext.current
-    Text(stringResource(R.string.split_tunnel_title), style = MaterialTheme.typography.bodyMedium)
-    Text(
-        stringResource(R.string.split_tunnel_desc),
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-    val options = listOf(
-        SplitTunnelMode.ALL to stringResource(R.string.split_tunnel_all),
-        SplitTunnelMode.INCLUDE to stringResource(R.string.split_tunnel_include),
-        SplitTunnelMode.EXCLUDE to stringResource(R.string.split_tunnel_exclude)
-    )
-    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-        options.forEachIndexed { index, (value, label) ->
-            SegmentedButton(
-                selected = mode == value,
-                onClick = { onModeChange(value) },
-                shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size)
-            ) { Text(label) }
-        }
-    }
-    if (mode != SplitTunnelMode.ALL) {
-        Button(
-            onClick = {
-                HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                onPickApps()
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !privacyMode
-        ) {
-            Text(stringResource(R.string.split_tunnel_pick_apps))
-        }
-        OutlinedTextField(
-            value = apps.redact(privacyMode),
-            onValueChange = { if (!privacyMode) onAppsChange(it) },
-            label = { Text(stringResource(R.string.split_tunnel_apps_label)) },
-            placeholder = { Text(stringResource(R.string.split_tunnel_apps_placeholder)) },
-            modifier = Modifier.fillMaxWidth(),
-            minLines = 3,
-            readOnly = privacyMode,
-            supportingText = { Text(stringResource(R.string.split_tunnel_apps_support)) }
-        )
-    }
-}
-
-@Composable
-private fun SplitTunnelAppPickerDialog(
-    selected: Set<String>,
-    onDismiss: () -> Unit,
-    onApply: (Set<String>) -> Unit
-) {
-    val context = LocalContext.current
-    var selectedApps by remember(selected) { mutableStateOf(selected) }
-    val apps = remember { context.installedInternetApps() }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.split_tunnel_pick_title)) },
-        text = {
-            LazyColumn(modifier = Modifier.heightIn(max = 420.dp)) {
-                items(apps) { app ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Checkbox(
-                            checked = app.packageName in selectedApps,
-                            onCheckedChange = { checked ->
-                                selectedApps = if (checked) selectedApps + app.packageName
-                                else selectedApps - app.packageName
-                            }
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(app.label, style = MaterialTheme.typography.bodyMedium)
-                            Text(
-                                app.packageName,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onApply(selectedApps) }) {
-                Text(stringResource(R.string.split_tunnel_done))
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
-        }
-    )
-}
-
-private data class AppChoice(
-    val label: String,
-    val packageName: String
-)
-
-private fun android.content.Context.installedInternetApps(): List<AppChoice> {
-    val pm = packageManager
-    val flags = android.content.pm.PackageManager.GET_PERMISSIONS
-    val packages = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-        pm.getInstalledPackages(android.content.pm.PackageManager.PackageInfoFlags.of(flags.toLong()))
-    } else {
-        @Suppress("DEPRECATION")
-        pm.getInstalledPackages(flags)
-    }
-    return packages
-        .asSequence()
-        .filter { info ->
-            info.packageName != packageName &&
-                info.requestedPermissions?.contains(android.Manifest.permission.INTERNET) == true
-        }
-        .map { info ->
-            val appInfo = info.applicationInfo
-            AppChoice(
-                label = appInfo?.loadLabel(pm)?.toString()?.takeIf { it.isNotBlank() }
-                    ?: info.packageName,
-                packageName = info.packageName
-            )
-        }
-        .distinctBy { it.packageName }
-        .sortedWith(compareBy<AppChoice> { it.label.lowercase() }.thenBy { it.packageName })
-        .toList()
-}
-
-private fun String.toPackageSet(): Set<String> =
-    split(',', '\n', ' ', ';')
-        .map { it.trim() }
-        .filter { it.isNotEmpty() }
-        .toSet()
 
 @Composable
 private fun SwitchRow(
@@ -840,12 +649,6 @@ private fun SwitchRow(
         }
         Switch(checked = checked, enabled = enabled, onCheckedChange = onCheckedChange)
     }
-}
-
-@Composable
-private fun providerLabel(value: String): String = when (value) {
-    Provider.VK -> stringResource(R.string.provider_vk)
-    else -> value
 }
 
 @Composable

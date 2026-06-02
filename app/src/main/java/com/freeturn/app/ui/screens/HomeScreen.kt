@@ -35,7 +35,6 @@ import androidx.compose.ui.res.stringResource
 import com.freeturn.app.R
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -45,8 +44,9 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemColors
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -54,7 +54,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberStandardBottomSheetState
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
@@ -85,8 +87,11 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import com.freeturn.app.data.SplitTunnelMode
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.viewmodel.ProxyState
@@ -159,11 +164,21 @@ fun HomeScreen(
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
     val profilesSnapshot by settingsViewModel.profilesSnapshot.collectAsStateWithLifecycle()
     val showBottomSheet = rememberSaveable { mutableStateOf(false) }
-    val showProfilesSheet = rememberSaveable { mutableStateOf(false) }
+    val showSplitSheet = rememberSaveable { mutableStateOf(false) }
     var showEasterEgg by rememberSaveable { mutableStateOf(false) }
     val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val profilesSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val splitSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    // Standard bottom sheet: свёрнутый peek = карточка активного профиля,
+    // тянется вверх до полного списка серверов. skipHiddenState — sheet всегда
+    // виден, не прячется полностью.
+    val sheetScaffoldState = rememberBottomSheetScaffoldState(
+        bottomSheetState = rememberStandardBottomSheetState(
+            initialValue = SheetValue.PartiallyExpanded,
+            skipHiddenState = true
+        )
+    )
     // WireGuard-туннелю нужно согласие пользователя на VPN. После выдачи —
     // запускаем прокси (а ProxyService уже поднимет WG поверх него).
     val wireGuardPermissionLauncher = rememberLauncherForActivityResult(
@@ -185,7 +200,21 @@ fun HomeScreen(
         proxyViewModel.startProxy()
     }
 
-    Scaffold(
+    val sheetColor = MaterialTheme.colorScheme.surfaceContainerLow
+    BottomSheetScaffold(
+        scaffoldState = sheetScaffoldState,
+        sheetPeekHeight = 132.dp,
+        sheetContainerColor = sheetColor,
+        sheetContent = {
+            ProfilesSheetContent(
+                settingsViewModel = settingsViewModel,
+                snapshot = profilesSnapshot,
+                privacyMode = privacyMode,
+                onCollapse = {
+                    scope.launch { sheetScaffoldState.bottomSheetState.partialExpand() }
+                }
+            )
+        },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.turn_proxy_title)) },
@@ -270,41 +299,7 @@ fun HomeScreen(
             )
 
             if (isConfigured) {
-                Spacer(Modifier.height(40.dp))
-
-                ElevatedCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp)
-                ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Text(stringResource(R.string.current_settings), style = MaterialTheme.typography.titleSmall)
-                        Spacer(Modifier.height(12.dp))
-                        ConfigRow(stringResource(R.string.server), clientConfig.serverAddress.redact(privacyMode))
-                        ConfigRow(stringResource(R.string.threads), "${clientConfig.threads}")
-                        ConfigRow(stringResource(R.string.streams_per_cred_label), "${clientConfig.streamsPerCred}")
-                        ConfigRow(
-                            stringResource(R.string.tcp_forward_mode),
-                            if (clientConfig.tcpForward) {
-                                if (clientConfig.bond) "TCP + bond" else "TCP"
-                            } else "UDP"
-                        )
-                        ConfigRow(
-                            stringResource(R.string.transport_protocol),
-                            if (clientConfig.useUdp) stringResource(R.string.udp)
-                            else stringResource(R.string.tcp)
-                        )
-                        ConfigRow(stringResource(R.string.local_port), clientConfig.localPort.redact(privacyMode))
-                        if (clientConfig.wireGuardActive) {
-                            ConfigRow(
-                                stringResource(R.string.tunnel_transport_title),
-                                stringResource(R.string.transport_wireguard)
-                            )
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(32.dp))
 
                 Row(
                     modifier = Modifier
@@ -349,28 +344,41 @@ fun HomeScreen(
             }
 
             Spacer(Modifier.height(32.dp))
-            // Резерв под прилипший к низу переключатель — он виден всегда.
-            Spacer(Modifier.height(96.dp))
         }
 
-        // Прилипший к низу переключатель — точка входа в управление профилями.
-        // Виден всегда: даже без сохранённых профилей показывает «Несохранённая
-        // конфигурация» и открывает sheet с действиями save/import.
-        ActiveProfileBar(
-            snapshot = profilesSnapshot,
-            onSwitch = {
-                HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                showProfilesSheet.value = true
-            },
+        // Ссылка-индикатор split-tunneling прямо над свёрнутым листом сервера.
+        Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-        )
+                .padding(bottom = 12.dp)
+                .clip(MaterialTheme.shapes.large)
+                .clickable {
+                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                    showSplitSheet.value = true
+                }
+                .heightIn(min = 48.dp)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = if (clientConfig.splitTunnelMode == SplitTunnelMode.ALL)
+                    stringResource(R.string.split_tunnel_status_off)
+                else stringResource(R.string.split_tunnel_status_on),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Icon(
+                painterResource(R.drawable.unfold_more_24px),
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         }
     }
 
     if (showBottomSheet.value) {
-        val sheetColor = MaterialTheme.colorScheme.surfaceContainerLow
         ModalBottomSheet(
             onDismissRequest = { showBottomSheet.value = false },
             sheetState = bottomSheetState,
@@ -389,18 +397,18 @@ fun HomeScreen(
         }
     }
 
-    if (showProfilesSheet.value) {
-        val sheetColor = MaterialTheme.colorScheme.surfaceContainerLow
+    if (showSplitSheet.value) {
         ModalBottomSheet(
-            onDismissRequest = { showProfilesSheet.value = false },
-            sheetState = profilesSheetState,
+            onDismissRequest = { showSplitSheet.value = false },
+            sheetState = splitSheetState,
             containerColor = sheetColor
         ) {
-            com.freeturn.app.ui.screens.ProfilesSheetContent(
+            SplitTunnelSheetContent(
                 settingsViewModel = settingsViewModel,
-                snapshot = profilesSnapshot,
-                containerColor = sheetColor,
-                onClose = { showProfilesSheet.value = false }
+                mode = clientConfig.splitTunnelMode,
+                apps = clientConfig.splitTunnelApps,
+                privacyMode = privacyMode,
+                containerColor = sheetColor
             )
         }
     }
@@ -891,66 +899,6 @@ private fun RepoLinkItem(
  * Виден всегда: с сохранённым активным профилем показывает его имя, без — лейбл
  * «несохранённая конфигурация» с приглашением открыть sheet.
  */
-@Composable
-private fun ActiveProfileBar(
-    snapshot: com.freeturn.app.data.ProfilesSnapshot,
-    onSwitch: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val active = snapshot.active
-    val title: String = active?.name ?: stringResource(R.string.profile_unsaved_label)
-    val subtitle: String? = if (active != null) stringResource(R.string.profile_active_label) else null
-
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .navigationBarsPadding(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 3.dp,
-        onClick = onSwitch
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(
-                    painterResource(R.drawable.manage_accounts_24px),
-                    contentDescription = null,
-                    tint = if (active != null) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Column {
-                    if (subtitle != null) {
-                        Text(
-                            subtitle,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Text(
-                        title,
-                        style = MaterialTheme.typography.titleSmall
-                    )
-                }
-            }
-            Icon(
-                painterResource(R.drawable.arrow_forward_24px),
-                contentDescription = stringResource(R.string.profile_switch_action),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
 internal fun String.redact(enabled: Boolean) = if (enabled) "••••••" else this
 
 /**
@@ -986,18 +934,3 @@ private fun rememberProxyUptime(connectedSince: Long?): String? {
     return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%02d:%02d".format(m, s)
 }
 
-@Composable
-private fun ConfigRow(label: String, value: String) {
-    Row(
-        horizontalArrangement = Arrangement.SpaceBetween,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(value, style = MaterialTheme.typography.bodySmall)
-    }
-    Spacer(Modifier.height(4.dp))
-}
