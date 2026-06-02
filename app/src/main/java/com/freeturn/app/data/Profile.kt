@@ -23,7 +23,9 @@ data class Profile(
 
 data class ProfilesSnapshot(
     val list: List<Profile> = emptyList(),
-    val activeId: String? = null
+    val activeId: String? = null,
+    /** false = initial-значение stateIn до первой эмиссии DataStore. */
+    val loaded: Boolean = false
 ) {
     val active: Profile? get() = list.firstOrNull { it.id == activeId }
 }
@@ -136,7 +138,7 @@ internal object ProfileJson {
                     if (it in TunnelTransport.ALL) it else TunnelTransport.WIREGUARD
                 },
                 wireGuardConfig = cliO.optString("wireGuardConfig"),
-                wireGuardTunnelName = cliO.optString("wireGuardTunnelName").ifBlank { "freeturn-wg" },
+                wireGuardTunnelName = cliO.optString("wireGuardTunnelName").ifBlank { TunnelTransport.DEFAULT_TUNNEL_NAME },
                 splitTunnelMode = cliO.optString("splitTunnelMode", SplitTunnelMode.ALL).let {
                     if (it in SplitTunnelMode.VALUES) it else SplitTunnelMode.ALL
                 },

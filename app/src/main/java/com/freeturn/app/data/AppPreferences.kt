@@ -57,6 +57,8 @@ object ObfProfile {
  */
 object TunnelTransport {
     const val WIREGUARD = "wireguard"
+    /** Имя WG-туннеля по умолчанию (GoBackend). */
+    const val DEFAULT_TUNNEL_NAME = "freeturn-wg"
     val ALL = listOf(WIREGUARD)
 }
 
@@ -110,7 +112,7 @@ data class ClientConfig(
     /** Конфиг WireGuard (.conf). Пусто = WG-туннель не поднимается. */
     val wireGuardConfig: String = "",
     /** Имя WG-туннеля для GoBackend. */
-    val wireGuardTunnelName: String = "freeturn-wg",
+    val wireGuardTunnelName: String = TunnelTransport.DEFAULT_TUNNEL_NAME,
     /** Режим split-tunneling: all | include | exclude. */
     val splitTunnelMode: String = SplitTunnelMode.ALL,
     /** Список package-имён для include/exclude (разделители: запятая/пробел/перенос строки). */
@@ -229,7 +231,8 @@ class AppPreferences(context: Context) {
                     if (it in TunnelTransport.ALL) it else TunnelTransport.WIREGUARD
                 },
                 wireGuardConfig = prefs[CLIENT_WG_CONFIG] ?: "",
-                wireGuardTunnelName = (prefs[CLIENT_WG_TUNNEL_NAME] ?: "freeturn-wg").ifBlank { "freeturn-wg" },
+                wireGuardTunnelName = (prefs[CLIENT_WG_TUNNEL_NAME] ?: TunnelTransport.DEFAULT_TUNNEL_NAME)
+                    .ifBlank { TunnelTransport.DEFAULT_TUNNEL_NAME },
                 splitTunnelMode = (prefs[CLIENT_SPLIT_TUNNEL_MODE] ?: SplitTunnelMode.ALL).let {
                     if (it in SplitTunnelMode.VALUES) it else SplitTunnelMode.ALL
                 },
@@ -358,7 +361,8 @@ class AppPreferences(context: Context) {
                 if (config.tunnelTransport in TunnelTransport.ALL) config.tunnelTransport
                 else TunnelTransport.WIREGUARD
             prefs[CLIENT_WG_CONFIG] = config.wireGuardConfig.trim()
-            prefs[CLIENT_WG_TUNNEL_NAME] = config.wireGuardTunnelName.trim().ifBlank { "freeturn-wg" }
+            prefs[CLIENT_WG_TUNNEL_NAME] =
+                config.wireGuardTunnelName.trim().ifBlank { TunnelTransport.DEFAULT_TUNNEL_NAME }
             prefs[CLIENT_SPLIT_TUNNEL_MODE] =
                 if (config.splitTunnelMode in SplitTunnelMode.VALUES) config.splitTunnelMode
                 else SplitTunnelMode.ALL
@@ -395,7 +399,8 @@ class AppPreferences(context: Context) {
         .map { prefs ->
             ProfilesSnapshot(
                 list = ProfileJson.decodeList(prefs[PROFILES_JSON]),
-                activeId = prefs[ACTIVE_PROFILE_ID]?.takeIf { it.isNotBlank() }
+                activeId = prefs[ACTIVE_PROFILE_ID]?.takeIf { it.isNotBlank() },
+                loaded = true
             )
         }
 
