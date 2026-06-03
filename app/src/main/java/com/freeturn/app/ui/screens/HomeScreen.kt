@@ -54,7 +54,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberStandardBottomSheetState
@@ -80,7 +79,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
@@ -166,7 +164,6 @@ fun HomeScreen(
     val profilesSnapshot by settingsViewModel.profilesSnapshot.collectAsStateWithLifecycle()
     val showBottomSheet = rememberSaveable { mutableStateOf(false) }
     val showSplitSheet = rememberSaveable { mutableStateOf(false) }
-    var showEasterEgg by rememberSaveable { mutableStateOf(false) }
     val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val splitSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val snackbarHostState = remember { SnackbarHostState() }
@@ -389,11 +386,7 @@ fun HomeScreen(
                 settingsViewModel = settingsViewModel,
                 containerColor = sheetColor,
                 privacyMode = privacyMode,
-                onPrivacyModeChange = { settingsViewModel.setPrivacyMode(it) },
-                onEasterEgg = {
-                    showBottomSheet.value = false
-                    showEasterEgg = true
-                }
+                onPrivacyModeChange = { settingsViewModel.setPrivacyMode(it) }
             )
         }
     }
@@ -417,12 +410,6 @@ fun HomeScreen(
     }
 
     UpdateDialogs(settingsViewModel)
-
-    if (showEasterEgg) {
-        com.freeturn.app.ui.screens.easteregg.EasterEggDialog(
-            onDismiss = { showEasterEgg = false }
-        )
-    }
 }
 
 // Диалоги обновления
@@ -591,14 +578,12 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
 
 // Bottom sheet
 
-@Suppress("AssignedValueIsNeverRead")
 @Composable
 private fun InfoBottomSheet(
     settingsViewModel: SettingsViewModel,
     containerColor: Color,
     privacyMode: Boolean,
     onPrivacyModeChange: (Boolean) -> Unit,
-    onEasterEgg: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
@@ -745,26 +730,11 @@ private fun InfoBottomSheet(
             )
         }
 
-        // Версия — 7 быстрых тапов открывают пасхалку
         item {
-            val tapTimes = remember { mutableStateOf<List<Long>>(emptyList()) }
             Text(
                 text = "v$appVersion",
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(
-                        indication = null,
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
-                    ) {
-                        val now = android.os.SystemClock.uptimeMillis()
-                        val recent = (tapTimes.value + now).filter { now - it <= 2500 }
-                        tapTimes.value = recent
-                        if (recent.size >= 7) {
-                            tapTimes.value = emptyList()
-                            HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                            onEasterEgg()
-                        }
-                    }
                     .padding(vertical = 16.dp),
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.labelSmall,
