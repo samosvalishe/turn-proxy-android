@@ -19,10 +19,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -31,7 +34,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -46,6 +53,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.data.Profile
@@ -89,17 +97,26 @@ fun ProfilesSheetContent(
                 .padding(horizontal = 24.dp, vertical = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                // Пока snapshot не загружен - пустая строка (держит высоту строки),
-                // чтобы на холодном старте не мигало «несохранённый».
-                when {
-                    active != null -> active.name
-                    snapshot.loaded -> stringResource(R.string.profile_unsaved_label)
-                    else -> ""
-                },
-                style = MaterialTheme.typography.headlineMedium,
-                textAlign = TextAlign.Center
-            )
+            val profileName = when {
+                active != null -> active.name
+                snapshot.loaded -> stringResource(R.string.profile_unsaved_label)
+                else -> ""
+            }
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(),
+                tooltip = { PlainTooltip { Text(profileName) } },
+                state = rememberTooltipState(),
+                enableUserInput = active != null
+            ) {
+                Text(
+                    profileName,
+                    style = MaterialTheme.typography.titleLarge,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
             val sub = active?.let {
                 val addr = (it.client.serverAddress.takeIf { a -> a.isNotBlank() }
                     ?: it.ssh.ip.takeIf { a -> a.isNotBlank() })?.redact(privacyMode)
@@ -279,7 +296,6 @@ private fun ProfileRow(
     onRename: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    val context = LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -358,22 +374,25 @@ private fun ProviderChip(
 ) {
     val context = LocalContext.current
     var expanded by remember { mutableStateOf(false) }
-    Box(modifier = modifier) {
-        AssistChip(
-            onClick = {
-                HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                expanded = true
-            },
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = {
+            HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+            expanded = it
+        },
+        modifier = modifier
+    ) {
+        FilterChip(
+            selected = true,
+            onClick = {},
             label = { Text(providerLabel(current)) },
-            trailingIcon = {
-                Icon(
-                    painterResource(R.drawable.arrow_drop_down_24px),
-                    contentDescription = stringResource(R.string.profiles_provider_label),
-                    modifier = Modifier.size(18.dp)
-                )
-            }
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+            modifier = Modifier.menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
         )
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
             Provider.ALL.forEach { value ->
                 DropdownMenuItem(
                     text = { Text(providerLabel(value)) },

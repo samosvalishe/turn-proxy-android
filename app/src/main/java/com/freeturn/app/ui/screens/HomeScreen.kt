@@ -201,7 +201,7 @@ fun HomeScreen(
     val sheetColor = MaterialTheme.colorScheme.surfaceContainerLow
     BottomSheetScaffold(
         scaffoldState = sheetScaffoldState,
-        sheetPeekHeight = 132.dp,
+        sheetPeekHeight = 112.dp,
         sheetContainerColor = sheetColor,
         sheetContent = {
             ProfilesSheetContent(
