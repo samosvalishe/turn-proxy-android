@@ -600,10 +600,9 @@ class ProxyService : Service() {
                 kotlinx.coroutines.delay(2_000)
                 val oldKey = lastPhysicalNetworkKey
                 val newKey = physicalNetworkKey(cm)
-                if (oldKey == newKey) {
-                    ProxyServiceState.addLog("=== СЕТЬ: физическая сеть не изменилась ($reason) ===")
-                    return@launch
-                }
+                // Ключ тот же — ожидаемый no-op. onCapabilitiesChanged сыплет
+                // десятки раз/мин (сигнал, link speed, валидация инета), не логаем.
+                if (oldKey == newKey) return@launch
                 lastPhysicalNetworkKey = newKey
                 if (newKey == null) {
                     ProxyServiceState.addLog("=== СЕТЬ: физическая сеть недоступна ($reason) ===")
@@ -653,9 +652,19 @@ class ProxyService : Service() {
     }
 
     /**
-     * Стабильный ключ текущего набора ФИЗИЧЕСКИХ сетей (без VPN): транспорт +
-     * имя интерфейса + отсортированные link-адреса. Меняется при реальном
-     * хендовере сети; не меняется при поднятии/опускании WG-интерфейса.
+     * Стабильный ключ ОДНОЙ приоритетной физической сети (без VPN): транспорт +
+     * имя интерфейса. Меняется при реальном хендовере (Wi-Fi↔LTE, смена
+     * интерфейса); не меняется при поднятии/опускании WG-интерфейса.
+     *
+     * ВАЖНО — берём только ПРИОРИТЕТНУЮ сеть, а не весь набор allNetworks. При
+     * активном Wi-Fi Android держит cellular в standby и то поднимает, то роняет
+     * её в фоне. Набор флапал (`wifi|wlan0` ↔ `cellular|rmnet0;wifi|wlan0`) → ключ
+     * прыгал → ложная «смена сети» → teardown ядра + watchdog-рестарт каждые пару
+     * минут, хотя активная сеть не менялась. Приоритет ethernet>wifi>cellular>bt
+     * = что реально несёт трафик; фоновый флап cellular ключ не трогает.
+     *
+     * link-адреса тоже НЕ в ключе: IPv6 SLAAC/privacy ротируются, DHCP-lease
+     * обновляется — всё на той же сети. Реальный хендовер меняет транспорт/iface.
      */
     private fun physicalNetworkKey(cm: ConnectivityManager): String? {
         // allNetworks deprecated с API 31, но это единственный синхронный способ
@@ -668,23 +677,19 @@ class ProxyService : Service() {
                 !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)) {
                 return@mapNotNull null
             }
-            val transports = buildList {
-                if (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) add("wifi")
-                if (caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)) add("cellular")
-                if (caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)) add("ethernet")
-                if (caps.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH)) add("bluetooth")
+            // Приоритет = индекс: меньше = важнее. Несколько транспортов у одной
+            // сети — берём самый приоритетный.
+            val (priority, transport) = when {
+                caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> 0 to "ethernet"
+                caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> 1 to "wifi"
+                caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> 2 to "cellular"
+                caps.hasTransport(NetworkCapabilities.TRANSPORT_BLUETOOTH) -> 3 to "bluetooth"
+                else -> return@mapNotNull null
             }
-            if (transports.isEmpty()) return@mapNotNull null
-            val lp = cm.getLinkProperties(network)
-            val iface = lp?.interfaceName.orEmpty()
-            val addresses = lp?.linkAddresses
-                ?.map { it.address.hostAddress.orEmpty() }
-                ?.filter { it.isNotBlank() }
-                ?.sorted()
-                ?.joinToString(",")
-                .orEmpty()
-            "${transports.joinToString("+")}|$iface|$addresses"
-        }.sorted().joinToString(";").ifBlank { null }
+            val iface = cm.getLinkProperties(network)?.interfaceName.orEmpty()
+            // tie-break по iface, чтобы выбор был детерминированным при равном приоритете.
+            Triple(priority, iface, "$transport|$iface")
+        }.minWithOrNull(compareBy({ it.first }, { it.second }))?.third
     }
 
     private fun unregisterNetworkCallback() {
