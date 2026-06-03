@@ -652,19 +652,10 @@ class ProxyService : Service() {
     }
 
     /**
-     * Стабильный ключ ОДНОЙ приоритетной физической сети (без VPN): транспорт +
-     * имя интерфейса. Меняется при реальном хендовере (Wi-Fi↔LTE, смена
-     * интерфейса); не меняется при поднятии/опускании WG-интерфейса.
-     *
-     * ВАЖНО — берём только ПРИОРИТЕТНУЮ сеть, а не весь набор allNetworks. При
-     * активном Wi-Fi Android держит cellular в standby и то поднимает, то роняет
-     * её в фоне. Набор флапал (`wifi|wlan0` ↔ `cellular|rmnet0;wifi|wlan0`) → ключ
-     * прыгал → ложная «смена сети» → teardown ядра + watchdog-рестарт каждые пару
-     * минут, хотя активная сеть не менялась. Приоритет ethernet>wifi>cellular>bt
-     * = что реально несёт трафик; фоновый флап cellular ключ не трогает.
-     *
-     * link-адреса тоже НЕ в ключе: IPv6 SLAAC/privacy ротируются, DHCP-lease
-     * обновляется — всё на той же сети. Реальный хендовер меняет транспорт/iface.
+     * Ключ ОДНОЙ приоритетной физсети (транспорт + iface). Берём приоритетную, а не
+     * весь allNetworks: при активном Wi-Fi cellular флапает в фоне, набор прыгал бы →
+     * ложная «смена сети» → лишний рестарт. link-адреса не в ключе — ротация
+     * IPv6/DHCP идёт на той же сети. Реальный хендовер меняет транспорт/iface.
      */
     private fun physicalNetworkKey(cm: ConnectivityManager): String? {
         // allNetworks deprecated с API 31, но это единственный синхронный способ
@@ -677,8 +668,7 @@ class ProxyService : Service() {
                 !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)) {
                 return@mapNotNull null
             }
-            // Приоритет = индекс: меньше = важнее. Несколько транспортов у одной
-            // сети — берём самый приоритетный.
+            // Приоритет = индекс, меньше важнее.
             val (priority, transport) = when {
                 caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> 0 to "ethernet"
                 caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> 1 to "wifi"
@@ -687,7 +677,7 @@ class ProxyService : Service() {
                 else -> return@mapNotNull null
             }
             val iface = cm.getLinkProperties(network)?.interfaceName.orEmpty()
-            // tie-break по iface, чтобы выбор был детерминированным при равном приоритете.
+            // tie-break по iface — детерминированный выбор при равном приоритете.
             Triple(priority, iface, "$transport|$iface")
         }.minWithOrNull(compareBy({ it.first }, { it.second }))?.third
     }

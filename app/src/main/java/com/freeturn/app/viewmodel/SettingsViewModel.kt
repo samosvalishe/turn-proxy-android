@@ -107,11 +107,17 @@ class SettingsViewModel(
         viewModelScope.launch { prefs.setOnboardingDone(true) }
     }
 
-    fun saveClientConfig(config: ClientConfig) {
+    // expectedActiveId — профиль, который правил экран. Сменился за время дебаунса —
+    // сейв отбрасываем, иначе старые поля затрут чужой профиль. null — онбординг.
+    fun saveClientConfig(config: ClientConfig, expectedActiveId: String? = null) {
         viewModelScope.launch {
-            profileMutex.withLock { prefs.saveClientConfig(config) }
-            // Тоггл логов применяем сразу, не дожидаясь рестарта прокси.
-            ProxyServiceState.setLogsEnabled(config.logsEnabled)
+            val saved = profileMutex.withLock {
+                val activeId = prefs.profilesSnapshot.first().activeId
+                if (expectedActiveId != null && expectedActiveId != activeId) return@withLock false
+                persistClient(config)
+                true
+            }
+            if (saved) ProxyServiceState.setLogsEnabled(config.logsEnabled)
         }
     }
 
@@ -123,7 +129,7 @@ class SettingsViewModel(
             profileMutex.withLock {
                 val current = prefs.clientConfigFlow.first()
                 if (current.provider == value) return@withLock
-                prefs.saveClientConfig(current.copy(provider = value))
+                persistClient(current.copy(provider = value))
             }
         }
     }
@@ -133,7 +139,7 @@ class SettingsViewModel(
             profileMutex.withLock {
                 val current = prefs.clientConfigFlow.first()
                 if (current.dnsMode == value) return@withLock
-                prefs.saveClientConfig(current.copy(dnsMode = value))
+                persistClient(current.copy(dnsMode = value))
             }
         }
     }
@@ -143,7 +149,7 @@ class SettingsViewModel(
             profileMutex.withLock {
                 val current = prefs.clientConfigFlow.first()
                 if (current.useUdp == enabled) return@withLock
-                prefs.saveClientConfig(current.copy(useUdp = enabled))
+                persistClient(current.copy(useUdp = enabled))
             }
         }
     }
@@ -153,7 +159,7 @@ class SettingsViewModel(
             profileMutex.withLock {
                 val current = prefs.clientConfigFlow.first()
                 if (current.manualCaptcha == enabled) return@withLock
-                prefs.saveClientConfig(current.copy(manualCaptcha = enabled))
+                persistClient(current.copy(manualCaptcha = enabled))
             }
         }
     }
@@ -163,7 +169,7 @@ class SettingsViewModel(
             profileMutex.withLock {
                 val current = prefs.clientConfigFlow.first()
                 if (current.useCarrierDns == enabled) return@withLock
-                prefs.saveClientConfig(current.copy(useCarrierDns = enabled))
+                persistClient(current.copy(useCarrierDns = enabled))
             }
         }
     }
@@ -173,7 +179,7 @@ class SettingsViewModel(
             profileMutex.withLock {
                 val current = prefs.clientConfigFlow.first()
                 if (current.debugMode == enabled) return@withLock
-                prefs.saveClientConfig(current.copy(debugMode = enabled))
+                persistClient(current.copy(debugMode = enabled))
             }
         }
     }
@@ -183,7 +189,7 @@ class SettingsViewModel(
             profileMutex.withLock {
                 val current = prefs.clientConfigFlow.first()
                 if (current.magicSwitch == enabled) return@withLock
-                prefs.saveClientConfig(current.copy(magicSwitch = enabled))
+                persistClient(current.copy(magicSwitch = enabled))
             }
         }
     }
@@ -193,7 +199,7 @@ class SettingsViewModel(
             profileMutex.withLock {
                 val current = prefs.clientConfigFlow.first()
                 if (current.splitTunnelMode == value) return@withLock
-                prefs.saveClientConfig(current.copy(splitTunnelMode = value))
+                persistClient(current.copy(splitTunnelMode = value))
             }
         }
     }
@@ -204,7 +210,7 @@ class SettingsViewModel(
                 val current = prefs.clientConfigFlow.first()
                 val trimmed = value.trim()
                 if (current.splitTunnelApps == trimmed) return@withLock
-                prefs.saveClientConfig(current.copy(splitTunnelApps = trimmed))
+                persistClient(current.copy(splitTunnelApps = trimmed))
             }
         }
     }
@@ -214,7 +220,7 @@ class SettingsViewModel(
             profileMutex.withLock {
                 val current = prefs.clientConfigFlow.first()
                 if (current.logsEnabled == enabled) return@withLock
-                prefs.saveClientConfig(current.copy(logsEnabled = enabled))
+                persistClient(current.copy(logsEnabled = enabled))
             }
             ProxyServiceState.setLogsEnabled(enabled)
         }
@@ -222,7 +228,7 @@ class SettingsViewModel(
 
     fun saveProxyServerConfig(listen: String, connect: String) {
         viewModelScope.launch {
-            profileMutex.withLock { prefs.saveProxyConfig(listen, connect) }
+            profileMutex.withLock { prefs.saveProxyConfig(listen, connect); mirrorActiveProfile() }
         }
     }
 
@@ -254,10 +260,6 @@ class SettingsViewModel(
         }
     }
 
-    fun updateActiveProfileFromCurrent() {
-        viewModelScope.launch { profileMutex.withLock { mirrorActiveProfile() } }
-    }
-
     private suspend fun mirrorActiveProfile() {
         val current = prefs.profilesSnapshot.first()
         val activeId = current.activeId ?: return
@@ -278,6 +280,18 @@ class SettingsViewModel(
             else it
         }
         if (updated != current.list) prefs.saveProfiles(updated)
+    }
+
+    // Пишет legacy + зеркалит в активный профиль. Только под profileMutex; НЕ из
+    // applyProfile/deleteProfile (там грузится снимок, mirror словил бы гонку).
+    private suspend fun persistClient(config: ClientConfig) {
+        prefs.saveClientConfig(config)
+        mirrorActiveProfile()
+    }
+
+    private suspend fun persistServer(opts: AppPreferences.ServerOpts) {
+        prefs.saveServerOpts(opts)
+        mirrorActiveProfile()
     }
 
     fun renameProfile(id: String, name: String) {
@@ -363,7 +377,7 @@ class SettingsViewModel(
             val changed = profileMutex.withLock {
                 val current = prefs.clientConfigFlow.first()
                 if (current.bond == enabled) return@withLock false
-                prefs.saveClientConfig(current.copy(bond = enabled))
+                persistClient(current.copy(bond = enabled))
                 true
             }
             if (changed) orchestrator.restartProxyIfRunning()
@@ -387,7 +401,7 @@ class SettingsViewModel(
                 val latest = prefs.serverOptsFlow.first()
                 var next = latest.copy(obfProfile = profile)
                 if (generatedKey != null && next.obfKey.isBlank()) next = next.copy(obfKey = generatedKey)
-                if (next != latest) prefs.saveServerOpts(next)
+                if (next != latest) persistServer(next)
             }
             if (sync) orchestrator.restartServerIfRunning()
             orchestrator.restartProxyIfRunning()
@@ -399,7 +413,7 @@ class SettingsViewModel(
             val changed = profileMutex.withLock {
                 val current = prefs.clientConfigFlow.first()
                 if (current.syncServerSwitches == enabled) return@withLock false
-                prefs.saveClientConfig(current.copy(syncServerSwitches = enabled))
+                persistClient(current.copy(syncServerSwitches = enabled))
                 true
             }
             if (changed && enabled) {
@@ -415,7 +429,7 @@ class SettingsViewModel(
             val changed = profileMutex.withLock {
                 val current = prefs.serverOptsFlow.first()
                 if (current.obfKey == trimmed) return@withLock false
-                prefs.saveServerOpts(current.copy(obfKey = trimmed))
+                persistServer(current.copy(obfKey = trimmed))
                 true
             }
             if (!changed) return@launch
@@ -434,7 +448,7 @@ class SettingsViewModel(
             if (!storedMatches) {
                 profileMutex.withLock {
                     val latest = prefs.clientConfigFlow.first()
-                    if (latest.tcpForward != enabled) prefs.saveClientConfig(latest.copy(tcpForward = enabled))
+                    if (latest.tcpForward != enabled) persistClient(latest.copy(tcpForward = enabled))
                 }
             }
             if (current.syncServerSwitches) {

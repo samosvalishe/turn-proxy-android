@@ -44,7 +44,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -98,16 +97,18 @@ fun ClientSetupScreen(
 
     val context = LocalContext.current
 
-    var serverAddress by rememberSaveable(saved.serverAddress) { mutableStateOf(saved.serverAddress) }
-    var vkLink       by rememberSaveable(saved.vkLink)         { mutableStateOf(saved.vkLink) }
-    var threads      by rememberSaveable(saved.threads)        { mutableFloatStateOf(saved.threads.toFloat()) }
-    var streamsPerCred by rememberSaveable(saved.streamsPerCred) { mutableFloatStateOf(saved.streamsPerCred.toFloat()) }
-    var localPort    by rememberSaveable(saved.localPort)      { mutableStateOf(saved.localPort) }
-    var magicTurn by rememberSaveable(saved.magicTurn) { mutableStateOf(saved.magicTurn) }
-    var wireGuardTunnelName by rememberSaveable(saved.wireGuardTunnelName) { mutableStateOf(saved.wireGuardTunnelName) }
-    var wireGuardConfig by rememberSaveable(saved.wireGuardConfig) { mutableStateOf(saved.wireGuardConfig) }
-    var lastSliderInt by rememberSaveable { mutableIntStateOf(saved.threads) }
-    var lastStreamsInt by rememberSaveable { mutableIntStateOf(saved.streamsPerCred) }
+    // remember, НЕ rememberSaveable: rememberSaveable восстановил бы stale-поля из
+    // bundle при возврате на экран, и авто-сейв зеркалил бы их в чужой профиль.
+    var serverAddress by remember(saved.serverAddress) { mutableStateOf(saved.serverAddress) }
+    var vkLink       by remember(saved.vkLink)         { mutableStateOf(saved.vkLink) }
+    var threads      by remember(saved.threads)        { mutableFloatStateOf(saved.threads.toFloat()) }
+    var streamsPerCred by remember(saved.streamsPerCred) { mutableFloatStateOf(saved.streamsPerCred.toFloat()) }
+    var localPort    by remember(saved.localPort)      { mutableStateOf(saved.localPort) }
+    var magicTurn by remember(saved.magicTurn) { mutableStateOf(saved.magicTurn) }
+    var wireGuardTunnelName by remember(saved.wireGuardTunnelName) { mutableStateOf(saved.wireGuardTunnelName) }
+    var wireGuardConfig by remember(saved.wireGuardConfig) { mutableStateOf(saved.wireGuardConfig) }
+    var lastSliderInt by remember(saved.threads) { mutableIntStateOf(saved.threads) }
+    var lastStreamsInt by remember(saved.streamsPerCred) { mutableIntStateOf(saved.streamsPerCred) }
 
     // Автозаполнение адреса сервера из SSH-конфига если поле пустое
     LaunchedEffect(sshConfig.ip, proxyListen) {
@@ -116,6 +117,10 @@ fun ClientSetupScreen(
             serverAddress = "${sshConfig.ip}:$port"
         }
     }
+
+    // Профиль полей (синхронно с saved). Сейв сверит с активным — защита от гонки
+    // переключения за время дебаунса.
+    val fieldsProfileId = remember(saved) { settingsViewModel.profilesSnapshot.value.activeId }
 
     // Авто-сохранение с дебаунсом 600 мс для текстовых полей и ползунков
     LaunchedEffect(
@@ -134,7 +139,8 @@ fun ClientSetupScreen(
                 magicTurn     = magicTurn.trim(),
                 wireGuardTunnelName = wireGuardTunnelName.trim().ifBlank { TunnelTransport.DEFAULT_TUNNEL_NAME },
                 wireGuardConfig = wireGuardConfig.trim()
-            )
+            ),
+            fieldsProfileId
         )
     }
 
@@ -524,7 +530,7 @@ fun ClientSetupScreen(
                     // на каждом keystroke. Применение — отдельной кнопкой ниже, только когда
                     // ключ валидный (64 hex). Серверный ключ из serverOpts — источник истины:
                     // при внешнем обновлении (regen/probe) черновик пересинхронизируется.
-                    var obfKeyDraft by rememberSaveable(serverOpts.obfKey) {
+                    var obfKeyDraft by remember(serverOpts.obfKey) {
                         mutableStateOf(serverOpts.obfKey)
                     }
                     val draftValid = obfKeyDraft.matches(obfKeyRegex)

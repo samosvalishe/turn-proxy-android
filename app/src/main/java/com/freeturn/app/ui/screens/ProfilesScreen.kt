@@ -72,7 +72,6 @@ fun ProfilesSheetContent(
     onCollapse: () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val updatedMsg = stringResource(R.string.profile_updated_toast)
 
     var showSaveDialog by rememberSaveable { mutableStateOf(false) }
     var renameTarget by rememberSaveable { mutableStateOf<String?>(null) }
@@ -80,7 +79,6 @@ fun ProfilesSheetContent(
     var menuTarget by rememberSaveable { mutableStateOf<String?>(null) }
 
     val takenNames = remember(snapshot.list) { snapshot.list.map { it.name } }
-    val hasActive = snapshot.activeId != null
 
     val active = snapshot.active
 
@@ -166,24 +164,12 @@ fun ProfilesSheetContent(
                     stringResource(R.string.profiles_servers_title),
                     style = MaterialTheme.typography.titleMedium
                 )
-                Row {
-                    if (hasActive) {
-                        IconButton(onClick = {
-                            settingsViewModel.updateActiveProfileFromCurrent()
-                            android.widget.Toast.makeText(context, updatedMsg, android.widget.Toast.LENGTH_SHORT).show()
-                        }) {
-                            Icon(
-                                painterResource(R.drawable.cached_24px),
-                                contentDescription = stringResource(R.string.profile_update_current)
-                            )
-                        }
-                    }
-                    IconButton(onClick = { showSaveDialog = true }) {
-                        Icon(
-                            painterResource(R.drawable.save_24px),
-                            contentDescription = stringResource(R.string.profile_save_current)
-                        )
-                    }
+                // Правки авто-сохраняются в активный профиль. Тут — только новый.
+                IconButton(onClick = { showSaveDialog = true }) {
+                    Icon(
+                        painterResource(R.drawable.save_24px),
+                        contentDescription = stringResource(R.string.profile_save_current)
+                    )
                 }
             }
             LazyColumn(
