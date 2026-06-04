@@ -243,6 +243,31 @@ class SshRepository(
         }
     }
 
+    suspend fun wgInstall(): String? {
+        val cfg = activeSshConfig ?: return null
+        return when (val r = runCmd(cfg, "WireGuard install", ServerCommand.WgInstall)) {
+            is CmdResult.Err -> null
+            is CmdResult.Ok -> decodeWgConfig(r.kv["WG_CLIENT_CONFIG"])
+        }
+    }
+
+    suspend fun wgShowPeer(): String? {
+        val cfg = activeSshConfig ?: return null
+        return when (val r = runCmd(cfg, "WireGuard show peer", ServerCommand.WgShowPeer)) {
+            is CmdResult.Err -> null
+            is CmdResult.Ok -> decodeWgConfig(r.kv["WG_CLIENT_CONFIG"])
+        }
+    }
+
+    private fun decodeWgConfig(encoded: String?): String? {
+        if (encoded == null) return null
+        return try {
+            String(android.util.Base64.decode(encoded, android.util.Base64.DEFAULT))
+        } catch (_: IllegalArgumentException) {
+            encoded
+        }
+    }
+
     fun updateServerState(state: ServerState) {
         _serverState.value = state
     }

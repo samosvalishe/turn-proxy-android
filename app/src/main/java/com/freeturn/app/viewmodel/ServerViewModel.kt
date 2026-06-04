@@ -45,6 +45,12 @@ class ServerViewModel(
     private val _isRegeneratingObfKey = MutableStateFlow(false)
     val isRegeneratingObfKey: StateFlow<Boolean> = _isRegeneratingObfKey.asStateFlow()
 
+    private val _isWgWorking = MutableStateFlow(false)
+    val isWgWorking: StateFlow<Boolean> = _isWgWorking.asStateFlow()
+
+    private val _lastWgConfig = MutableStateFlow<String?>(null)
+    val lastWgConfig: StateFlow<String?> = _lastWgConfig.asStateFlow()
+
     fun connectSsh(config: SshConfig) {
         viewModelScope.launch {
             prefs.saveSshConfig(config)
@@ -88,6 +94,42 @@ class ServerViewModel(
                     startServer()
                     orchestrator.restartProxyIfRunning()
                 }
+            }
+        }
+    }
+
+    fun wgInstall() {
+        viewModelScope.launch {
+            if (_isWgWorking.value) return@launch
+            _isWgWorking.value = true
+            _lastWgConfig.value = null
+            try {
+                val config = sshRepository.wgInstall()
+                if (config != null) {
+                    val current = prefs.clientConfigFlow.first()
+                    prefs.saveClientConfig(current.copy(wireGuardConfig = config))
+                    _lastWgConfig.value = config
+                }
+            } finally {
+                _isWgWorking.value = false
+            }
+        }
+    }
+
+    fun wgShowPeer() {
+        viewModelScope.launch {
+            if (_isWgWorking.value) return@launch
+            _isWgWorking.value = true
+            _lastWgConfig.value = null
+            try {
+                val config = sshRepository.wgShowPeer()
+                if (config != null) {
+                    val current = prefs.clientConfigFlow.first()
+                    prefs.saveClientConfig(current.copy(wireGuardConfig = config))
+                    _lastWgConfig.value = config
+                }
+            } finally {
+                _isWgWorking.value = false
             }
         }
     }

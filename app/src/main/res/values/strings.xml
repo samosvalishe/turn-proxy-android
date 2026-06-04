@@ -243,6 +243,11 @@
     <string name="split_tunnel_status_off">Раздельное туннелирование выключено</string>
     <string name="split_tunnel_status_on">Раздельное туннелирование включено</string>
 
+    <!-- WireGuard server management -->
+    <string name="wg_install_btn">Установить WireGuard на сервер</string>
+    <string name="wg_show_peer_btn">Получить конфиг пира (WG)</string>
+    <string name="wg_config_saved">✅ Конфиг WireGuard сохранён в настройках клиента</string>
+
     <!-- Profiles sheet (servers) -->
     <string name="profiles_servers_title">Серверы</string>
     <string name="profiles_provider_label">Провайдер</string>

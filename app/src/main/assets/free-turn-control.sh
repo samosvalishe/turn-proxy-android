@@ -351,6 +351,81 @@ cmd_install() {
     if [ "$was_running" = "1" ] && [ "$cached" = "0" ]; then
         emit NEEDS_RESTART yes
     fi
+ # --- WireGuard auto-install section -------------------------------------
+
+    wg_conf="/etc/wireguard/wg0.conf"
+
+    # Проверка: установлен ли wg
+    if ! command -v wg >/dev/null 2>&1 || ! command -v wg-quick >/dev/null 2>&1; then
+        log "WireGuard not installed — installing"
+        if command -v apt >/dev/null 2>&1; then
+            apt update -y && apt install -y wireguard
+        elif command -v dnf >/dev/null 2>&1; then
+            dnf install -y wireguard-tools
+        elif command -v yum >/dev/null 2>&1; then
+            yum install -y epel-release && yum install -y wireguard-tools
+        elif command -v pacman >/dev/null 2>&1; then
+            pacman -Sy --noconfirm wireguard-tools
+        else
+            die "cannot install wireguard: unsupported package manager"
+        fi
+    fi
+
+    # Если конфиг уже есть — ничего не делаем, порт захардкожен - в ui по умолчанию такой
+    if [ ! -f "$wg_conf" ]; then
+        log "WireGuard config not found — creating new wg0.conf"
+
+        SERVER_PRIV=$(wg genkey)
+        SERVER_PUB=$(printf "%s" "$SERVER_PRIV" | wg pubkey)
+        CLIENT_PRIV=$(wg genkey)
+        CLIENT_PUB=$(printf "%s" "$CLIENT_PRIV" | wg pubkey)
+
+        # Создаём серверный конфиг
+        cat > "$wg_conf" <<EOF
+[Interface]
+Address = 172.16.25.1/24
+ListenPort = 40537
+PrivateKey = $SERVER_PRIV
+MTU = 1280
+
+[Peer]
+PublicKey = $CLIENT_PUB
+AllowedIPs = 172.16.25.10/32
+EOF
+
+        chmod 600 "$wg_conf"
+
+        # Сохраняем приватный ключ клиента
+        echo "$CLIENT_PRIV" > /etc/wireguard/client_priv.key
+        chmod 600 /etc/wireguard/client_priv.key
+
+        # Поднимаем интерфейс
+        wg-quick down wg0 2>/dev/null || true
+        wg-quick up wg0 || die "wg0 failed to start"
+
+        # Формируем клиентский конфиг
+        CLIENT_CONF=$(cat <<EOF
+[Interface]
+Address = 172.16.25.10/24
+DNS = 1.1.1.1, 8.8.8.8
+MTU = 1280
+PrivateKey = $CLIENT_PRIV
+
+[Peer]
+AllowedIPs = 0.0.0.0/0
+Endpoint = 127.0.0.1:9000
+PublicKey = $SERVER_PUB
+PersistentKeepalive = 20
+EOF
+)
+
+        emit WG_CLIENT_CONFIG "$(printf '%s' "$CLIENT_CONF" | base64 -w0)"
+    else
+        log "WireGuard already configured — skipping"
+    fi
+#-------------------------------------------
+
+
     echo "RESULT=ok"
     trap - EXIT
 }
@@ -603,6 +678,127 @@ cmd_gen_obf_key() {
     trap - EXIT
 }
 
+# --- WireGuard installer ------------------------------------------------------
+
+_wg_install_packages() {
+    if command -v apt >/dev/null 2>&1; then
+        apt update -y && apt install -y wireguard
+    elif command -v dnf >/dev/null 2>&1; then
+        dnf install -y wireguard-tools
+    elif command -v yum >/dev/null 2>&1; then
+        yum install -y epel-release && yum install -y wireguard-tools
+    elif command -v pacman >/dev/null 2>&1; then
+        pacman -Sy --noconfirm wireguard-tools
+    else
+        die "cannot install wireguard: unsupported package manager"
+    fi
+}
+
+_wg_generate_keys() {
+    SERVER_PRIV=$(wg genkey)
+    SERVER_PUB=$(printf "%s" "$SERVER_PRIV" | wg pubkey)
+    CLIENT_PRIV=$(wg genkey)
+    CLIENT_PUB=$(printf "%s" "$CLIENT_PRIV" | wg pubkey)
+}
+
+_wg_create_server_conf() {
+    cat > /etc/wireguard/wg0.conf <<EOF
+[Interface]
+Address = 172.16.25.1/24
+ListenPort = 40537
+PrivateKey = $SERVER_PRIV
+MTU = 1280
+[Peer]
+PublicKey = $CLIENT_PUB
+AllowedIPs = 172.16.25.10/32
+EOF
+
+    chmod 600 /etc/wireguard/wg0.conf
+}
+
+_wg_create_client_conf() {
+#так делать нельзя, но для себя делаем - дабы не забыть, сохраним
+echo "$CLIENT_PRIV" > /etc/wireguard/client_priv.key
+chmod 600 /etc/wireguard/client_priv.key
+    CLIENT_CONF=$(cat <<EOF
+[Interface]
+Address = 172.16.25.10/24
+DNS = 1.1.1.1, 8.8.8.8
+MTU = 1280
+PrivateKey = $CLIENT_PRIV
+[Peer]
+AllowedIPs = 0.0.0.0/0
+Endpoint = 127.0.0.1:9000
+PublicKey = $SERVER_PUB
+PersistentKeepalive = 20
+EOF
+)
+}
+
+cmd_wg_install() {
+    log "installing wireguard"
+    _wg_install_packages
+
+    log "generating keys"
+    _wg_generate_keys
+
+    log "creating server config"
+    _wg_create_server_conf
+
+    log "bringing up wg0"
+    wg-quick down wg0 2>/dev/null || true
+    wg-quick up wg0 || die "wg0 failed to start"
+
+    log "creating client config"
+    _wg_create_client_conf
+
+    emit WG_CLIENT_CONFIG "$(printf '%s' "$CLIENT_CONF" | base64 -w0)"
+    echo "RESULT=ok"
+    trap - EXIT
+}
+
+
+# --- WireGuard: забыл конфиг, подскажем ---------------------------------------------
+
+cmd_wg_show_peer() {
+    local conf="/etc/wireguard/wg0.conf"
+
+    [ -f "$conf" ] || die "wg0.conf not found (WireGuard not installed?)"
+
+    # Извлекаем ключи
+    SERVER_PRIV=$(grep -m1 '^PrivateKey' "$conf" | awk '{print $3}')
+    SERVER_PUB=$(printf "%s" "$SERVER_PRIV" | wg pubkey)
+
+    CLIENT_PUB=$(grep -m1 '^PublicKey' "$conf" | awk '{print $3}')
+
+    # Клиентский приватный ключ не хранится на сервере — но мы можем
+    # восстановить его, если он был сохранён в отдельный файл.
+    # Поэтому создадим файл при установке.
+    if [ -f /etc/wireguard/client_priv.key ]; then
+        CLIENT_PRIV=$(cat /etc/wireguard/client_priv.key)
+    else
+        die "client private key not found (cannot reconstruct peer config)"
+    fi
+
+    CLIENT_CONF=$(cat <<EOF
+[Interface]
+Address = 172.16.25.10/24
+DNS = 1.1.1.1, 8.8.8.8
+MTU = 1280
+PrivateKey = $CLIENT_PRIV
+[Peer]
+AllowedIPs = 0.0.0.0/0
+Endpoint = 127.0.0.1:9000
+PublicKey = $SERVER_PUB
+PersistentKeepalive = 20
+EOF
+)
+
+    emit WG_CLIENT_CONFIG "$(printf '%s' "$CLIENT_CONF" | base64 -w0)"
+    echo "RESULT=ok"
+    trap - EXIT
+}
+
 main() {
     [ $# -ge 1 ] || die "no subcommand"
     local sub=$1
@@ -614,6 +810,8 @@ main() {
         stop)         cmd_stop ;;
         logs)         cmd_logs "$@" ;;
         gen-obf-key)  cmd_gen_obf_key ;;
+        wg-install)   cmd_wg_install ;; 
+        wg-show-peer) cmd_wg_show_peer ;;
         *) die "unknown subcommand: $sub" ;;
     esac
 }
