@@ -36,6 +36,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
@@ -101,7 +102,7 @@ fun ProfilesSheetContent(
                 else -> ""
             }
             TooltipBox(
-                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(),
+                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
                 tooltip = { PlainTooltip { Text(profileName) } },
                 state = rememberTooltipState(),
                 enableUserInput = active != null
