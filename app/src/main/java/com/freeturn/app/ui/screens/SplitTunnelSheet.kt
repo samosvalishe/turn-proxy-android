@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
@@ -26,8 +28,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -52,6 +57,40 @@ import com.freeturn.app.ui.components.AppIcon
 import com.freeturn.app.ui.components.installedInternetApps
 import com.freeturn.app.ui.components.toPackageSet
 import com.freeturn.app.viewmodel.SettingsViewModel
+
+/**
+ * Общий модальный лист split-tunneling. Один источник для главного экрана и экрана
+ * «Режим подключения» — обёртка [ModalBottomSheet] вокруг [SplitTunnelSheetContent].
+ * Лист открывается сразу на полную высоту (skipPartiallyExpanded) и держит инсеты сам
+ * (contentWindowInsets = 0), чтобы не «вырастать» над клавиатурой при фокусе поиска.
+ */
+@Composable
+fun SplitTunnelModal(
+    settingsViewModel: SettingsViewModel,
+    mode: String,
+    apps: String,
+    locked: Boolean,
+    onDismiss: () -> Unit,
+    containerColor: Color = BottomSheetDefaults.ContainerColor
+) {
+    val sheetState = rememberBottomSheetState(
+        initialValue = SheetValue.Hidden,
+        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded)
+    )
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = containerColor,
+        contentWindowInsets = { WindowInsets(0, 0, 0, 0) }
+    ) {
+        SplitTunnelSheetContent(
+            settingsViewModel = settingsViewModel,
+            mode = mode,
+            apps = apps,
+            locked = locked
+        )
+    }
+}
 
 /**
  * Лист split-tunneling с главного экрана. Один общий sheet: свитч вкл/выкл,

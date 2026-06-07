@@ -18,8 +18,6 @@
     <string name="proxy_active_stop">Прокси активен - нажмите для остановки</string>
     <string name="proxy_error_restart">Ошибка - нажмите для повторного запуска</string>
     <string name="start_proxy">Запустить прокси</string>
-    <string name="connection">Соединение</string>
-    <string name="not_connected">Не сопряжено</string>
     <string name="android_client">Android-клиент</string>
     <string name="proxy_core">Прокси-ядро</string>
     <string name="btn_open">Открыть</string>
@@ -30,7 +28,6 @@
     <string name="cancel">Отмена</string>
 
     <!-- ClientSetupScreen -->
-    <string name="client_title">Клиент</string>
     <string name="connection_title">Подключение</string>
     <string name="server_address_label">Адрес turn-proxy сервера</string>
     <string name="server_address_placeholder">1.2.3.4:56000</string>
@@ -48,25 +45,20 @@
     <string name="streams_per_cred_format">Потоков на аккаунт: %1$d</string>
 
     <string name="tcp_forward_mode">Режим</string>
-    <string name="tcp_forward_mode_desc">Режим tcp для проброса Xray/VLESS/Trojan</string>
     <string name="client_bond">Bond (стрипинг TCP)</string>
     <string name="client_bond_desc">Распределяет TCP по smux-сессиям. Только в TCP-режиме.</string>
     <string name="obf_profile_title">Обфускация</string>
-    <string name="obf_profile_desc">Профиль маскировки</string>
     <string name="obf_none">Выкл</string>
     <string name="obf_rtpopus">rtpopus</string>
     <string name="provider_vk">VK Calls</string>
-    <string name="locked_disconnect_hint">Подключитесь к серверу, чтобы изменить</string>
     <string name="obf_key_empty_hint">Ключ не сгенерирован - нажмите кнопку ниже</string>
     <string name="obf_key_invalid_hint">Неверный формат - нужны 64 hex-символа</string>
-    <string name="obf_key_apply">Применить</string>
     <string name="obf_key_regen_in_progress">Генерация ключа…</string>
     <string name="server_sync_section">Синхронные настройки сервера</string>
     <string name="sync_server_switches">Синхронизировать с сервером</string>
     <string name="sync_server_switches_desc">При выкл. флаги меняются только у клиента, серверный процесс не перезапускается</string>
     <string name="sync_off_banner">Sync с сервером выключен. Cледите за совпадением вручную.</string>
     <string name="server_journal_title">Журнал</string>
-    <string name="server_journal_fetch">Показать журнал</string>
     <string name="server_journal_refresh">Обновить</string>
     <string name="server_journal_loading">Загрузка журнала…</string>
     <string name="server_journal_empty">Журнал пуст</string>
@@ -91,10 +83,6 @@
     <string name="no_logs">Нет логов</string>
 
     <!-- ServerManagementScreen -->
-    <string name="server_status">Статус сервера</string>
-    <string name="ssh_connection">SSH‑соединение</string>
-    <string name="free_turn_proxy">free-turn-proxy</string>
-    <string name="error_format">Ошибка: %1$s</string>
     <string name="server_config">Конфигурация сервера</string>
     <string name="listen_port">Порт прослушивания</string>
     <string name="listen_port_placeholder">56000</string>
@@ -108,17 +96,12 @@
     <string name="install">Установить / обновить</string>
     <string name="server_install_cached">Актуально</string>
     <string name="server_install_downloaded">Обновлено</string>
-    <string name="server_version_label">Версия: %1$s</string>
     <string name="server_obf_key_label">Obf-ключ (64 hex)</string>
     <string name="obf_key_regen">Сгенерировать новый ключ на сервере</string>
     <string name="start_server">Запустить сервер</string>
     <string name="stop_server">Остановить сервер</string>
     <string name="continue_client_setup">Продолжить настройку клиента</string>
-    <string name="server_running_tcp">Сервер запущен в TCP-форвард режиме</string>
     <string name="ssh_log_title">SSH-лог</string>
-    <string name="active">Активно</string>
-    <string name="inactive">Неактивно</string>
-    <string name="paired">Сопряжено</string>
 
     <!-- SshSetupScreen -->
     <string name="show_password">Показать пароль</string>
@@ -198,7 +181,6 @@
     <string name="tg_not_now">Не сейчас</string>
 
     <!-- Profiles -->
-    <string name="profiles_title">Профили</string>
     <string name="profiles_empty_title">Пока нет сохранённых профилей</string>
     <string name="profiles_empty_desc">Сохраните текущие настройки как профиль или импортируйте ссылку, чтобы переключаться между разными профилями.</string>
     <string name="profile_save_current">Сохранить текущие настройки</string>
@@ -214,8 +196,6 @@
     <string name="profile_default_name">Новый профиль</string>
     <string name="profile_name_taken">Профиль с таким именем уже существует</string>
     <string name="profile_unsaved_label">Несохранённая конфигурация</string>
-    <string name="profile_update_current">Обновить активный профиль</string>
-    <string name="profile_updated_toast">Профиль обновлён</string>
 
     <!-- Notification & Tile -->
     <string name="notif_proxy_stop_action">Отключить</string>
@@ -224,13 +204,7 @@
     <string name="proxy_active_wireguard">Прокси и WireGuard активны</string>
 
     <!-- Туннельное приложение (WireGuard) -->
-    <string name="tunnel_transport_title">Туннельное приложение</string>
-    <string name="tunnel_transport_desc">Поднимает VPN-туннель поверх локального прокси: трафик устройства заворачивается через TURN-релей. Оставьте конфиг пустым, чтобы не использовать туннель.</string>
-    <string name="wireguard_section">WireGuard</string>
     <string name="wireguard_tunnel_name">Имя туннеля</string>
-    <string name="wireguard_config_label">Конфигурация WireGuard (.conf)</string>
-    <string name="wireguard_config_placeholder">[Interface]\nPrivateKey = …\nAddress = …\n\n[Peer]\nPublicKey = …\nAllowedIPs = 0.0.0.0/0</string>
-    <string name="wireguard_config_support">Endpoint подменяется на локальный порт прокси автоматически. Пусто = туннель не поднимается.</string>
 
     <!-- Split tunneling -->
     <string name="split_tunnel_title">Раздельное туннелирование</string>
@@ -245,9 +219,53 @@
 
     <!-- Profiles sheet (servers) -->
     <string name="profiles_servers_title">Серверы</string>
-    <string name="profiles_provider_label">Провайдер</string>
 
     <!-- Логи -->
     <string name="logs_enabled">Сбор логов</string>
     <string name="logs_enabled_desc">Показывать вывод ядра на экране логов. Выключите для экономии памяти.</string>
+
+    <!-- Настройки (новый раздел) -->
+    <string name="nav_settings">Настройки</string>
+    <string name="settings_title">Настройки</string>
+    <string name="settings_servers">Серверы</string>
+    <string name="settings_servers_desc">Управление добавленными серверами и их настройками</string>
+    <string name="settings_empty_servers">Нет добавленных серверов. Сохраните конфигурацию на главном экране.</string>
+    <string name="provider_vk_calls">VK Звонки</string>
+    <string name="server_delete_confirm_title">Удалить сервер?</string>
+    <string name="server_delete_confirm_desc">Сервер «%1$s» и все его настройки будут удалены из приложения.</string>
+    <string name="provider_connection_settings">Настройки подключения</string>
+    <string name="provider_connection_settings_desc">Параметры клиента: адрес, потоки, DNS</string>
+    <string name="provider_server_settings">Настройки сервера</string>
+    <string name="provider_server_settings_desc">Состояние, обфускация, проброс и управление ядром</string>
+    <!-- Живой статус сервера в хабе -->
+    <string name="hub_server_running">Сервер работает</string>
+    <string name="hub_server_stopped">Сервер остановлен</string>
+    <string name="hub_connect_failed">Не удалось подключиться</string>
+    <string name="hub_not_installed">Ядро не установлено</string>
+    <!-- Заголовки фаз статуса (hero) -->
+    <string name="pill_connecting">Подключение…</string>
+    <string name="pill_not_paired">SSH не настроен</string>
+    <string name="pill_offline">Сервер неактивен</string>
+    <string name="not_paired_hint">Настройте подключение к серверу ниже</string>
+    <string name="server_apply">Применить</string>
+    <string name="server_apply_restart_note">Изменения перезапустят сервер</string>
+    <string name="server_inactive_title">Сервер не активен</string>
+    <string name="server_inactive_desc">Чтобы управлять ядром и SSH-подключением, сделайте этот сервер активным.</string>
+    <string name="make_active">Сделать активным</string>
+    <string name="profile_active_badge">Активный</string>
+    <string name="profile_has_ssh">SSH</string>
+    <string name="menu_delete_server">Удалить сервер</string>
+    <string name="menu_rename_server">Переименовать</string>
+    <string name="rename_server_title">Переименовать сервер</string>
+    <string name="server_name_label">Имя сервера</string>
+    <string name="save">Сохранить</string>
+    <string name="connection_mode_title">Режим подключения</string>
+    <string name="provider_connection_mode_desc">Proxy или VPN (WireGuard), импорт конфига</string>
+    <string name="mode_proxy">Proxy</string>
+    <string name="mode_vpn">VPN</string>
+    <string name="mode_proxy_desc">Трафик идёт через локальный прокси, без туннеля.</string>
+    <string name="mode_vpn_desc">Весь трафик устройства туннелируется через WireGuard.</string>
+    <string name="load_wg_conf">Загрузить из файла</string>
+    <string name="connection_config_section">Конфигурация туннеля</string>
+    <string name="change_server">Сменить сервер</string>
 </resources>
