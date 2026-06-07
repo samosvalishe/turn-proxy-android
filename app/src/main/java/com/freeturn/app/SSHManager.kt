@@ -138,7 +138,7 @@ class SSHManager {
             // Нормализуем переносы строк stdin: Kotlin source может содержать
             // CRLF, что ломает bash heredoc/parser.
             val stdinLf = stdin.replace("\r\n", "\n").replace("\r", "\n")
-            channel.setInputStream(ByteArrayInputStream(stdinLf.toByteArray(Charsets.UTF_8)))
+            channel.inputStream = ByteArrayInputStream(stdinLf.toByteArray(Charsets.UTF_8))
 
             val inStream = channel.inputStream
             channel.connect(execTimeoutMs)
