@@ -10,6 +10,7 @@ import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.ClientConfig
 import com.freeturn.app.data.ObfProfile
 import com.freeturn.app.data.Profile
+import com.freeturn.app.data.ProfileJson
 import com.freeturn.app.data.ProfilesSnapshot
 import com.freeturn.app.domain.AppUpdater
 import com.freeturn.app.domain.LocalProxyManager
@@ -270,6 +271,32 @@ class SettingsViewModel(
                 }
             }
         }
+    }
+
+    fun exportProfile(id: String): String? {
+        val profile = profilesSnapshot.value.list.firstOrNull { it.id == id } ?: return null
+        return ProfileJson.exportToJson(listOf(profile))
+    }
+
+    fun exportAllProfiles(): String {
+        return ProfileJson.exportToJson(profilesSnapshot.value.list)
+    }
+
+    fun importProfiles(json: String): Int {
+        val imported = ProfileJson.importFromJson(json)
+        if (imported.isEmpty()) return 0
+        viewModelScope.launch {
+            profileMutex.withLock {
+                val current = prefs.profilesSnapshot.first()
+                val merged = current.list.toMutableList()
+                for (p in imported) {
+                    val idx = merged.indexOfFirst { it.id == p.id }
+                    if (idx >= 0) merged[idx] = p else merged.add(p)
+                }
+                prefs.saveProfiles(merged)
+            }
+        }
+        return imported.size
     }
 
     private fun serverAddrToProfileName(serverAddr: String): String =

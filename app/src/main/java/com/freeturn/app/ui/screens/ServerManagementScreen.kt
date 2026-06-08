@@ -81,6 +81,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.data.ObfProfile
 import com.freeturn.app.ui.HapticUtil
+import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.viewmodel.ServerState
 import com.freeturn.app.viewmodel.SshConnectionState
 import com.freeturn.app.viewmodel.ServerViewModel
@@ -118,6 +119,8 @@ fun ServerManagementScreen(
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
     val clientCfg by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
     val serverLogs by serverViewModel.serverLogs.collectAsStateWithLifecycle()
+    val isWgWorking by serverViewModel.isWgWorking.collectAsStateWithLifecycle()
+    val lastWgConfig by serverViewModel.lastWgConfig.collectAsStateWithLifecycle()
     val serverOpts by serverViewModel.serverOpts.collectAsStateWithLifecycle()
     val isRegen by serverViewModel.isRegeneratingObfKey.collectAsStateWithLifecycle()
 
@@ -519,6 +522,65 @@ fun ServerManagementScreen(
                         Text(stringResource(R.string.continue_client_setup))
                         Spacer(Modifier.width(8.dp))
                         Icon(painterResource(R.drawable.arrow_forward_24px), null)
+                    }
+                }
+
+                // WireGuard управление (установка / получение конфига пира)
+                if (isConnected) {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(20.dp)) {
+                            Text(
+                                "WireGuard",
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                            Spacer(Modifier.height(12.dp))
+
+                            FilledTonalButton(
+                                onClick = {
+                                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                                    serverViewModel.wgInstall()
+                                },
+                                enabled = !isWorking && !isWgWorking,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = MaterialTheme.shapes.large
+                            ) {
+                                if (isWgWorking) {
+                                    androidx.compose.material3.CircularWavyProgressIndicator(
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                } else {
+                                    Icon(painterResource(R.drawable.cloud_download_24px), null)
+                                    Spacer(Modifier.width(8.dp))
+                                }
+                                Text(stringResource(R.string.wg_install_btn))
+                            }
+
+                            Spacer(Modifier.height(8.dp))
+
+                            OutlinedButton(
+                                onClick = {
+                                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                                    serverViewModel.wgShowPeer()
+                                },
+                                enabled = !isWorking && !isWgWorking,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = MaterialTheme.shapes.large
+                            ) {
+                                Icon(painterResource(R.drawable.refresh_24px), null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.wg_show_peer_btn))
+                            }
+
+                            if (lastWgConfig != null) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    stringResource(R.string.wg_config_saved),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.extendedColorScheme.info
+                                )
+                            }
+                        }
                     }
                 }
 

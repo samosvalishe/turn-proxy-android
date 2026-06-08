@@ -196,6 +196,22 @@
     <string name="profile_default_name">Новый профиль</string>
     <string name="profile_name_taken">Профиль с таким именем уже существует</string>
     <string name="profile_unsaved_label">Несохранённая конфигурация</string>
+    <string name="profile_update_current">Обновить активный профиль</string>
+    <string name="profile_updated_toast">Профиль обновлён</string>
+    <string name="profile_export">Экспорт</string>
+    <string name="profile_export_title">Экспорт профиля</string>
+    <string name="profile_export_all">Экспорт всех</string>
+    <string name="profile_export_all_title">Экспорт всех профилей</string>
+    <string name="profile_import">Импорт</string>
+    <string name="profile_import_from_clipboard">Импорт из буфера</string>
+    <string name="profile_imported_toast">Импортировано профилей: %1$d</string>
+    <string name="backup_title">Резервное копирование</string>
+    <string name="backup_desc">Экспорт и импорт всех профилей и настроек</string>
+    <string name="backup_create">Создать резервную копию</string>
+    <string name="backup_restore">Восстановить из резервной копии</string>
+    <string name="backup_restored_toast">Восстановлено профилей: %1$d</string>
+    <string name="backup_restore_failed">Не удалось восстановить: %1$d профилей</string>
+    <string name="backup_clipboard_empty">Буфер обмена пуст. Скопируйте JSON резервной копии</string>
 
     <!-- Notification & Tile -->
     <string name="notif_proxy_stop_action">Отключить</string>
@@ -216,6 +232,11 @@
     <string name="split_tunnel_locked">Остановите VPN, чтобы изменить раздельное туннелирование</string>
     <string name="split_tunnel_status_off">Раздельное туннелирование выключено</string>
     <string name="split_tunnel_status_on">Раздельное туннелирование включено</string>
+
+    <!-- WireGuard server management -->
+    <string name="wg_install_btn">Установить WireGuard на сервер</string>
+    <string name="wg_show_peer_btn">Получить конфиг пира (WG)</string>
+    <string name="wg_config_saved">Конфиг WireGuard сохранён в настройках клиента</string>
 
     <!-- Profiles sheet (servers) -->
     <string name="profiles_servers_title">Серверы</string>

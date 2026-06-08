@@ -11,6 +11,8 @@ sealed class ServerCommand {
     data object Stop : ServerCommand()
     data object GenObfKey : ServerCommand()
     data class FetchLogs(val lines: Int = 80) : ServerCommand()
+    data object WgInstall : ServerCommand()
+    data object WgShowPeer : ServerCommand()
 
     fun toArgv(): List<String> = when (this) {
         is Probe -> listOf("probe")
@@ -31,6 +33,8 @@ sealed class ServerCommand {
         is Stop -> listOf("stop")
         is GenObfKey -> listOf("gen-obf-key")
         is FetchLogs -> listOf("logs", "--tail=$lines")
+        is WgInstall -> listOf("wg-install")
+        is WgShowPeer -> listOf("wg-show-peer")
     }
 }
 

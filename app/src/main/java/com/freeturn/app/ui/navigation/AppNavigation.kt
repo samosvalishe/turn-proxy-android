@@ -319,7 +319,7 @@ private fun AppNavHost(
         // Вкладка «Настройки»: Настройки → Серверы → [сервер] → подключение/режим/сервер → SSH
         navigation(startDestination = Routes.SETTINGS, route = Routes.SETTINGS_GRAPH) {
             composable(Routes.SETTINGS) {
-                SettingsScreen(onOpenServers = { navController.navigate(Routes.SERVERS_LIST) })
+                SettingsScreen(settingsViewModel = settingsViewModel, onOpenServers = { navController.navigate(Routes.SERVERS_LIST) })
             }
 
             composable(Routes.SERVERS_LIST) {

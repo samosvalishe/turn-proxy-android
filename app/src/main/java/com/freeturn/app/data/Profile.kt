@@ -47,6 +47,32 @@ internal object ProfileJson {
         }
     }
 
+    fun exportToJson(list: List<Profile>, pretty: Boolean = true): String {
+        val root = JSONObject().apply {
+            put("app", "free-turn-proxy")
+            put("version", 1)
+            put("profiles", JSONArray().apply {
+                list.forEach { put(encode(it)) }
+            })
+        }
+        return if (pretty) root.toString(2) else root.toString()
+    }
+
+    fun importFromJson(raw: String?): List<Profile> {
+        if (raw.isNullOrBlank()) return emptyList()
+        return try {
+            val root = JSONObject(raw)
+            val arr = root.optJSONArray("profiles")
+            if (arr != null) {
+                (0 until arr.length()).map { decode(arr.getJSONObject(it)) }
+            } else {
+                decodeList(raw)
+            }
+        } catch (_: Throwable) {
+            decodeList(raw)
+        }
+    }
+
     private fun encode(p: Profile): JSONObject = JSONObject().apply {
         put("id", p.id)
         put("name", p.name)

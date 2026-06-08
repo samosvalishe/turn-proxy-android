@@ -47,6 +47,7 @@ import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -97,12 +98,15 @@ import com.freeturn.app.viewmodel.SettingsViewModel
 import com.freeturn.app.viewmodel.SshConnectionState
 
 
-/** Корневой экран настроек (нижнее меню). Пока единственный пункт — «Серверы». */
+/** Корневой экран настроек (нижнее меню). */
 @Composable
 fun SettingsScreen(
+    settingsViewModel: SettingsViewModel,
     onOpenServers: () -> Unit
 ) {
+    val context = LocalContext.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
@@ -111,7 +115,6 @@ fun SettingsScreen(
                 scrollBehavior = scrollBehavior
             )
         },
-        // Корневой экран — внутри NavigationSuite, нижний бар сам держит инсет.
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Column(
@@ -134,6 +137,68 @@ fun SettingsScreen(
                         subtitle = stringResource(R.string.settings_servers_desc),
                         onClick = onOpenServers
                     )
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                SectionLabel(stringResource(R.string.backup_title))
+                SettingsCard {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Button(
+                            onClick = {
+                                HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                                val json = settingsViewModel.exportAllProfiles()
+                                val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                    type = "application/json"
+                                    putExtra(android.content.Intent.EXTRA_TEXT, json)
+                                    putExtra(android.content.Intent.EXTRA_SUBJECT, "FreeTurn Backup")
+                                }
+                                context.startActivity(
+                                    android.content.Intent.createChooser(send, context.getString(R.string.backup_create))
+                                )
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.large
+                        ) {
+                            Icon(painterResource(R.drawable.open_in_new_24px), null)
+                            Spacer(Modifier.size(8.dp))
+                            Text(stringResource(R.string.backup_create))
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+
+                        OutlinedButton(
+                            onClick = {
+                                HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                                val clip = context.getSystemService(android.content.ClipboardManager::class.java)
+                                val clipText = clip?.primaryClip?.getItemAt(0)?.text?.toString()
+                                if (clipText != null) {
+                                    val count = settingsViewModel.importProfiles(clipText)
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        context.getString(
+                                            if (count > 0) R.string.backup_restored_toast
+                                            else R.string.backup_restore_failed,
+                                            count
+                                        ),
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
+                                } else {
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        R.string.backup_clipboard_empty,
+                                        android.widget.Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.large
+                        ) {
+                            Icon(painterResource(R.drawable.content_copy_24px), null)
+                            Spacer(Modifier.size(8.dp))
+                            Text(stringResource(R.string.backup_restore))
+                        }
+                    }
                 }
             }
         }
