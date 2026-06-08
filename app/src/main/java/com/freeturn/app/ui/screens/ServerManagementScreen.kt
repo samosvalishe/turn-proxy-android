@@ -81,6 +81,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.data.ObfProfile
 import com.freeturn.app.ui.HapticUtil
+import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.viewmodel.ServerState
 import com.freeturn.app.viewmodel.SshConnectionState
 import com.freeturn.app.viewmodel.ServerViewModel

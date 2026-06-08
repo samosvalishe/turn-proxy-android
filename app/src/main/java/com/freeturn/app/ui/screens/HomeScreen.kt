@@ -638,30 +638,6 @@ private fun InfoBottomSheet(
 
         item { HorizontalDivider() }
 
-        // Резервное копирование
-        var showBackupDialog by rememberSaveable { mutableStateOf(false) }
-        item {
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.backup_title)) },
-                supportingContent = { Text(stringResource(R.string.backup_desc)) },
-                colors = listColors,
-                trailingContent = {
-                    Icon(
-                        painterResource(R.drawable.database_outlined_24px),
-                        contentDescription = stringResource(R.string.backup_title),
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                },
-                modifier = Modifier.clickable {
-                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                    showBackupDialog = true
-                }
-            )
-        }
-
-        item { HorizontalDivider() }
-
         // Сброс
         item {
             ListItem(
@@ -699,57 +675,6 @@ private fun InfoBottomSheet(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-    }
-
-    if (showBackupDialog) {
-        AlertDialog(
-            onDismissRequest = { showBackupDialog = false },
-            title = { Text(stringResource(R.string.backup_title)) },
-            text = { Text(stringResource(R.string.backup_desc)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showBackupDialog = false
-                        val json = settingsViewModel.exportAllProfiles()
-                        val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                            type = "application/json"
-                            putExtra(android.content.Intent.EXTRA_TEXT, json)
-                            putExtra(android.content.Intent.EXTRA_SUBJECT, "FreeTurn Backup")
-                        }
-                        context.startActivity(
-                            android.content.Intent.createChooser(send, context.getString(R.string.backup_create))
-                        )
-                    }
-                ) { Text(stringResource(R.string.backup_create)) }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showBackupDialog = false
-                        val clip = context.getSystemService(android.content.ClipboardManager::class.java)
-                        val clipText = clip?.primaryClip?.getItemAt(0)?.text?.toString()
-                        if (clipText != null) {
-                            val count = settingsViewModel.importProfiles(clipText)
-                            android.widget.Toast.makeText(
-                                context,
-                                context.getString(
-                                    if (count > 0) R.string.backup_restored_toast
-                                    else R.string.backup_restore_failed,
-                                    count
-                                ),
-                                android.widget.Toast.LENGTH_SHORT
-                            ).show()
-                        } else {
-                            android.widget.Toast.makeText(
-                                context,
-                                R.string.backup_clipboard_empty,
-                                android.widget.Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    }
-                ) { Text(stringResource(R.string.backup_restore)) }
-            }
-        )
     }
 
     if (showResetDialog) {
