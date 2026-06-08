@@ -28,7 +28,6 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -150,16 +149,6 @@ fun ProfilesSheetContent(
         } else if (snapshot.list.isEmpty()) {
             ProfilesEmptyState(
                 onSave = { showSaveDialog = true },
-                onImport = { json ->
-                    val count = settingsViewModel.importProfiles(json)
-                    if (count > 0) {
-                        android.widget.Toast.makeText(
-                            context,
-                            context.getString(R.string.profile_imported_toast, count),
-                            android.widget.Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
@@ -176,51 +165,12 @@ fun ProfilesSheetContent(
                     stringResource(R.string.profiles_servers_title),
                     style = MaterialTheme.typography.titleMedium
                 )
-                Row {
-                    // Импорт из буфера обмена
-                    IconButton(onClick = {
-                        val clip = context.getSystemService(android.content.ClipboardManager::class.java)
-                        val clipText = clip?.primaryClip?.getItemAt(0)?.text?.toString()
-                        if (clipText != null) {
-                            val count = settingsViewModel.importProfiles(clipText)
-                            if (count > 0) {
-                                android.widget.Toast.makeText(
-                                    context,
-                                    context.getString(R.string.profile_imported_toast, count),
-                                    android.widget.Toast.LENGTH_SHORT
-                                ).show()
-                            }
-                        }
-                    }) {
-                        Icon(
-                            painterResource(R.drawable.content_copy_24px),
-                            contentDescription = stringResource(R.string.profile_import)
-                        )
-                    }
-                    // Экспорт всех профилей
-                    IconButton(onClick = {
-                        val json = settingsViewModel.exportAllProfiles()
-                        val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                            type = "application/json"
-                            putExtra(android.content.Intent.EXTRA_TEXT, json)
-                            putExtra(android.content.Intent.EXTRA_SUBJECT, "FreeTurn: all profiles")
-                        }
-                        context.startActivity(
-                            android.content.Intent.createChooser(send, context.getString(R.string.profile_export_all_title))
-                        )
-                    }) {
-                        Icon(
-                            painterResource(R.drawable.open_in_new_24px),
-                            contentDescription = stringResource(R.string.profile_export_all)
-                        )
-                    }
-                    // Правки авто-сохраняются в активный профиль. Тут — только новый.
-                    IconButton(onClick = { showSaveDialog = true }) {
-                        Icon(
-                            painterResource(R.drawable.save_24px),
-                            contentDescription = stringResource(R.string.profile_save_current)
-                        )
-                    }
+                // Правки авто-сохраняются в активный профиль. Тут — только новый.
+                IconButton(onClick = { showSaveDialog = true }) {
+                    Icon(
+                        painterResource(R.drawable.save_24px),
+                        contentDescription = stringResource(R.string.profile_save_current)
+                    )
                 }
             }
             LazyColumn(
@@ -246,20 +196,6 @@ fun ProfilesSheetContent(
                         onRename = {
                             menuTarget = null
                             renameTarget = p.id
-                        },
-                        onExport = {
-                            menuTarget = null
-                            val json = settingsViewModel.exportProfile(p.id)
-                            if (json != null) {
-                                val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                    type = "application/json"
-                                    putExtra(android.content.Intent.EXTRA_TEXT, json)
-                                    putExtra(android.content.Intent.EXTRA_SUBJECT, "FreeTurn: ${p.name}")
-                                }
-                                context.startActivity(
-                                    android.content.Intent.createChooser(send, context.getString(R.string.profile_export_title))
-                                )
-                            }
                         },
                         onDelete = {
                             menuTarget = null
@@ -334,7 +270,7 @@ fun ProfilesSheetContent(
     }
 }
 
-/** Строка-сервер в стиле референса: radio + имя/адрес + меню (rename/export/delete). */
+/** Строка-сервер в стиле референса: radio + имя/адрес + меню (rename/delete). */
 @Composable
 private fun ProfileRow(
     profile: Profile,
@@ -345,7 +281,6 @@ private fun ProfileRow(
     onMenuToggle: () -> Unit,
     onMenuDismiss: () -> Unit,
     onRename: () -> Unit,
-    onExport: () -> Unit,
     onDelete: () -> Unit,
 ) {
     Row(
@@ -394,11 +329,6 @@ private fun ProfileRow(
                     text = { Text(stringResource(R.string.profile_rename)) },
                     leadingIcon = { Icon(painterResource(R.drawable.edit_24px), null) },
                     onClick = onRename
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.profile_export)) },
-                    leadingIcon = { Icon(painterResource(R.drawable.open_in_new_24px), null) },
-                    onClick = onExport
                 )
                 HorizontalDivider()
                 DropdownMenuItem(
@@ -475,7 +405,6 @@ private fun providerLabel(value: String): String = when (value) {
 @Composable
 private fun ProfilesEmptyState(
     onSave: () -> Unit,
-    onImport: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -519,17 +448,6 @@ private fun ProfilesEmptyState(
             Icon(painterResource(R.drawable.save_24px), null)
             Spacer(Modifier.size(8.dp))
             Text(stringResource(R.string.profile_save_current))
-        }
-        Spacer(Modifier.height(12.dp))
-        OutlinedButton(onClick = {
-            HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-            val clip = context.getSystemService(android.content.ClipboardManager::class.java)
-            val clipText = clip?.primaryClip?.getItemAt(0)?.text?.toString()
-            if (clipText != null) onImport(clipText)
-        }) {
-            Icon(painterResource(R.drawable.content_copy_24px), null)
-            Spacer(Modifier.size(8.dp))
-            Text(stringResource(R.string.profile_import_from_clipboard))
         }
     }
 }
