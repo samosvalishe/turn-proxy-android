@@ -14,7 +14,6 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <!-- Нужно для split-tunnel: показать список установленных приложений в пикере. -->
     <uses-permission
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
@@ -38,7 +37,8 @@
         android:extractNativeLibs="true"
         android:networkSecurityConfig="@xml/network_security_config"
         android:theme="@style/Theme.FreeTurn"
-        tools:targetApi="31">
+        android:enableOnBackInvokedCallback="true"
+        tools:targetApi="33">
 
         <activity
             android:name=".MainActivity"
@@ -56,17 +56,11 @@
             android:exported="false"
             android:foregroundServiceType="specialUse"
             tools:targetApi="29">
-            <!--
-                Обязательное свойство для foregroundServiceType="specialUse".
-                Без него Google Play отклоняет приложение.
-                Описывает назначение: поддержание сетевого прокси-соединения.
-            -->
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Maintains an active local network proxy connection over TURN servers so the user can keep using a working tunnel while the app is in the background." />
         </service>
 
-        <!-- VPN-сервис WireGuard GoBackend: поднимает туннель поверх локального прокси. -->
         <service
             android:name="com.wireguard.android.backend.GoBackend$VpnService"
             android:exported="false"
@@ -100,8 +94,7 @@
             android:exported="true"
             android:icon="@drawable/ic_qs_tile_nearby"
             android:label="@string/tile_service_label"
-            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
-            tools:targetApi="24">
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>

@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
-import java.io.File
 import java.io.IOException
 import androidx.core.content.edit
 
@@ -56,10 +55,10 @@ object ObfProfile {
  * прокси, так что трафик устройства идёт через TURN-релей.
  */
 object TunnelTransport {
+    const val NONE = "none"
     const val WIREGUARD = "wireguard"
-    /** Имя WG-туннеля по умолчанию (GoBackend). */
     const val DEFAULT_TUNNEL_NAME = "freeturn-wg"
-    val ALL = listOf(WIREGUARD)
+    val PERSISTED = listOf(NONE, WIREGUARD)
 }
 
 /** Режим split-tunneling для WireGuard-интерфейса. */
@@ -107,8 +106,8 @@ data class ClientConfig(
     val magicSwitch: Boolean = false,
     /** Адрес для флага -turn ядра, если magicSwitch включён. Пусто = не передавать. */
     val magicTurn: String = "",
-    /** Транспорт туннельного приложения (пока только WireGuard). */
-    val tunnelTransport: String = TunnelTransport.WIREGUARD,
+    /** Транспорт туннеля: NONE (proxy) либо WIREGUARD (VPN). По умолчанию — без туннеля. */
+    val tunnelTransport: String = TunnelTransport.NONE,
     /** Конфиг WireGuard (.conf). Пусто = WG-туннель не поднимается. */
     val wireGuardConfig: String = "",
     /** Имя WG-туннеля для GoBackend. */
@@ -227,8 +226,12 @@ class AppPreferences(context: Context) {
                 syncServerSwitches = prefs[CLIENT_SYNC_SERVER] ?: true,
                 magicSwitch = prefs[CLIENT_MAGIC_SWITCH] ?: false,
                 magicTurn = prefs[CLIENT_MAGIC_TURN] ?: "",
-                tunnelTransport = (prefs[CLIENT_TUNNEL_TRANSPORT] ?: TunnelTransport.WIREGUARD).let {
-                    if (it in TunnelTransport.ALL) it else TunnelTransport.WIREGUARD
+                tunnelTransport = (prefs[CLIENT_TUNNEL_TRANSPORT] ?: TunnelTransport.NONE).let {
+                    val t = if (it in TunnelTransport.PERSISTED) it else TunnelTransport.NONE
+                    // Legacy: старый ClientSetup всегда писал WIREGUARD; пустой конфиг = туннель
+                    // не выбран → читаем как NONE (proxy), чтобы режим не показывался как VPN.
+                    if (t == TunnelTransport.WIREGUARD && prefs[CLIENT_WG_CONFIG].isNullOrBlank())
+                        TunnelTransport.NONE else t
                 },
                 wireGuardConfig = prefs[CLIENT_WG_CONFIG] ?: "",
                 wireGuardTunnelName = (prefs[CLIENT_WG_TUNNEL_NAME] ?: TunnelTransport.DEFAULT_TUNNEL_NAME)
@@ -293,14 +296,6 @@ class AppPreferences(context: Context) {
         .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
         .map { prefs -> prefs[TG_SUBSCRIBE_SHOWN] ?: false }
 
-    val profilesFlow: Flow<List<Profile>> = context.dataStore.data
-        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { prefs -> ProfileJson.decodeList(prefs[PROFILES_JSON]) }
-
-    val activeProfileIdFlow: Flow<String?> = context.dataStore.data
-        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { prefs -> prefs[ACTIVE_PROFILE_ID]?.takeIf { it.isNotBlank() } }
-
     /** Заменяет весь список профилей. */
     suspend fun saveProfiles(list: List<Profile>) {
         context.dataStore.edit { prefs ->
@@ -358,8 +353,8 @@ class AppPreferences(context: Context) {
             prefs[CLIENT_MAGIC_SWITCH] = config.magicSwitch
             prefs[CLIENT_MAGIC_TURN] = config.magicTurn.trim()
             prefs[CLIENT_TUNNEL_TRANSPORT] =
-                if (config.tunnelTransport in TunnelTransport.ALL) config.tunnelTransport
-                else TunnelTransport.WIREGUARD
+                if (config.tunnelTransport in TunnelTransport.PERSISTED) config.tunnelTransport
+                else TunnelTransport.NONE
             prefs[CLIENT_WG_CONFIG] = config.wireGuardConfig.trim()
             prefs[CLIENT_WG_TUNNEL_NAME] =
                 config.wireGuardTunnelName.trim().ifBlank { TunnelTransport.DEFAULT_TUNNEL_NAME }

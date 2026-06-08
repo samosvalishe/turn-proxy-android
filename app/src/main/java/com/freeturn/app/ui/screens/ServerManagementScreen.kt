@@ -8,7 +8,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -28,7 +28,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -37,8 +36,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularWavyProgressIndicator
+import androidx.compose.material3.DividerDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearWavyProgressIndicator
@@ -46,9 +50,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -60,9 +68,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import kotlinx.coroutines.delay
 import androidx.compose.ui.text.font.FontFamily
@@ -71,8 +79,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.freeturn.app.data.ObfProfile
 import com.freeturn.app.ui.HapticUtil
-import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.viewmodel.ServerState
 import com.freeturn.app.viewmodel.SshConnectionState
 import com.freeturn.app.viewmodel.ServerViewModel
@@ -83,54 +91,55 @@ import com.freeturn.app.viewmodel.SettingsViewModel
 fun ServerManagementScreen(
     serverViewModel: ServerViewModel,
     settingsViewModel: SettingsViewModel,
-    onContinue: () -> Unit,
-    // null — поток онбординга (SERVER_MANAGEMENT_OB): сюда приходят уже сопряжёнными,
-    // SSH-логика не активна, экран рендерится как раньше. Не-null — основная вкладка:
-    // включает авто-сопряжение при открытии, кнопку смены сервера и состояния
-    // «не сопряжено / подключаюсь / ошибка».
-    onEditConnection: (() -> Unit)? = null
+    // Шаг мастера онбординга «продолжить к настройке клиента». В settings-флоу не нужен.
+    onContinue: (() -> Unit)? = null,
+    // Кнопка смены сервера (overflow ⋮). null в онбординге.
+    onEditConnection: (() -> Unit)? = null,
+    // null = онбординг/legacy. Не-null = настройки сервера конкретного профиля (Settings).
+    profileId: String? = null,
+    onBack: (() -> Unit)? = null
 ) {
-    val mainFlow = onEditConnection != null
+    // Settings-флоу vs мастер онбординга. В settings: apply-модель (черновики → «Применить»,
+    // один рестарт), карточки сопряжения, смена сервера. В онбординге — proxy + действия.
+    val settingsFlow = onBack != null
+    val snapshot by settingsViewModel.profilesSnapshot.collectAsStateWithLifecycle()
+    val profile = profileId?.let { id -> snapshot.list.firstOrNull { it.id == id } }
+    // Живая SSH-сессия и состояние сервера принадлежат активному серверу. Управлять
+    // ядром можно только когда редактируемый профиль активен (или онбординг).
+    val isActive = profileId == null || profileId == snapshot.activeId
     val sshState by serverViewModel.sshState.collectAsStateWithLifecycle()
     val serverState by serverViewModel.serverState.collectAsStateWithLifecycle()
     val sshConfig by serverViewModel.sshConfig.collectAsStateWithLifecycle()
-    val savedListen by settingsViewModel.proxyListen.collectAsStateWithLifecycle()
-    val savedConnect by settingsViewModel.proxyConnect.collectAsStateWithLifecycle()
+    val legacyListen by settingsViewModel.proxyListen.collectAsStateWithLifecycle()
+    val legacyConnect by settingsViewModel.proxyConnect.collectAsStateWithLifecycle()
+    val savedListen = profile?.proxyListen ?: legacyListen
+    val savedConnect = profile?.proxyConnect ?: legacyConnect
     val sshLog by serverViewModel.sshLog.collectAsStateWithLifecycle()
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
-    val installStage by serverViewModel.serverInstallStage.collectAsStateWithLifecycle()
     val clientCfg by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
     val serverLogs by serverViewModel.serverLogs.collectAsStateWithLifecycle()
     val isWgWorking by serverViewModel.isWgWorking.collectAsStateWithLifecycle()
     val lastWgConfig by serverViewModel.lastWgConfig.collectAsStateWithLifecycle()
+    val serverOpts by serverViewModel.serverOpts.collectAsStateWithLifecycle()
+    val isRegen by serverViewModel.isRegeneratingObfKey.collectAsStateWithLifecycle()
 
+    // --- Черновики конфигурации (без авто-сохранения) ---
     var proxyListenIp by rememberSaveable(savedListen) {
         mutableStateOf(savedListen.substringBeforeLast(":", "0.0.0.0").ifBlank { "0.0.0.0" })
     }
     var proxyListenPort by rememberSaveable(savedListen) { mutableStateOf(savedListen.substringAfterLast(":", "56000")) }
     var proxyConnect by rememberSaveable(savedConnect) { mutableStateOf(savedConnect) }
+    var tcpDraft by rememberSaveable(clientCfg.tcpForward) { mutableStateOf(clientCfg.tcpForward) }
+    var obfDraft by rememberSaveable(serverOpts.obfProfile) { mutableStateOf(serverOpts.obfProfile) }
+    var keyDraft by rememberSaveable(serverOpts.obfKey) { mutableStateOf(serverOpts.obfKey) }
 
-    LaunchedEffect(proxyListenIp, proxyListenPort, proxyConnect) {
-        kotlinx.coroutines.delay(400)
-        val ip = proxyListenIp.ifBlank { "0.0.0.0" }
-        val listen = "$ip:$proxyListenPort"
-        if (listen != savedListen || proxyConnect != savedConnect) {
-            settingsViewModel.saveProxyServerConfig(listen, proxyConnect)
-        }
-    }
-
-    // Авто-сопряжение при открытии основной вкладки: есть сохранённый конфиг, но
-    // соединение не установлено → пробуем переподключиться. Триггер только из
-    // Disconnected (после неудачи состояние Error — без бесконечного цикла). Ключ по
-    // ip корректно отрабатывает асинхронную загрузку конфига из DataStore.
-    LaunchedEffect(sshConfig.ip, mainFlow) {
-        if (mainFlow && sshConfig.ip.isNotBlank() && sshState is SshConnectionState.Disconnected) {
-            serverViewModel.reconnectSsh()
-        }
-    }
+    // SSH-сессию держит хаб (ServerDetailScreen): этот экран в settings-флоу открыт только
+    // при активном подключении, в онбординг сюда приходят уже Connected. Свой реконнект
+    // не нужен — не дублируем коннект на двух экранах.
 
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
+    var showServerMenu by rememberSaveable { mutableStateOf(false) }
     val isConnected = sshState is SshConnectionState.Connected
     // Дебаунс карточки сопряжения: при открытии config грузится из DataStore async,
     // а sshState стартует Disconnected — без задержки карточка мигает на доли секунды
@@ -149,31 +158,74 @@ fun ServerManagementScreen(
     val serverKnown = serverState as? ServerState.Known
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
 
+    // --- Dirty-детект для apply-модели ---
+    val obfKeyRegex = remember { Regex("^[0-9a-fA-F]{64}$") }
+    val listenFull = "${proxyListenIp.ifBlank { "0.0.0.0" }}:$proxyListenPort"
+    val proxyDirty = listenFull != savedListen || proxyConnect != savedConnect
+    val configDirty = settingsFlow && (proxyDirty ||
+        tcpDraft != clientCfg.tcpForward ||
+        obfDraft != serverOpts.obfProfile ||
+        keyDraft != serverOpts.obfKey)
+    // Ключ валиден для применения: обфускация выкл, ИЛИ пусто (сервер сгенерит), ИЛИ 64 hex.
+    val keyOkForApply = obfDraft == ObfProfile.NONE || keyDraft.isBlank() || keyDraft.matches(obfKeyRegex)
+
+
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.server)) },
+                title = {
+                    Text(stringResource(
+                        if (onBack != null) R.string.provider_server_settings else R.string.server
+                    ))
+                },
+                navigationIcon = {
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                painterResource(R.drawable.arrow_back_24px),
+                                contentDescription = stringResource(R.string.back)
+                            )
+                        }
+                    }
+                },
                 scrollBehavior = scrollBehavior,
                 actions = {
-                    SshStatusBadge(sshState = sshState, ip = sshConfig.ip.redact(privacyMode))
-                    // Вход в форму сопряжения / смены сервера (перенесён с главного экрана).
-                    if (onEditConnection != null) {
-                        IconButton(onClick = {
-                            HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                            onEditConnection()
-                        }) {
-                            Icon(
-                                painterResource(R.drawable.host_24px),
-                                contentDescription = stringResource(R.string.connection)
-                            )
+                    // App bar разгружен: SSH-статус живёт в карточке статуса ниже, смена
+                    // сервера спрятана в overflow ⋮ — заголовок остаётся в одну строку.
+                    if (isActive && onEditConnection != null) {
+                        Box {
+                            IconButton(onClick = { showServerMenu = true }) {
+                                Icon(
+                                    painterResource(R.drawable.more_vert_24px),
+                                    contentDescription = stringResource(R.string.change_server)
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showServerMenu,
+                                onDismissRequest = { showServerMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.change_server)) },
+                                    onClick = {
+                                        showServerMenu = false
+                                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                                        onEditConnection()
+                                    },
+                                    leadingIcon = {
+                                        Icon(painterResource(R.drawable.host_24px), contentDescription = null)
+                                    }
+                                )
+                            }
                         }
                     }
                 }
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        // Settings-флоу (onBack != null) — внутри NavigationSuite, бар держит навбар-инсет.
+        // Онбординг (onBack == null) — полноэкранный, инсет держим сами.
+        contentWindowInsets = if (onBack != null) WindowInsets(0, 0, 0, 0) else WindowInsets.navigationBars
     ) { padding ->
         Column(
             modifier = Modifier
@@ -192,10 +244,23 @@ fun ServerManagementScreen(
             ) {
                 Spacer(Modifier.height(4.dp))
 
-                // Основная вкладка без активного сопряжения → приглашение/прогресс/ошибка
-                // вместо бесполезных задизейбленных контролов. В онбординге (mainFlow=false)
-                // сюда приходят уже Connected, поэтому ветка management как раньше.
-                if (mainFlow && !isConnected) {
+                // Неактивный профиль: живая SSH-сессия и управление ядром недоступны.
+                // Предлагаем сделать активным — после этого SSH/управление оживают.
+                if (!isActive) {
+                    InactiveServerCard(
+                        onMakeActive = {
+                            HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                            profileId?.let { settingsViewModel.applyProfile(it) }
+                        }
+                    )
+                    Spacer(Modifier.height(24.dp))
+                    return@Column
+                }
+
+                // Settings-флоу без активного сопряжения → приглашение/прогресс/ошибка
+                // вместо бесполезных задизейбленных контролов. В онбординге сюда приходят
+                // уже Connected, поэтому ветка management как раньше.
+                if (settingsFlow && !isConnected) {
                     // showPairing дебаунсит первичный показ — пустой экран до 400мс
                     // вместо мигающей карточки при загрузке config / авто-сопряжении.
                     if (showPairing) {
@@ -230,72 +295,15 @@ fun ServerManagementScreen(
                     }
                 }
 
-                // Status card
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Text(stringResource(R.string.server_status), style = MaterialTheme.typography.titleMedium)
-                        Spacer(Modifier.height(16.dp))
-                        StatusRow(
-                            label = stringResource(R.string.ssh_connection),
-                            isActive = isConnected,
-                            activeLabel = stringResource(R.string.paired),
-                            activeColor = MaterialTheme.extendedColorScheme.info
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        StatusRow(stringResource(R.string.free_turn_proxy), serverKnown?.running == true)
-
-                        if (serverKnown?.installed == true && !serverKnown.version.isNullOrBlank()) {
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                stringResource(R.string.server_version_label, serverKnown.version),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        installStage?.let { stage ->
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                when (stage) {
-                                    "cached" -> stringResource(R.string.server_install_cached)
-                                    "downloaded" -> stringResource(R.string.server_install_downloaded)
-                                    else -> stage
-                                },
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.extendedColorScheme.info
-                            )
-                        }
-
-                        when (serverState) {
-                            is ServerState.Checking -> {
-                                Spacer(Modifier.height(12.dp))
-                                LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
-                            }
-                            is ServerState.Working -> {
-                                Spacer(Modifier.height(12.dp))
-                                Text(
-                                    (serverState as ServerState.Working).action,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.secondary
-                                )
-                                Spacer(Modifier.height(6.dp))
-                                LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
-                            }
-                            is ServerState.Error -> {
-                                Spacer(Modifier.height(12.dp))
-                                Text(
-                                    stringResource(R.string.error_format, (serverState as ServerState.Error).message),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                            }
-                            else -> {}
-                        }
-                    }
-                }
+                // Статус сервера теперь в хабе (ServerDetailScreen.ServerStatusCard) —
+                // тут не дублируем. На этом экране — конфиг (apply-модель) + действия.
 
                 // Server config
-                Text(stringResource(R.string.server_config), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    stringResource(R.string.server_config),
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.semantics { heading() }
+                )
 
                 OutlinedTextField(
                     value = proxyListenIp,
@@ -328,17 +336,125 @@ fun ServerManagementScreen(
                     supportingText = { Text(stringResource(R.string.turn_client_desc)) }
                 )
 
-                // Индикатор TCP-форвард режима сервера
-                if (serverKnown?.running == true && serverKnown.tcpMode == true) {
+                // --- Синхронные настройки сервера (apply-модель, только settings-флоу) ---
+                if (settingsFlow) {
+                    HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
+
                     Text(
-                        text = stringResource(R.string.server_running_tcp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.extendedColorScheme.info
+                        stringResource(R.string.server_sync_section),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.semantics { heading() }
                     )
+
+                    // Проброс: UDP / TCP.
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.tcp_forward_mode), style = MaterialTheme.typography.bodyMedium)
+                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                            SegmentedButton(
+                                selected = !tcpDraft,
+                                onClick = { HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON); tcpDraft = false },
+                                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                            ) { Text(stringResource(R.string.udp)) }
+                            SegmentedButton(
+                                selected = tcpDraft,
+                                onClick = { HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON); tcpDraft = true },
+                                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                            ) { Text(stringResource(R.string.tcp)) }
+                        }
+                    }
+
+                    // Профиль обфускации.
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.obf_profile_title), style = MaterialTheme.typography.bodyMedium)
+                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                            ObfProfile.ALL.forEachIndexed { idx, value ->
+                                SegmentedButton(
+                                    selected = obfDraft == value,
+                                    onClick = { HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON); obfDraft = value },
+                                    shape = SegmentedButtonDefaults.itemShape(index = idx, count = ObfProfile.ALL.size)
+                                ) { Text(obfProfileLabel(value)) }
+                            }
+                        }
+                    }
+
+                    // obf-ключ (черновик) + регенерация на сервере (живая SSH-операция).
+                    if (obfDraft != ObfProfile.NONE) {
+                        OutlinedTextField(
+                            value = if (privacyMode) serverOpts.obfKey.redact(true) else keyDraft,
+                            onValueChange = { if (!privacyMode) keyDraft = it },
+                            label = { Text(stringResource(R.string.server_obf_key_label)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            readOnly = privacyMode,
+                            singleLine = true,
+                            isError = keyDraft.isNotBlank() && !keyDraft.matches(obfKeyRegex),
+                            trailingIcon = {
+                                if (serverOpts.obfKey.isNotBlank() && !privacyMode) {
+                                    IconButton(onClick = {
+                                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                                        val cm = context.getSystemService(android.content.ClipboardManager::class.java)
+                                        cm?.setPrimaryClip(android.content.ClipData.newPlainText("obf-key", serverOpts.obfKey))
+                                    }) {
+                                        Icon(
+                                            painterResource(R.drawable.content_copy_24px),
+                                            contentDescription = stringResource(R.string.copy)
+                                        )
+                                    }
+                                }
+                            },
+                            supportingText = {
+                                when {
+                                    keyDraft.isBlank() -> Text(stringResource(R.string.obf_key_empty_hint))
+                                    !keyDraft.matches(obfKeyRegex) -> Text(
+                                        stringResource(R.string.obf_key_invalid_hint),
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        )
+                        if (isConnected && !privacyMode) {
+                            TextButton(
+                                onClick = {
+                                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                                    serverViewModel.regenerateObfKey()
+                                },
+                                enabled = !isRegen,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                if (isRegen) {
+                                    CircularWavyProgressIndicator(modifier = Modifier.size(20.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(stringResource(R.string.obf_key_regen_in_progress))
+                                } else {
+                                    Text(stringResource(R.string.obf_key_regen))
+                                }
+                            }
+                        }
+                    }
+
+                    // Применить — фиксирует весь черновик одним рестартом, затем назад в хаб.
+                    Button(
+                        onClick = {
+                            HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                            settingsViewModel.applyServerConfig(listenFull, proxyConnect, tcpDraft, obfDraft, keyDraft)
+                            onBack?.invoke()
+                        },
+                        enabled = configDirty && keyOkForApply && !isWorking,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.large
+                    ) {
+                        Icon(painterResource(R.drawable.check_circle_24px), null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.server_apply))
+                    }
+                    Text(
+                        stringResource(R.string.server_apply_restart_note),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
                 }
 
-                // Режим туннеля / обфускация управляются на клиентском экране — общий source.
-                // Здесь не дублируем, чтобы не путать пользователя двумя точками контроля.
 
                 // Action buttons
                 FilledTonalButton(
@@ -389,12 +505,15 @@ fun ServerManagementScreen(
                     Text(stringResource(R.string.stop_server))
                 }
 
-                if (serverKnown?.running == true) {
+                // «Продолжить к настройке клиента» — шаг мастера онбординга (onBack == null).
+                // В settings-флоу (onBack != null) этой кнопки нет — там провайдер уже
+                // даёт отдельный вход в «Настройки подключения».
+                if (serverKnown?.running == true && onBack == null) {
                     Spacer(Modifier.height(4.dp))
                     Button(
                         onClick = {
                             HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                            onContinue()
+                            onContinue?.invoke()
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape = MaterialTheme.shapes.large
@@ -478,7 +597,7 @@ fun ServerManagementScreen(
                                 style = MaterialTheme.typography.titleMedium,
                                 modifier = Modifier.weight(1f)
                             )
-                            androidx.compose.material3.IconButton(
+                            IconButton(
                                 onClick = {
                                     HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                                     serverViewModel.fetchServerLogs()
@@ -491,7 +610,7 @@ fun ServerManagementScreen(
                                 )
                             }
                             if (serverLogs != null) {
-                                androidx.compose.material3.IconButton(
+                                IconButton(
                                     onClick = {
                                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                                         serverViewModel.clearServerLogs()
@@ -582,6 +701,40 @@ fun ServerManagementScreen(
 
                 Spacer(Modifier.height(24.dp))
             }
+        }
+    }
+}
+
+/** Карточка для неактивного профиля: управление ядром требует активного сервера. */
+@Composable
+private fun InactiveServerCard(onMakeActive: () -> Unit) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Icon(
+                painterResource(R.drawable.host_24px),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Text(
+                stringResource(R.string.server_inactive_title),
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center
+            )
+            Text(
+                stringResource(R.string.server_inactive_desc),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            Button(
+                onClick = onMakeActive,
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large
+            ) { Text(stringResource(R.string.make_active)) }
         }
     }
 }
@@ -690,56 +843,9 @@ private fun SshPairingPrompt(
 }
 
 @Composable
-private fun SshStatusBadge(sshState: SshConnectionState, ip: String) {
-    val connected = sshState is SshConnectionState.Connected
-    val dotColor = if (connected) MaterialTheme.extendedColorScheme.info
-                   else MaterialTheme.colorScheme.error
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(end = 16.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .background(dotColor, CircleShape)
-        )
-        Spacer(Modifier.width(6.dp))
-        Text(
-            if (connected) ip else stringResource(R.string.not_connected),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
+private fun obfProfileLabel(value: String): String = when (value) {
+    ObfProfile.NONE -> stringResource(R.string.obf_none)
+    ObfProfile.RTPOPUS -> stringResource(R.string.obf_rtpopus)
+    else -> value
 }
 
-@Composable
-private fun StatusRow(
-    label: String,
-    isActive: Boolean,
-    activeLabel: String = stringResource(R.string.active),
-    activeColor: Color = MaterialTheme.extendedColorScheme.success
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(
-                        if (isActive) activeColor else MaterialTheme.colorScheme.outline,
-                        CircleShape
-                    )
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                if (isActive) activeLabel else stringResource(R.string.inactive),
-                style = MaterialTheme.typography.labelSmall,
-                color = if (isActive) activeColor else MaterialTheme.colorScheme.outline
-            )
-        }
-    }
-}

@@ -41,7 +41,6 @@ object ProxyServiceState {
     val logs: StateFlow<List<String>> = _logs.asStateFlow()
 
     private val _logsEnabled = MutableStateFlow(true)
-    val logsEnabled: StateFlow<Boolean> = _logsEnabled.asStateFlow()
 
     private val _proxyFailed = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val proxyFailed: SharedFlow<Unit> = _proxyFailed.asSharedFlow()

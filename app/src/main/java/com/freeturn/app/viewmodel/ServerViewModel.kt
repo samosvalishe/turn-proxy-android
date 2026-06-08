@@ -3,7 +3,6 @@ package com.freeturn.app.viewmodel
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.freeturn.app.ProxyServiceState
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.SshConfig
 import com.freeturn.app.domain.ProxyOrchestrator
@@ -13,10 +12,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 
 class ServerViewModel(
     private val sshRepository: SshRepository,
@@ -40,7 +40,6 @@ class ServerViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SshConfig())
 
     private val _serverInstallStage = MutableStateFlow<String?>(null)
-    val serverInstallStage: StateFlow<String?> = _serverInstallStage.asStateFlow()
 
     private val _isRegeneratingObfKey = MutableStateFlow(false)
     val isRegeneratingObfKey: StateFlow<Boolean> = _isRegeneratingObfKey.asStateFlow()
@@ -50,6 +49,33 @@ class ServerViewModel(
 
     private val _lastWgConfig = MutableStateFlow<String?>(null)
     val lastWgConfig: StateFlow<String?> = _lastWgConfig.asStateFlow()
+
+    /**
+     * Сводный статус АКТИВНОГО сервера для хаба — одна модель из 3 потоков. Profile-контекст
+     * (активность профиля, наличие SSH) добавляет экран. Промежуточные фазы коллапсятся в
+     * [ServerHubStatus.Connecting]: от cold start до готовности — один переход в [ServerHubStatus.Online].
+     */
+    val hubStatus: StateFlow<ServerHubStatus> =
+        combine(sshState, serverState, _serverInstallStage) { ssh, server, stage ->
+            when {
+                ssh is SshConnectionState.Error -> ServerHubStatus.Failed(ssh.message)
+                server is ServerState.Error -> ServerHubStatus.Failed(server.message)
+                server is ServerState.Working -> ServerHubStatus.Working(server.action)
+                ssh is SshConnectionState.Connected && server is ServerState.Known ->
+                    ServerHubStatus.Online(
+                        running = server.running,
+                        installed = server.installed,
+                        tcpMode = server.tcpMode,
+                        obfProfile = server.obfProfile,
+                        version = server.version,
+                        installStage = stage,
+                        sshIp = ssh.ip
+                    )
+                // Disconnected / Connecting / Connected+Checking → единый busy-визуал.
+                else -> ServerHubStatus.Connecting
+            }
+        }.distinctUntilChanged()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ServerHubStatus.Connecting)
 
     fun connectSsh(config: SshConfig) {
         viewModelScope.launch {
@@ -135,7 +161,6 @@ class ServerViewModel(
     }
 
     fun consumeInstallStage() { _serverInstallStage.value = null }
-
     fun startServer() {
         viewModelScope.launch {
             val l = prefs.proxyListenFlow.first()

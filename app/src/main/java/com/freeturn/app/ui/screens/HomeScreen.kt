@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -53,7 +52,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberBottomSheetScaffoldState
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import android.Manifest
 import android.annotation.SuppressLint
@@ -155,8 +154,10 @@ fun HomeScreen(
     val profilesSnapshot by settingsViewModel.profilesSnapshot.collectAsStateWithLifecycle()
     val showBottomSheet = rememberSaveable { mutableStateOf(false) }
     val showSplitSheet = rememberSaveable { mutableStateOf(false) }
-    val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val splitSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val bottomSheetState = rememberBottomSheetState(
+        initialValue = SheetValue.Hidden,
+        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded)
+    )
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     // Standard bottom sheet: свёрнутый peek = карточка активного профиля,
@@ -332,21 +333,14 @@ fun HomeScreen(
     }
 
     if (showSplitSheet.value) {
-        ModalBottomSheet(
-            onDismissRequest = { showSplitSheet.value = false },
-            sheetState = splitSheetState,
-            containerColor = sheetColor,
-            // Не поднимаем контент над клавиатурой — иначе высокий лист «вырастает»
-            // на весь экран при фокусе поиска. Свои инсеты лист держит сам.
-            contentWindowInsets = { WindowInsets(0, 0, 0, 0) }
-        ) {
-            SplitTunnelSheetContent(
-                settingsViewModel = settingsViewModel,
-                mode = clientConfig.splitTunnelMode,
-                apps = clientConfig.splitTunnelApps,
-                locked = proxyState !is ProxyState.Idle && proxyState !is ProxyState.Error
-            )
-        }
+        SplitTunnelModal(
+            settingsViewModel = settingsViewModel,
+            mode = clientConfig.splitTunnelMode,
+            apps = clientConfig.splitTunnelApps,
+            locked = proxyState !is ProxyState.Idle && proxyState !is ProxyState.Error,
+            onDismiss = { showSplitSheet.value = false },
+            containerColor = sheetColor
+        )
     }
 
     UpdateDialogs(settingsViewModel)
@@ -832,7 +826,7 @@ private fun rememberProxyUptime(connectedSince: Long?): String? {
     val tick = androidx.compose.runtime.produceState(initialValue = 0L, connectedSince) {
         while (true) {
             value = android.os.SystemClock.elapsedRealtime()
-            kotlinx.coroutines.delay(1_000)
+            delay(1_000)
         }
     }
     val now = tick.value.coerceAtLeast(connectedSince)

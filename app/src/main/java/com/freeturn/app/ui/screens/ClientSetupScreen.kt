@@ -6,16 +6,15 @@
 package com.freeturn.app.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -55,13 +54,10 @@ import com.freeturn.app.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.data.ClientConfig
 import com.freeturn.app.data.DnsMode
-import com.freeturn.app.data.ObfProfile
 import com.freeturn.app.data.Provider
-import com.freeturn.app.data.TunnelTransport
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.viewmodel.ServerViewModel
 import com.freeturn.app.viewmodel.SettingsViewModel
-import com.freeturn.app.viewmodel.SshConnectionState
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 
@@ -74,26 +70,44 @@ import kotlinx.coroutines.delay
 fun ClientSetupScreen(
     settingsViewModel: SettingsViewModel,
     serverViewModel: ServerViewModel,
+    // null = онбординг/legacy-режим (профиль ещё не создан, пишем в legacy-ключи).
+    // не-null = редактируем конкретный профиль по id (Settings-флоу).
+    profileId: String? = null,
+    onBack: (() -> Unit)? = null,
     showFinishButton: Boolean = false,
     onFinish: (() -> Unit)? = null
 ) {
-    val saved by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
+    val snapshot by settingsViewModel.profilesSnapshot.collectAsStateWithLifecycle()
+    val legacyClient by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
     val sshConfig by serverViewModel.sshConfig.collectAsStateWithLifecycle()
-    val sshState by serverViewModel.sshState.collectAsStateWithLifecycle()
     val serverState by serverViewModel.serverState.collectAsStateWithLifecycle()
-    val serverOpts by serverViewModel.serverOpts.collectAsStateWithLifecycle()
-    val proxyListen by settingsViewModel.proxyListen.collectAsStateWithLifecycle()
+    val legacyProxyListen by settingsViewModel.proxyListen.collectAsStateWithLifecycle()
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
-    val isRegeneratingObfKey by serverViewModel.isRegeneratingObfKey.collectAsStateWithLifecycle()
 
-    val isSshConnected = sshState is SshConnectionState.Connected
+    // Источник данных: конкретный профиль по id либо legacy (онбординг).
+    val profile = profileId?.let { id -> snapshot.list.firstOrNull { it.id == id } }
+    val saved = profile?.client ?: legacyClient
+    // Активный профиль (или онбординг) рулит живым рантаймом: SSH-сессия, рестарты,
+    // sync с сервером. Для неактивного редактируем только хранимые данные.
+    val isActive = profileId == null || profileId == snapshot.activeId
+    val effSshIp = profile?.ssh?.ip ?: sshConfig.ip
+    val effProxyListen = profile?.proxyListen ?: legacyProxyListen
+
+    // Единая точка записи client-конфига: профиль by-id либо legacy.
+    fun clientEdit(transform: (ClientConfig) -> ClientConfig) {
+        if (profileId != null) {
+            settingsViewModel.updateProfileClient(profileId, transform)
+        } else {
+            settingsViewModel.saveClientConfig(transform(settingsViewModel.clientConfig.value), snapshot.activeId)
+        }
+    }
+
     val serverKnown = serverState as? com.freeturn.app.viewmodel.ServerState.Known
-    // В sync-режиме эффективное значение — реальное состояние сервера из probe
-    // (если запущен), иначе сохранённое. В !sync режиме — всегда сохранённое:
-    // серверная и клиентская стороны могут различаться, и UI отражает клиента.
+    // TCP-форвард: в sync-режиме у активного сервера берём реальное состояние из probe
+    // (если запущен), иначе — сохранённое значение клиента. Нужно лишь для показа Bond.
     val syncOn = saved.syncServerSwitches
-    val effectiveTcpForward = if (syncOn && serverKnown?.running == true) serverKnown.tcpMode ?: saved.tcpForward else saved.tcpForward
-    val effectiveObfProfile = if (syncOn && serverKnown?.running == true) serverKnown.obfProfile ?: serverOpts.obfProfile else serverOpts.obfProfile
+    val effectiveTcpForward = if (isActive && syncOn && serverKnown?.running == true)
+        serverKnown.tcpMode ?: saved.tcpForward else saved.tcpForward
 
     val context = LocalContext.current
 
@@ -105,43 +119,34 @@ fun ClientSetupScreen(
     var streamsPerCred by remember(saved.streamsPerCred) { mutableFloatStateOf(saved.streamsPerCred.toFloat()) }
     var localPort    by remember(saved.localPort)      { mutableStateOf(saved.localPort) }
     var magicTurn by remember(saved.magicTurn) { mutableStateOf(saved.magicTurn) }
-    var wireGuardTunnelName by remember(saved.wireGuardTunnelName) { mutableStateOf(saved.wireGuardTunnelName) }
-    var wireGuardConfig by remember(saved.wireGuardConfig) { mutableStateOf(saved.wireGuardConfig) }
     var lastSliderInt by remember(saved.threads) { mutableIntStateOf(saved.threads) }
     var lastStreamsInt by remember(saved.streamsPerCred) { mutableIntStateOf(saved.streamsPerCred) }
 
     // Автозаполнение адреса сервера из SSH-конфига если поле пустое
-    LaunchedEffect(sshConfig.ip, proxyListen) {
-        if (serverAddress.isBlank() && sshConfig.ip.isNotBlank()) {
-            val port = proxyListen.substringAfterLast(":", "56000")
-            serverAddress = "${sshConfig.ip}:$port"
+    LaunchedEffect(effSshIp, effProxyListen) {
+        if (serverAddress.isBlank() && effSshIp.isNotBlank()) {
+            val port = effProxyListen.substringAfterLast(":", "56000")
+            serverAddress = "$effSshIp:$port"
         }
     }
 
-    // Профиль полей (синхронно с saved). Сейв сверит с активным — защита от гонки
-    // переключения за время дебаунса.
-    val fieldsProfileId = remember(saved) { settingsViewModel.profilesSnapshot.value.activeId }
-
-    // Авто-сохранение с дебаунсом 600 мс для текстовых полей и ползунков
+    // Авто-сохранение с дебаунсом 600 мс для текстовых полей и ползунков.
+    // clientEdit сам маршрутизирует запись в профиль by-id либо в legacy и под
+    // mutex сверяет цель — защита от гонки переключения за время дебаунса.
     LaunchedEffect(
-        serverAddress, vkLink, threads, streamsPerCred, localPort, magicTurn,
-        wireGuardTunnelName, wireGuardConfig
+        serverAddress, vkLink, threads, streamsPerCred, localPort, magicTurn
     ) {
         delay(600)
-        val current = settingsViewModel.clientConfig.value
-        settingsViewModel.saveClientConfig(
+        clientEdit { current ->
             current.copy(
                 serverAddress = serverAddress.trim(),
                 vkLink        = vkLink.trim(),
                 threads       = threads.roundToInt(),
                 streamsPerCred = streamsPerCred.roundToInt(),
                 localPort     = localPort.trim(),
-                magicTurn     = magicTurn.trim(),
-                wireGuardTunnelName = wireGuardTunnelName.trim().ifBlank { TunnelTransport.DEFAULT_TUNNEL_NAME },
-                wireGuardConfig = wireGuardConfig.trim()
-            ),
-            fieldsProfileId
-        )
+                magicTurn     = magicTurn.trim()
+            )
+        }
     }
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
@@ -150,11 +155,21 @@ fun ClientSetupScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.client_title)) },
+                title = { Text(stringResource(R.string.provider_connection_settings)) },
+                navigationIcon = {
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                painterResource(R.drawable.arrow_back_24px),
+                                contentDescription = stringResource(R.string.back)
+                            )
+                        }
+                    }
+                },
                 scrollBehavior = scrollBehavior
             )
         },
-        contentWindowInsets = WindowInsets(0, 0, 0, 0)
+        contentWindowInsets = if (onBack != null) WindowInsets(0, 0, 0, 0) else WindowInsets.navigationBars
     ) { padding ->
         Column(
             modifier = Modifier
@@ -292,7 +307,7 @@ fun ClientSetupScreen(
                                 selected = saved.dnsMode == value,
                                 onClick = {
                                     HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                    settingsViewModel.setDnsMode(value)
+                                    clientEdit { it.copy(dnsMode = value) }
                                 },
                                 shape = SegmentedButtonDefaults.itemShape(index = idx, count = dnsOptions.size)
                             ) { Text(label) }
@@ -315,7 +330,7 @@ fun ClientSetupScreen(
                             selected = !saved.useUdp,
                             onClick = {
                                 HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                settingsViewModel.setUseUdp(false)
+                                clientEdit { it.copy(useUdp = false) }
                             },
                             shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
                         ) { Text(stringResource(R.string.tcp)) }
@@ -323,7 +338,7 @@ fun ClientSetupScreen(
                             selected = saved.useUdp,
                             onClick = {
                                 HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                settingsViewModel.setUseUdp(true)
+                                clientEdit { it.copy(useUdp = true) }
                             },
                             shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
                         ) { Text(stringResource(R.string.udp)) }
@@ -336,9 +351,9 @@ fun ClientSetupScreen(
                     label = stringResource(R.string.manual_captcha),
                     description = stringResource(R.string.manual_captcha_desc),
                     checked = saved.manualCaptcha,
-                    onCheckedChange = {
-                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                        settingsViewModel.setManualCaptcha(it)
+                    onCheckedChange = { v ->
+                        HapticUtil.perform(context, if (v) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                        clientEdit { it.copy(manualCaptcha = v) }
                     }
                 )
 
@@ -346,9 +361,9 @@ fun ClientSetupScreen(
                     label = stringResource(R.string.use_carrier_dns),
                     description = stringResource(R.string.use_carrier_dns_desc),
                     checked = saved.useCarrierDns,
-                    onCheckedChange = {
-                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                        settingsViewModel.setUseCarrierDns(it)
+                    onCheckedChange = { v ->
+                        HapticUtil.perform(context, if (v) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                        clientEdit { it.copy(useCarrierDns = v) }
                     }
                 )
 
@@ -356,9 +371,9 @@ fun ClientSetupScreen(
                     label = stringResource(R.string.debug_mode),
                     description = stringResource(R.string.debug_mode_desc),
                     checked = saved.debugMode,
-                    onCheckedChange = {
-                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                        settingsViewModel.setDebugMode(it)
+                    onCheckedChange = { v ->
+                        HapticUtil.perform(context, if (v) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                        clientEdit { it.copy(debugMode = v) }
                     }
                 )
 
@@ -366,9 +381,9 @@ fun ClientSetupScreen(
                     label = stringResource(R.string.magic_switch),
                     description = stringResource(R.string.magic_switch_desc),
                     checked = saved.magicSwitch,
-                    onCheckedChange = {
-                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                        settingsViewModel.setMagicSwitch(it)
+                    onCheckedChange = { v ->
+                        HapticUtil.perform(context, if (v) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                        clientEdit { it.copy(magicSwitch = v) }
                     }
                 )
 
@@ -392,221 +407,30 @@ fun ClientSetupScreen(
                         label = stringResource(R.string.client_bond),
                         description = stringResource(R.string.client_bond_desc),
                         checked = saved.bond,
-                        onCheckedChange = {
-                            HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                            settingsViewModel.setBond(it)
+                        onCheckedChange = { v ->
+                            HapticUtil.perform(context, if (v) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                            // bond триггерит рестарт прокси только у активного; иначе пишем данные.
+                            if (isActive) settingsViewModel.setBond(v) else clientEdit { it.copy(bond = v) }
                         }
                     )
                 }
 
                 HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
 
-                // --- Туннельное приложение (WireGuard) ---
-                Text(stringResource(R.string.tunnel_transport_title), style = MaterialTheme.typography.titleMedium)
-                Text(
-                    stringResource(R.string.tunnel_transport_desc),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Text(stringResource(R.string.wireguard_section), style = MaterialTheme.typography.bodyMedium)
-                OutlinedTextField(
-                    value = wireGuardTunnelName.redact(privacyMode),
-                    onValueChange = { if (!privacyMode) wireGuardTunnelName = it },
-                    label = { Text(stringResource(R.string.wireguard_tunnel_name)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    readOnly = privacyMode
-                )
-                OutlinedTextField(
-                    value = wireGuardConfig.redact(privacyMode),
-                    onValueChange = { if (!privacyMode) wireGuardConfig = it },
-                    label = { Text(stringResource(R.string.wireguard_config_label)) },
-                    placeholder = { Text(stringResource(R.string.wireguard_config_placeholder)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 8,
-                    readOnly = privacyMode,
-                    supportingText = { Text(stringResource(R.string.wireguard_config_support)) }
-                )
-
-                // Split-tunneling настраивается на главном экране (SplitTunnelSheet),
-                // здесь — только WG-конфиг и тоггл логов.
+                // Режим подключения (Proxy/VPN) и WireGuard-конфиг вынесены в отдельный
+                // экран «Режим подключения» (ConnectionModeScreen). Здесь — клиентские
+                // параметры ядра и тоггл логов.
 
                 SwitchRow(
                     label = stringResource(R.string.logs_enabled),
                     description = stringResource(R.string.logs_enabled_desc),
                     checked = saved.logsEnabled,
-                    onCheckedChange = {
-                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                        settingsViewModel.setLogsEnabled(it)
+                    onCheckedChange = { v ->
+                        HapticUtil.perform(context, if (v) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
+                        clientEdit { it.copy(logsEnabled = v) }
                     }
                 )
 
-                HorizontalDivider(Modifier, DividerDefaults.Thickness, DividerDefaults.color)
-
-                Text(
-                    stringResource(R.string.server_sync_section),
-                    style = MaterialTheme.typography.titleMedium
-                )
-
-                SwitchRow(
-                    label = stringResource(R.string.sync_server_switches),
-                    description = stringResource(R.string.sync_server_switches_desc),
-                    checked = syncOn,
-                    onCheckedChange = {
-                        HapticUtil.perform(context, if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF)
-                        settingsViewModel.setSyncServerSwitches(it)
-                    }
-                )
-
-                // В sync-режиме менять эти флаги без SSH опасно (рассинхрон).
-                // В !sync — клиентские, SSH не нужен.
-                val controlsEnabled = if (syncOn) isSshConnected else true
-                val lockedHint = if (syncOn)
-                    stringResource(R.string.locked_disconnect_hint) else null
-
-                // TCP-форвард — табы (UDP по умолчанию / TCP для проброса). Синхр. с сервером.
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Column {
-                        Text(stringResource(R.string.tcp_forward_mode), style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            lockedHint?.takeIf { !isSshConnected }
-                                ?: stringResource(R.string.tcp_forward_mode_desc),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        SegmentedButton(
-                            selected = !effectiveTcpForward,
-                            enabled = controlsEnabled,
-                            onClick = {
-                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                settingsViewModel.setTcpForward(false)
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                        ) { Text(stringResource(R.string.udp)) }
-                        SegmentedButton(
-                            selected = effectiveTcpForward,
-                            enabled = controlsEnabled,
-                            onClick = {
-                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                settingsViewModel.setTcpForward(true)
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                        ) { Text(stringResource(R.string.tcp)) }
-                    }
-                }
-
-                // Профиль обфускации — табы (как транспорт). Должен совпадать с сервером.
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Column {
-                        Text(stringResource(R.string.obf_profile_title), style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            lockedHint?.takeIf { !isSshConnected }
-                                ?: stringResource(R.string.obf_profile_desc),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                        ObfProfile.ALL.forEachIndexed { idx, value ->
-                            SegmentedButton(
-                                selected = effectiveObfProfile == value,
-                                enabled = controlsEnabled,
-                                onClick = {
-                                    HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                    settingsViewModel.setObfProfile(value)
-                                },
-                                shape = SegmentedButtonDefaults.itemShape(index = idx, count = ObfProfile.ALL.size)
-                            ) { Text(obfProfileLabel(value)) }
-                        }
-                    }
-                }
-
-                if (effectiveObfProfile != ObfProfile.NONE) {
-                    val obfKeyRegex = remember { Regex("^[0-9a-fA-F]{64}$") }
-                    // Локальный черновик: правки в TextField не дёргают saveServerOpts/restart
-                    // на каждом keystroke. Применение — отдельной кнопкой ниже, только когда
-                    // ключ валидный (64 hex). Серверный ключ из serverOpts — источник истины:
-                    // при внешнем обновлении (regen/probe) черновик пересинхронизируется.
-                    var obfKeyDraft by remember(serverOpts.obfKey) {
-                        mutableStateOf(serverOpts.obfKey)
-                    }
-                    val draftValid = obfKeyDraft.matches(obfKeyRegex)
-                    val draftDirty = obfKeyDraft != serverOpts.obfKey
-                    OutlinedTextField(
-                        value = if (privacyMode) serverOpts.obfKey.redact(true) else obfKeyDraft,
-                        onValueChange = { if (!privacyMode) obfKeyDraft = it },
-                        label = { Text(stringResource(R.string.server_obf_key_label)) },
-                        modifier = Modifier.fillMaxWidth(),
-                        readOnly = privacyMode,
-                        singleLine = true,
-                        isError = obfKeyDraft.isNotBlank() && !draftValid,
-                        trailingIcon = {
-                            if (serverOpts.obfKey.isNotBlank() && !privacyMode) {
-                                IconButton(onClick = {
-                                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                                    val cm = context.getSystemService(android.content.ClipboardManager::class.java)
-                                    cm?.setPrimaryClip(
-                                        android.content.ClipData.newPlainText("obf-key", serverOpts.obfKey)
-                                    )
-                                }) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.content_copy_24px),
-                                        contentDescription = stringResource(R.string.copy)
-                                    )
-                                }
-                            }
-                        },
-                        supportingText = {
-                            when {
-                                obfKeyDraft.isBlank() -> Text(
-                                    stringResource(R.string.obf_key_empty_hint),
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                                !draftValid -> Text(
-                                    stringResource(R.string.obf_key_invalid_hint),
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        }
-                    )
-                    if (!privacyMode && draftDirty) {
-                        androidx.compose.material3.TextButton(
-                            onClick = {
-                                HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                                settingsViewModel.setObfKey(obfKeyDraft)
-                            },
-                            enabled = draftValid,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(stringResource(R.string.obf_key_apply))
-                        }
-                    }
-                    if (isSshConnected) {
-                        Box(modifier = Modifier.fillMaxWidth()) {
-                            androidx.compose.material3.TextButton(
-                                onClick = {
-                                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                                    serverViewModel.regenerateObfKey()
-                                },
-                                enabled = !isRegeneratingObfKey,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                if (isRegeneratingObfKey) {
-                                    androidx.compose.material3.CircularWavyProgressIndicator(
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(Modifier.size(8.dp))
-                                    Text(stringResource(R.string.obf_key_regen_in_progress))
-                                } else {
-                                    Text(stringResource(R.string.obf_key_regen))
-                                }
-                            }
-                        }
-                    }
-                }
 
                 // Кнопка «Завершить» — только в онбординг-флоу
                 if (showFinishButton && onFinish != null) {
@@ -628,7 +452,7 @@ fun ClientSetupScreen(
 }
 
 @Composable
-private fun SwitchRow(
+internal fun SwitchRow(
     label: String,
     description: String,
     checked: Boolean,
@@ -657,9 +481,3 @@ private fun SwitchRow(
     }
 }
 
-@Composable
-private fun obfProfileLabel(value: String): String = when (value) {
-    ObfProfile.NONE -> stringResource(R.string.obf_none)
-    ObfProfile.RTPOPUS -> stringResource(R.string.obf_rtpopus)
-    else -> value
-}

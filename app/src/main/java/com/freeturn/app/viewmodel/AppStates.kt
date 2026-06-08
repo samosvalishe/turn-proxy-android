@@ -25,6 +25,29 @@ sealed class ServerState {
     data class Error(val message: String) : ServerState()
 }
 
+sealed interface ServerHubStatus {
+    /** Профиль не активен: живой SSH/ядро принадлежат активному. Предлагаем активировать. */
+    data class Offline(val serverAddress: String?, val sshIp: String?) : ServerHubStatus
+    /** Активен, но SSH не настроен — нечего подключать. */
+    data object NotPaired : ServerHubStatus
+    /** Идёт подключение/проверка (единая busy-фаза, skeleton). */
+    data object Connecting : ServerHubStatus
+    /** Идёт серверное действие (старт/стоп/установка). */
+    data class Working(val action: String) : ServerHubStatus
+    /** SSH установлен и состояние ядра известно. */
+    data class Online(
+        val running: Boolean,
+        val installed: Boolean,
+        val tcpMode: Boolean?,
+        val obfProfile: String?,
+        val version: String?,
+        val installStage: String?,
+        val sshIp: String
+    ) : ServerHubStatus
+    /** Ошибка SSH или серверной команды. */
+    data class Failed(val message: String?) : ServerHubStatus
+}
+
 // Local proxy client states
 sealed class ProxyState {
     object Idle : ProxyState()

@@ -1,6 +1,14 @@
 package com.freeturn.app.ui.navigation
 
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.AlertDialog
@@ -26,18 +34,26 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.freeturn.app.R
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import com.freeturn.app.ui.HapticUtil
+import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.screens.CaptchaWebViewDialog
 import com.freeturn.app.ui.screens.ClientSetupScreen
+import com.freeturn.app.ui.screens.ConnectionModeScreen
 import com.freeturn.app.ui.screens.HomeScreen
 import com.freeturn.app.ui.screens.LogsScreen
 import com.freeturn.app.ui.screens.OnboardingScreen
+import com.freeturn.app.ui.screens.ServerDetailScreen
 import com.freeturn.app.ui.screens.ServerManagementScreen
+import com.freeturn.app.ui.screens.ServersListScreen
+import com.freeturn.app.ui.screens.SettingsScreen
 import com.freeturn.app.ui.screens.SshSetupScreen
 import com.freeturn.app.viewmodel.ProxyState
 import com.freeturn.app.viewmodel.SettingsViewModel
@@ -47,18 +63,39 @@ import org.koin.androidx.compose.koinViewModel
 
 object Routes {
     const val ONBOARDING = "onboarding"
-    const val SSH_SETUP = "ssh_setup"              // из настроек/инфо-модалки
+    const val SSH_SETUP = "ssh_setup"              // из настроек сервера
     const val SSH_SETUP_OB = "ssh_setup_ob"        // только в мастере онбординга
-    const val SERVER_MANAGEMENT = "server_management"
     const val SERVER_MANAGEMENT_OB = "server_management_ob" // только в мастере онбординга
-    const val CLIENT_SETUP = "client_setup"
     const val CLIENT_SETUP_OB = "client_setup_onboarding"
+
+    // Графы вкладок нижнего меню. У каждой вкладки свой back-stack: бар виден на всех
+    // уровнях вложенности, повторный тап по активной вкладке возвращает в её корень.
+    const val HOME_GRAPH = "home_graph"
+    const val LOGS_GRAPH = "logs_graph"
+    const val SETTINGS_GRAPH = "settings_graph"
+
     const val HOME = "home"
     const val LOGS = "logs"
+
+    // Settings-флоу: Настройки → Серверы → [сервер] → подключение / сервер
+    const val SETTINGS = "settings"
+    const val SERVERS_LIST = "servers_list"
+    const val SERVER_DETAIL = "server_detail/{profileId}"
+    const val CONNECTION_MODE = "connection_mode/{profileId}"
+    const val CLIENT_SETUP = "client_setup/{profileId}"
+    const val SERVER_MANAGEMENT = "server_management/{profileId}"
+
+    fun serverDetail(id: String) = "server_detail/$id"
+    fun connectionMode(id: String) = "connection_mode/$id"
+    fun clientSetup(id: String) = "client_setup/$id"
+    fun serverManagement(id: String) = "server_management/$id"
 }
 
-// Нижнее меню / рельс видно только в основном потоке, не во время онбординга
-private val BOTTOM_NAV_ROUTES = setOf(Routes.HOME, Routes.LOGS, Routes.SERVER_MANAGEMENT, Routes.CLIENT_SETUP)
+// MD3 emphasized-кривая + длительности навигационных переходов (единый источник).
+private val EmphasizedEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+private const val NAV_SLIDE_MS = 300
+private const val NAV_FADE_IN_MS = 180
+private const val NAV_FADE_OUT_MS = 120
 
 @Composable
 fun AppNavigation(
@@ -75,11 +112,15 @@ fun AppNavigation(
     val proxyState by proxyViewModel.proxyState.collectAsStateWithLifecycle()
     val initialOnboardingDone by settingsViewModel.initialOnboardingDone.collectAsStateWithLifecycle()
     val initialTgSubscribeShown by settingsViewModel.initialTgSubscribeShown.collectAsStateWithLifecycle()
-    val startDestination = remember { if (initialOnboardingDone) Routes.HOME else Routes.ONBOARDING }
+    val startDestination = remember { if (initialOnboardingDone) Routes.HOME_GRAPH else Routes.ONBOARDING }
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
-    val currentRoute = backStackEntry?.destination?.route
-    val showNavSuite = currentRoute in BOTTOM_NAV_ROUTES
+    val destination = backStackEntry?.destination
+    // Бар виден, когда текущий экран принадлежит одному из графов-вкладок (т.е. не
+    // онбординг). hierarchy включает родительский граф на любом уровне вложенности.
+    val showNavSuite = navItems.any { item ->
+        destination?.hierarchy?.any { it.route == item.graphRoute } == true
+    }
 
     var showTgDialog by rememberSaveable { mutableStateOf(!initialTgSubscribeShown && initialOnboardingDone) }
 
@@ -93,19 +134,25 @@ fun AppNavigation(
         layoutType = layoutType,
         navigationSuiteItems = {
             navItems.forEach { item ->
-                val selected = currentRoute == item.route
+                val selected = destination?.hierarchy?.any { it.route == item.graphRoute } == true
                 item(
                     selected = selected,
                     onClick = {
-                        if (!selected) HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
-                        navController.navigate(item.route) {
-                            popUpTo(Routes.HOME) { saveState = true; inclusive = false }
-                            launchSingleTop = true
-                            restoreState = true
+                        if (selected) {
+                            // Повторный тап по активной вкладке — назад в её корень.
+                            navController.popBackStack(item.startRoute, inclusive = false)
+                        } else {
+                            HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
+                            navController.navigate(item.graphRoute) {
+                                // Сохраняем стек текущей вкладки, восстанавливаем целевую.
+                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
                         }
                     },
                     icon = {
-                        Crossfade(targetState = selected, label = "nav_icon_${item.route}") { isSelected ->
+                        Crossfade(targetState = selected, label = "nav_icon_${item.graphRoute}") { isSelected ->
                             Icon(
                                 painter = painterResource(
                                     if (isSelected) item.selectedIconRes else item.unselectedIconRes
@@ -165,20 +212,45 @@ private fun AppNavHost(
     serverViewModel: ServerViewModel,
     startDestination: String
 ) {
+    // Reduced-motion (системная «Убрать анимации»): мгновенные переходы без слайда.
+    // MotionScheme.expressive() в теме рулит моушеном самих m3-компонентов; здесь —
+    // только навигационные shared-axis X переходы, единый источник длительностей выше.
+    val reducedMotion = LocalReducedMotion.current
     NavHost(
         navController = navController,
         startDestination = startDestination,
         modifier = Modifier
             .fillMaxSize()
-            .statusBarsPadding()
+            .statusBarsPadding(),
+        // Снаппи emphasized shared-axis X вместо дефолтного медленного 700ms-fade.
+        enterTransition = {
+            if (reducedMotion) EnterTransition.None
+            else fadeIn(tween(NAV_FADE_IN_MS, easing = EmphasizedEasing)) +
+                slideInHorizontally(tween(NAV_SLIDE_MS, easing = EmphasizedEasing)) { it / 5 }
+        },
+        exitTransition = {
+            if (reducedMotion) ExitTransition.None
+            else fadeOut(tween(NAV_FADE_OUT_MS, easing = EmphasizedEasing)) +
+                slideOutHorizontally(tween(NAV_SLIDE_MS, easing = EmphasizedEasing)) { -it / 12 }
+        },
+        popEnterTransition = {
+            if (reducedMotion) EnterTransition.None
+            else fadeIn(tween(NAV_FADE_IN_MS, easing = EmphasizedEasing)) +
+                slideInHorizontally(tween(NAV_SLIDE_MS, easing = EmphasizedEasing)) { -it / 5 }
+        },
+        popExitTransition = {
+            if (reducedMotion) ExitTransition.None
+            else fadeOut(tween(NAV_FADE_OUT_MS, easing = EmphasizedEasing)) +
+                slideOutHorizontally(tween(NAV_SLIDE_MS, easing = EmphasizedEasing)) { it / 12 }
+        }
     ) {
-        // Онбординг-мастер (без навигации)
+        // Онбординг-мастер (вне графов-вкладок → нижнее меню скрыто)
         composable(Routes.ONBOARDING) {
             OnboardingScreen(
                 onSetupServer = { navController.navigate(Routes.SSH_SETUP_OB) },
                 onSkip = {
                     settingsViewModel.setOnboardingDone()
-                    navController.navigate(Routes.HOME) {
+                    navController.navigate(Routes.HOME_GRAPH) {
                         popUpTo(navController.graph.startDestinationId) { inclusive = true }
                         launchSingleTop = true
                     }
@@ -219,7 +291,7 @@ private fun AppNavHost(
                 showFinishButton = true,
                 onFinish = {
                     settingsViewModel.setOnboardingDone()
-                    navController.navigate(Routes.HOME) {
+                    navController.navigate(Routes.HOME_GRAPH) {
                         popUpTo(navController.graph.startDestinationId) { inclusive = true }
                         launchSingleTop = true
                     }
@@ -227,56 +299,98 @@ private fun AppNavHost(
             )
         }
 
-        // Основной поток (с навигацией)
-        composable(Routes.SSH_SETUP) {
-            SshSetupScreen(
-                serverViewModel = serverViewModel,
-                settingsViewModel = settingsViewModel,
-                // Форма открыта поверх экрана сервера — после успеха возвращаемся на него.
-                onConnected = { navController.popBackStack() },
-                onBack = { navController.popBackStack() }
-            )
+        // Вкладка «Главная»
+        navigation(startDestination = Routes.HOME, route = Routes.HOME_GRAPH) {
+            composable(Routes.HOME) {
+                HomeScreen(
+                    settingsViewModel = settingsViewModel,
+                    proxyViewModel = proxyViewModel
+                )
+            }
         }
 
-        composable(Routes.SERVER_MANAGEMENT) {
-            ServerManagementScreen(
-                serverViewModel = serverViewModel,
-                settingsViewModel = settingsViewModel,
-                onEditConnection = { navController.navigate(Routes.SSH_SETUP) },
-                onContinue = {
-                    navController.navigate(Routes.CLIENT_SETUP) {
-                        // Убираем SERVER_MANAGEMENT из back stack,
-                        // иначе он остаётся под CLIENT_SETUP и навигация ломается
-                        popUpTo(Routes.HOME) { inclusive = false; saveState = false }
-                        launchSingleTop = true
-                    }
-                }
-            )
+        // Вкладка «Логи»
+        navigation(startDestination = Routes.LOGS, route = Routes.LOGS_GRAPH) {
+            composable(Routes.LOGS) {
+                LogsScreen(proxyViewModel = proxyViewModel)
+            }
         }
 
-        composable(Routes.CLIENT_SETUP) {
-            ClientSetupScreen(
-                settingsViewModel = settingsViewModel,
-                serverViewModel = serverViewModel,
-                showFinishButton = false
-            )
-        }
+        // Вкладка «Настройки»: Настройки → Серверы → [сервер] → подключение/режим/сервер → SSH
+        navigation(startDestination = Routes.SETTINGS, route = Routes.SETTINGS_GRAPH) {
+            composable(Routes.SETTINGS) {
+                SettingsScreen(onOpenServers = { navController.navigate(Routes.SERVERS_LIST) })
+            }
 
-        composable(Routes.HOME) {
-            HomeScreen(
-                settingsViewModel = settingsViewModel,
-                proxyViewModel = proxyViewModel
-            )
-        }
+            composable(Routes.SERVERS_LIST) {
+                ServersListScreen(
+                    settingsViewModel = settingsViewModel,
+                    onBack = { navController.popBackStack() },
+                    onOpenServer = { id -> navController.navigate(Routes.serverDetail(id)) }
+                )
+            }
 
-        composable(Routes.LOGS) {
-            LogsScreen(proxyViewModel = proxyViewModel)
+            composable(Routes.SERVER_DETAIL) { entry ->
+                val id = entry.arguments?.getString("profileId").orEmpty()
+                ServerDetailScreen(
+                    profileId = id,
+                    settingsViewModel = settingsViewModel,
+                    serverViewModel = serverViewModel,
+                    onBack = { navController.popBackStack() },
+                    onOpenConnection = { navController.navigate(Routes.clientSetup(id)) },
+                    onOpenConnectionMode = { navController.navigate(Routes.connectionMode(id)) },
+                    onOpenServerSettings = { navController.navigate(Routes.serverManagement(id)) }
+                )
+            }
+
+            composable(Routes.CONNECTION_MODE) { entry ->
+                val id = entry.arguments?.getString("profileId").orEmpty()
+                ConnectionModeScreen(
+                    settingsViewModel = settingsViewModel,
+                    proxyViewModel = proxyViewModel,
+                    profileId = id,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Routes.SERVER_MANAGEMENT) { entry ->
+                val id = entry.arguments?.getString("profileId").orEmpty()
+                ServerManagementScreen(
+                    serverViewModel = serverViewModel,
+                    settingsViewModel = settingsViewModel,
+                    profileId = id,
+                    onBack = { navController.popBackStack() },
+                    onEditConnection = { navController.navigate(Routes.SSH_SETUP) }
+                )
+            }
+
+            composable(Routes.CLIENT_SETUP) { entry ->
+                val id = entry.arguments?.getString("profileId").orEmpty()
+                ClientSetupScreen(
+                    settingsViewModel = settingsViewModel,
+                    serverViewModel = serverViewModel,
+                    profileId = id,
+                    onBack = { navController.popBackStack() },
+                    showFinishButton = false
+                )
+            }
+
+            composable(Routes.SSH_SETUP) {
+                SshSetupScreen(
+                    serverViewModel = serverViewModel,
+                    settingsViewModel = settingsViewModel,
+                    // Форма поверх настроек сервера — после успеха возвращаемся назад.
+                    onConnected = { navController.popBackStack() },
+                    onBack = { navController.popBackStack() }
+                )
+            }
         }
     }
 }
 
 private data class NavItem(
-    val route: String,
+    val graphRoute: String,   // граф-вкладка (цель навигации, проверка selected)
+    val startRoute: String,   // корневой экран вкладки (для re-tap → корень)
     val labelResId: Int,
     val selectedIconRes: Int,
     val unselectedIconRes: Int
@@ -303,8 +417,7 @@ private fun TelegramSubscribeDialog(onSubscribe: () -> Unit, onDismiss: () -> Un
 }
 
 private val navItems = listOf(
-    NavItem(Routes.HOME, R.string.nav_home, R.drawable.home_24px, R.drawable.home_outlined_24px),
-    NavItem(Routes.SERVER_MANAGEMENT, R.string.server, R.drawable.database_24px, R.drawable.database_outlined_24px),
-    NavItem(Routes.CLIENT_SETUP, R.string.client_title, R.drawable.mobile_24px, R.drawable.mobile_outlined_24px),
-    NavItem(Routes.LOGS, R.string.logs_title, R.drawable.terminal_24px, R.drawable.terminal_24px)
+    NavItem(Routes.HOME_GRAPH, Routes.HOME, R.string.nav_home, R.drawable.home_24px, R.drawable.home_outlined_24px),
+    NavItem(Routes.LOGS_GRAPH, Routes.LOGS, R.string.logs_title, R.drawable.terminal_24px, R.drawable.terminal_24px),
+    NavItem(Routes.SETTINGS_GRAPH, Routes.SETTINGS, R.string.nav_settings, R.drawable.settings_24px, R.drawable.settings_outlined_24px)
 )

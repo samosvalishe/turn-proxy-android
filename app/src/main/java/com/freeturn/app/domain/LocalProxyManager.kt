@@ -17,7 +17,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -213,9 +212,5 @@ class LocalProxyManager(private val context: Context) {
 
     fun clearState() {
         _proxyState.value = ProxyState.Idle
-    }
-
-    fun destroy() {
-        scope.cancel()
     }
 }

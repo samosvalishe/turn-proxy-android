@@ -12,7 +12,6 @@ import com.freeturn.app.data.ObfProfile
 import com.freeturn.app.data.Profile
 import com.freeturn.app.data.ProfileJson
 import com.freeturn.app.data.ProfilesSnapshot
-import com.freeturn.app.data.SshConfig
 import com.freeturn.app.domain.AppUpdater
 import com.freeturn.app.domain.LocalProxyManager
 import com.freeturn.app.domain.ProxyOrchestrator
@@ -54,9 +53,6 @@ class SettingsViewModel(
     val dynamicTheme: StateFlow<Boolean> = prefs.dynamicThemeFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), true)
 
-    val tgSubscribeShown: StateFlow<Boolean> = prefs.tgSubscribeShownFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
-
     val profilesSnapshot: StateFlow<ProfilesSnapshot> = prefs.profilesSnapshot
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ProfilesSnapshot())
 
@@ -70,9 +66,6 @@ class SettingsViewModel(
 
     private val _initialTgSubscribeShown = MutableStateFlow(false)
     val initialTgSubscribeShown: StateFlow<Boolean> = _initialTgSubscribeShown.asStateFlow()
-
-    val onboardingDone: StateFlow<Boolean> = prefs.onboardingDoneFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     private val _privacyMode = MutableStateFlow(false)
     val privacyMode: StateFlow<Boolean> = _privacyMode.asStateFlow()
@@ -135,66 +128,6 @@ class SettingsViewModel(
         }
     }
 
-    fun setDnsMode(value: String) {
-        viewModelScope.launch {
-            profileMutex.withLock {
-                val current = prefs.clientConfigFlow.first()
-                if (current.dnsMode == value) return@withLock
-                persistClient(current.copy(dnsMode = value))
-            }
-        }
-    }
-
-    fun setUseUdp(enabled: Boolean) {
-        viewModelScope.launch {
-            profileMutex.withLock {
-                val current = prefs.clientConfigFlow.first()
-                if (current.useUdp == enabled) return@withLock
-                persistClient(current.copy(useUdp = enabled))
-            }
-        }
-    }
-
-    fun setManualCaptcha(enabled: Boolean) {
-        viewModelScope.launch {
-            profileMutex.withLock {
-                val current = prefs.clientConfigFlow.first()
-                if (current.manualCaptcha == enabled) return@withLock
-                persistClient(current.copy(manualCaptcha = enabled))
-            }
-        }
-    }
-
-    fun setUseCarrierDns(enabled: Boolean) {
-        viewModelScope.launch {
-            profileMutex.withLock {
-                val current = prefs.clientConfigFlow.first()
-                if (current.useCarrierDns == enabled) return@withLock
-                persistClient(current.copy(useCarrierDns = enabled))
-            }
-        }
-    }
-
-    fun setDebugMode(enabled: Boolean) {
-        viewModelScope.launch {
-            profileMutex.withLock {
-                val current = prefs.clientConfigFlow.first()
-                if (current.debugMode == enabled) return@withLock
-                persistClient(current.copy(debugMode = enabled))
-            }
-        }
-    }
-
-    fun setMagicSwitch(enabled: Boolean) {
-        viewModelScope.launch {
-            profileMutex.withLock {
-                val current = prefs.clientConfigFlow.first()
-                if (current.magicSwitch == enabled) return@withLock
-                persistClient(current.copy(magicSwitch = enabled))
-            }
-        }
-    }
-
     fun setSplitTunnelMode(value: String) {
         viewModelScope.launch {
             profileMutex.withLock {
@@ -213,17 +146,6 @@ class SettingsViewModel(
                 if (current.splitTunnelApps == trimmed) return@withLock
                 persistClient(current.copy(splitTunnelApps = trimmed))
             }
-        }
-    }
-
-    fun setLogsEnabled(enabled: Boolean) {
-        viewModelScope.launch {
-            profileMutex.withLock {
-                val current = prefs.clientConfigFlow.first()
-                if (current.logsEnabled == enabled) return@withLock
-                persistClient(current.copy(logsEnabled = enabled))
-            }
-            ProxyServiceState.setLogsEnabled(enabled)
         }
     }
 
@@ -287,11 +209,6 @@ class SettingsViewModel(
     // applyProfile/deleteProfile (там грузится снимок, mirror словил бы гонку).
     private suspend fun persistClient(config: ClientConfig) {
         prefs.saveClientConfig(config)
-        mirrorActiveProfile()
-    }
-
-    private suspend fun persistServer(opts: AppPreferences.ServerOpts) {
-        prefs.saveServerOpts(opts)
         mirrorActiveProfile()
     }
 
@@ -398,6 +315,30 @@ class SettingsViewModel(
         return "$trimmed ($i)"
     }
 
+    // --- Edit-by-id (новый Settings-флоу) ---
+    // Правит client-конфиг профиля по id, НЕ требуя его активации. Для активного
+    // профиля дополнительно зеркалит в legacy-ключи (рантаймовое ядро их читает) и
+    // обновляет глобальный флаг логов. Для неактивного — пишет только сохранённый
+    // снимок, рантайм не трогается (нужно для редактирования неактивных серверов).
+    fun updateProfileClient(id: String, transform: (ClientConfig) -> ClientConfig) {
+        viewModelScope.launch {
+            var mirrored: ClientConfig? = null
+            profileMutex.withLock {
+                val snap = prefs.profilesSnapshot.first()
+                val target = snap.list.firstOrNull { it.id == id } ?: return@withLock
+                val updated = transform(target.client)
+                if (updated == target.client) return@withLock
+                val list = snap.list.map { if (it.id == id) it.copy(client = updated) else it }
+                prefs.saveProfiles(list)
+                if (id == snap.activeId) {
+                    prefs.saveClientConfig(updated)
+                    mirrored = updated
+                }
+            }
+            mirrored?.let { ProxyServiceState.setLogsEnabled(it.logsEnabled) }
+        }
+    }
+
     // --- Server & Proxy Switches (TcpForward, Bond, Obf, Sync) ---
     fun setBond(enabled: Boolean) {
         viewModelScope.launch {
@@ -408,30 +349,6 @@ class SettingsViewModel(
                 true
             }
             if (changed) orchestrator.restartProxyIfRunning()
-        }
-    }
-
-    fun setObfProfile(profile: String) {
-        viewModelScope.launch {
-            val current = prefs.serverOptsFlow.first()
-            val known = sshRepository.serverState.value as? ServerState.Known
-            val storedMatches = current.obfProfile == profile
-            val effectiveMatches = known?.obfProfile?.let { it == profile } ?: true
-            if (storedMatches && effectiveMatches) return@launch
-            val sync = prefs.clientConfigFlow.first().syncServerSwitches
-            // generateObfKey — сетевой SSH-вызов, не держим под profileMutex.
-            val generatedKey: String? =
-                if (profile != ObfProfile.NONE && current.obfKey.isBlank() && sync)
-                    sshRepository.generateObfKey()?.takeIf { it.isNotBlank() }
-                else null
-            profileMutex.withLock {
-                val latest = prefs.serverOptsFlow.first()
-                var next = latest.copy(obfProfile = profile)
-                if (generatedKey != null && next.obfKey.isBlank()) next = next.copy(obfKey = generatedKey)
-                if (next != latest) persistServer(next)
-            }
-            if (sync) orchestrator.restartServerIfRunning()
-            orchestrator.restartProxyIfRunning()
         }
     }
 
@@ -450,42 +367,45 @@ class SettingsViewModel(
         }
     }
 
-    fun setObfKey(key: String) {
+    /**
+     * Атомарно применяет конфиг сервера (proxy-адреса + tcp-проброс + профиль обфускации
+     * + obf-ключ) одной транзакцией и перезапускает сервер/прокси РОВНО один раз — для
+     * apply-модели «Настроек сервера» (натыкали черновик → Применить). Если включается
+     * обфускация без ключа в sync-режиме, ключ генерируется на сервере (SSH, вне mutex).
+     */
+    fun applyServerConfig(
+        listen: String,
+        connect: String,
+        tcpForward: Boolean,
+        obfProfile: String,
+        obfKey: String
+    ) {
         viewModelScope.launch {
-            val trimmed = key.trim()
-            val changed = profileMutex.withLock {
-                val current = prefs.serverOptsFlow.first()
-                if (current.obfKey == trimmed) return@withLock false
-                persistServer(current.copy(obfKey = trimmed))
-                true
-            }
-            if (!changed) return@launch
-            if (prefs.clientConfigFlow.first().syncServerSwitches) orchestrator.restartServerIfRunning()
-            orchestrator.restartProxyIfRunning()
-        }
-    }
-
-    fun setTcpForward(enabled: Boolean) {
-        viewModelScope.launch {
-            val current = prefs.clientConfigFlow.first()
-            val known = sshRepository.serverState.value as? ServerState.Known
-            val storedMatches = current.tcpForward == enabled
-            val effectiveMatches = known?.tcpMode?.let { it == enabled } ?: true
-            if (storedMatches && effectiveMatches) return@launch
-            if (!storedMatches) {
-                profileMutex.withLock {
-                    val latest = prefs.clientConfigFlow.first()
-                    if (latest.tcpForward != enabled) persistClient(latest.copy(tcpForward = enabled))
+            val sync = prefs.clientConfigFlow.first().syncServerSwitches
+            val trimmedKey = obfKey.trim()
+            val generatedKey: String? =
+                if (obfProfile != ObfProfile.NONE && trimmedKey.isBlank() && sync)
+                    sshRepository.generateObfKey()?.takeIf { it.isNotBlank() }
+                else null
+            var changed = false
+            profileMutex.withLock {
+                if (prefs.proxyListenFlow.first() != listen || prefs.proxyConnectFlow.first() != connect) {
+                    prefs.saveProxyConfig(listen, connect); changed = true
                 }
-            }
-            if (current.syncServerSwitches) {
-                val serverRunning = (sshRepository.serverState.value as? ServerState.Known)?.running == true
-                if (serverRunning) {
-                    sshRepository.stopServer()
-                    orchestrator.startServerFromPrefs()
+                val client = prefs.clientConfigFlow.first()
+                if (client.tcpForward != tcpForward) {
+                    prefs.saveClientConfig(client.copy(tcpForward = tcpForward)); changed = true
                 }
+                val opts = prefs.serverOptsFlow.first()
+                val effKey = trimmedKey.ifBlank { generatedKey ?: opts.obfKey }
+                val nextOpts = opts.copy(obfProfile = obfProfile, obfKey = effKey)
+                if (nextOpts != opts) { prefs.saveServerOpts(nextOpts); changed = true }
+                if (changed) mirrorActiveProfile()
             }
-            orchestrator.restartProxyIfRunning()
+            if (changed) {
+                if (sync) orchestrator.restartServerIfRunning()
+                orchestrator.restartProxyIfRunning()
+            }
         }
     }
 

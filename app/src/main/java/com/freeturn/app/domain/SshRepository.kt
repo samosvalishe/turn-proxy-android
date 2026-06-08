@@ -143,8 +143,7 @@ class SshRepository(
         if (cfg.ip.isEmpty()) return InstallOutcome.Failed("no SSH config")
         _serverState.value = ServerState.Working("Установка free-turn-proxy...")
 
-        val result = runCmd(cfg, "Установка", ServerCommand.Install)
-        return when (result) {
+        return when (val result = runCmd(cfg, "Установка", ServerCommand.Install)) {
             is CmdResult.Err -> {
                 _serverState.value = ServerState.Error(result.message)
                 InstallOutcome.Failed(result.message)
