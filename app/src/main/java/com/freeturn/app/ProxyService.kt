@@ -20,8 +20,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import com.freeturn.app.data.AppPreferences
-import com.freeturn.app.data.DnsMode
-import com.freeturn.app.data.Provider
+import com.freeturn.app.data.CoreArgs
 import com.freeturn.app.domain.WireGuardTunnelManager
 import java.io.BufferedReader
 import java.io.File
@@ -132,10 +131,8 @@ class ProxyService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // ВАЖНО: startForeground вызываем ПЕРВЫМ делом и БЕЗУСЛОВНО. Если ранее
-        // была ветка с return до startForeground (например, при stale
-        // ProxyServiceState.isRunning после kill'а сервиса без onDestroy),
-        // система через ~5с бросала ForegroundServiceDidNotStartInTimeException.
+        // ВАЖНО: startForeground вызываем ПЕРВЫМ делом и БЕЗУСЛОВНО — любой return
+        // до него даёт ForegroundServiceDidNotStartInTimeException через ~5с.
         if (openAppIntent == null) {
             openAppIntent = packageManager.getLaunchIntentForPackage(packageName)?.let {
                 PendingIntent.getActivity(this, 0, it, PendingIntent.FLAG_IMMUTABLE)
@@ -225,56 +222,11 @@ class ProxyService : Service() {
             cmdArgs.addAll(parts.drop(1))
         } else {
             cmdArgs.add(executable)
-            cmdArgs.add("-peer"); cmdArgs.add(cfg.serverAddress)
-
-            cmdArgs.add("-provider"); cmdArgs.add(cfg.provider)
-            // -link нужен только провайдеру vk (callroom URL).
-            if (cfg.provider == Provider.VK) { cmdArgs.add("-link"); cmdArgs.add(cfg.vkLink) }
-            cmdArgs.add("-listen"); cmdArgs.add(cfg.localPort)
-            if (cfg.threads > 0) { cmdArgs.add("-n"); cmdArgs.add(cfg.threads.toString()) }
-            // -streams-per-cred передаём только если пользователь поменял дефолт.
-            if (cfg.streamsPerCred > 0 && cfg.streamsPerCred != 10) {
-                cmdArgs.add("-streams-per-cred"); cmdArgs.add(cfg.streamsPerCred.toString())
-            }
-            // Режим туннеля: tcp-форвард (Xray/sing-box) vs udp-релей (WireGuard, дефолт).
-            if (cfg.tcpForward) { cmdArgs.add("-mode"); cmdArgs.add("tcp") }
-            // Bond работает только в tcp-режиме; в новом ядре это client-only флаг
-            // (сервер сам детектит bond по magic-префиксу).
-            if (cfg.tcpForward && cfg.bond) cmdArgs.add("-bond")
-            // TURN-транспорт: UDP вместо TCP/TLS по умолчанию.
-            if (cfg.useUdp) { cmdArgs.add("-transport"); cmdArgs.add("udp") }
-            // Обфускация (-obf-profile): профиль и ключ должны совпадать с сервером
-            // (хранятся в общем serverOpts). Без валидного 64-hex не передаём —
-            // ядро упадёт на DecodeKey.
-            if (srv.obfEnabled &&
-                srv.obfKey.length == 64 &&
-                srv.obfKey.matches(Regex("^[0-9a-fA-F]+$"))
-            ) {
-                cmdArgs.add("-obf-profile"); cmdArgs.add(srv.obfProfile)
-                cmdArgs.add("-obf-key"); cmdArgs.add(srv.obfKey)
-            }
-            if (cfg.manualCaptcha) cmdArgs.add("-manual-captcha")
-
-            if (cfg.debugMode) cmdArgs.add("-debug")
-            if (cfg.useCarrierDns) {
-                val dns = activeNetworkDnsServers()
-                if (dns.isNotBlank()) {
-                    cmdArgs.add("-dns-servers"); cmdArgs.add(dns)
-                }
-            }
-            // -dns-mode: plain|doh (auto — дефолт ядра, не шлём).
-            if (cfg.dnsMode == DnsMode.PLAIN || cfg.dnsMode == DnsMode.DOH) {
-                cmdArgs.add("-dns-mode"); cmdArgs.add(cfg.dnsMode)
-            }
-            // Альтернативный TURN-узел: переключает клиент на указанный server-side relay
-            // вместо автоподбора. Адрес задаётся пользователем, флаг работает только при
-            // непустом значении (иначе ядро запустится без -turn и будет автоподбор).
-            if (cfg.magicSwitch) {
-                val turn = cfg.magicTurn.trim()
-                if (turn.isNotEmpty()) {
-                    cmdArgs.add("-turn"); cmdArgs.add(turn)
-                }
-            }
+            // argv строит общий с UI билдер ([CoreArgs.client]) — показанная команда не
+            // расходится с реально запускаемой. DNS оператора резолвим здесь (зависит от
+            // активной сети) и передаём в билдер.
+            val carrierDns = if (cfg.useCarrierDns) activeNetworkDnsServers() else null
+            cmdArgs.addAll(CoreArgs.client(cfg, srv, carrierDns))
         }
 
         var exitCode = -1

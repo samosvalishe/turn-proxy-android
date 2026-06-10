@@ -47,6 +47,11 @@ object ObfProfile {
     const val NONE = "none"
     const val RTPOPUS = "rtpopus"
     val ALL = listOf(NONE, RTPOPUS)
+
+    private val KEY_REGEX = Regex("^[0-9a-fA-F]{64}$")
+
+    /** Ключ -obf-key, который примет ядро (DecodeKey). Единая проверка для argv, UI и regen. */
+    fun isValidKey(key: String): Boolean = key.matches(KEY_REGEX)
 }
 
 /**
@@ -97,6 +102,11 @@ data class ClientConfig(
     val useCarrierDns: Boolean = false,
     // "auto" | "plain" | "doh" — соответствует флагу -dns-mode ядра.
     val dnsMode: String = DnsMode.AUTO,
+    /**
+     * Ручной список DNS-серверов (через запятую/пробел). Непустое значение имеет
+     * приоритет над [useCarrierDns] и передаётся в флаг -dns-servers ядра.
+     */
+    val customDns: String = "",
     /**
      * Если true — изменения tcpForward/obfEnabled на клиенте дёргают рестарт
      * сервера (текущее поведение). Если false — флаги меняются только у клиента,
@@ -149,6 +159,7 @@ class AppPreferences(context: Context) {
         val CLIENT_DEBUG = booleanPreferencesKey("client_debug")
         val CLIENT_USE_CARRIER_DNS = booleanPreferencesKey("client_use_carrier_dns")
         val CLIENT_DNS_MODE = stringPreferencesKey("client_dns_mode")
+        val CLIENT_CUSTOM_DNS = stringPreferencesKey("client_custom_dns")
         val CLIENT_SYNC_SERVER = booleanPreferencesKey("client_sync_server")
         val CLIENT_MAGIC_SWITCH = booleanPreferencesKey("client_magic_switch")
         val CLIENT_MAGIC_TURN = stringPreferencesKey("client_magic_turn")
@@ -163,6 +174,7 @@ class AppPreferences(context: Context) {
         val SERVER_OBF_PROFILE = stringPreferencesKey("server_obf_profile")
         val SERVER_OPTS_REV = intPreferencesKey("server_opts_rev")
         val DYNAMIC_THEME = booleanPreferencesKey("dynamic_theme")
+        val NERD_MODE = booleanPreferencesKey("nerd_mode")
         val TG_SUBSCRIBE_SHOWN = booleanPreferencesKey("tg_subscribe_shown")
         val PROFILES_JSON = stringPreferencesKey("profiles_json")
         val ACTIVE_PROFILE_ID = stringPreferencesKey("active_profile_id")
@@ -184,9 +196,13 @@ class AppPreferences(context: Context) {
         )
     }
 
-    val sshConfigFlow: Flow<SshConfig> = context.dataStore.data
-        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { prefs ->
+    /** DataStore-флоу: IOException (битый файл) → дефолты, остальное пробрасываем. */
+    private fun <T> prefFlow(transform: (Preferences) -> T): Flow<T> =
+        context.dataStore.data
+            .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
+            .map(transform)
+
+    val sshConfigFlow: Flow<SshConfig> = prefFlow { prefs ->
             SshConfig(
                 ip = prefs[SSH_IP] ?: "",
                 port = prefs[SSH_PORT] ?: 22,
@@ -199,9 +215,7 @@ class AppPreferences(context: Context) {
             )
         }
 
-    val clientConfigFlow: Flow<ClientConfig> = context.dataStore.data
-        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { prefs ->
+    val clientConfigFlow: Flow<ClientConfig> = prefFlow { prefs ->
             ClientConfig(
                 serverAddress = prefs[CLIENT_SERVER_ADDR] ?: "",
                 vkLink = prefs[CLIENT_VK_LINK] ?: "",
@@ -223,6 +237,7 @@ class AppPreferences(context: Context) {
                 dnsMode = (prefs[CLIENT_DNS_MODE] ?: DnsMode.AUTO).let {
                     if (it in DnsMode.ALL) it else DnsMode.AUTO
                 },
+                customDns = prefs[CLIENT_CUSTOM_DNS] ?: "",
                 syncServerSwitches = prefs[CLIENT_SYNC_SERVER] ?: true,
                 magicSwitch = prefs[CLIENT_MAGIC_SWITCH] ?: false,
                 magicTurn = prefs[CLIENT_MAGIC_TURN] ?: "",
@@ -244,17 +259,11 @@ class AppPreferences(context: Context) {
             )
         }
 
-    val onboardingDoneFlow: Flow<Boolean> = context.dataStore.data
-        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { prefs -> prefs[ONBOARDING_DONE] ?: false }
+    val onboardingDoneFlow: Flow<Boolean> = prefFlow { prefs -> prefs[ONBOARDING_DONE] ?: false }
 
-    val proxyListenFlow: Flow<String> = context.dataStore.data
-        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { prefs -> prefs[PROXY_LISTEN] ?: "0.0.0.0:56000" }
+    val proxyListenFlow: Flow<String> = prefFlow { prefs -> prefs[PROXY_LISTEN] ?: "0.0.0.0:56000" }
 
-    val proxyConnectFlow: Flow<String> = context.dataStore.data
-        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { prefs -> prefs[PROXY_CONNECT] ?: "127.0.0.1:40537" }
+    val proxyConnectFlow: Flow<String> = prefFlow { prefs -> prefs[PROXY_CONNECT] ?: "127.0.0.1:40537" }
 
     /** Снимок серверных obf-опций. obfKey читается из шифрованного хранилища. */
     data class ServerOpts(
@@ -267,9 +276,7 @@ class AppPreferences(context: Context) {
         val obfEnabled: Boolean get() = obfProfile != ObfProfile.NONE
     }
 
-    val serverOptsFlow: Flow<ServerOpts> = context.dataStore.data
-        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { prefs ->
+    val serverOptsFlow: Flow<ServerOpts> = prefFlow { prefs ->
             ServerOpts(
                 obfProfile = (prefs[SERVER_OBF_PROFILE] ?: ObfProfile.NONE).let {
                     if (it in ObfProfile.ALL) it else ObfProfile.NONE
@@ -288,13 +295,12 @@ class AppPreferences(context: Context) {
         }
     }
 
-    val dynamicThemeFlow: Flow<Boolean> = context.dataStore.data
-        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { prefs -> prefs[DYNAMIC_THEME] ?: true }
+    val dynamicThemeFlow: Flow<Boolean> = prefFlow { prefs -> prefs[DYNAMIC_THEME] ?: true }
 
-    val tgSubscribeShownFlow: Flow<Boolean> = context.dataStore.data
-        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { prefs -> prefs[TG_SUBSCRIBE_SHOWN] ?: false }
+    /** «Режим отладки» — открывает отладочные секции (журнал, verbose, экран логов). */
+    val nerdModeFlow: Flow<Boolean> = prefFlow { prefs -> prefs[NERD_MODE] ?: false }
+
+    val tgSubscribeShownFlow: Flow<Boolean> = prefFlow { prefs -> prefs[TG_SUBSCRIBE_SHOWN] ?: false }
 
     /** Заменяет весь список профилей. */
     suspend fun saveProfiles(list: List<Profile>) {
@@ -349,6 +355,7 @@ class AppPreferences(context: Context) {
             prefs[CLIENT_DEBUG] = config.debugMode
             prefs[CLIENT_USE_CARRIER_DNS] = config.useCarrierDns
             prefs[CLIENT_DNS_MODE] = if (config.dnsMode in DnsMode.ALL) config.dnsMode else DnsMode.AUTO
+            prefs[CLIENT_CUSTOM_DNS] = config.customDns.trim()
             prefs[CLIENT_SYNC_SERVER] = config.syncServerSwitches
             prefs[CLIENT_MAGIC_SWITCH] = config.magicSwitch
             prefs[CLIENT_MAGIC_TURN] = config.magicTurn.trim()
@@ -374,6 +381,10 @@ class AppPreferences(context: Context) {
         context.dataStore.edit { prefs -> prefs[DYNAMIC_THEME] = enabled }
     }
 
+    suspend fun setNerdMode(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[NERD_MODE] = enabled }
+    }
+
     suspend fun setTgSubscribeShown() {
         context.dataStore.edit { prefs -> prefs[TG_SUBSCRIBE_SHOWN] = true }
     }
@@ -389,9 +400,7 @@ class AppPreferences(context: Context) {
      * Снимок: список + id активного. Объединено в один Flow, чтобы UI получал
      * консистентную пару (нет окна, в котором активный id указывает на удалённый).
      */
-    val profilesSnapshot: Flow<ProfilesSnapshot> = context.dataStore.data
-        .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
-        .map { prefs ->
+    val profilesSnapshot: Flow<ProfilesSnapshot> = prefFlow { prefs ->
             ProfilesSnapshot(
                 list = ProfileJson.decodeList(prefs[PROFILES_JSON]),
                 activeId = prefs[ACTIVE_PROFILE_ID]?.takeIf { it.isNotBlank() },

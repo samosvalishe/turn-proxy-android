@@ -76,6 +76,7 @@ internal object ProfileJson {
             put("debugMode", p.client.debugMode)
             put("useCarrierDns", p.client.useCarrierDns)
             put("dnsMode", p.client.dnsMode)
+            put("customDns", p.client.customDns)
             put("syncServerSwitches", p.client.syncServerSwitches)
             put("magicSwitch", p.client.magicSwitch)
             put("magicTurn", p.client.magicTurn)
@@ -131,6 +132,7 @@ internal object ProfileJson {
                 dnsMode = cliO.optString("dnsMode", DnsMode.AUTO).let {
                     if (it in DnsMode.ALL) it else DnsMode.AUTO
                 },
+                customDns = cliO.optString("customDns"),
                 syncServerSwitches = cliO.optBoolean("syncServerSwitches", true),
                 magicSwitch = cliO.optBoolean("magicSwitch", false),
                 magicTurn = cliO.optString("magicTurn"),
