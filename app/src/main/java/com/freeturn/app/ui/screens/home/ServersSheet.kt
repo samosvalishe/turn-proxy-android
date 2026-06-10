@@ -3,7 +3,7 @@
     androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class
 )
 
-package com.freeturn.app.ui.screens
+package com.freeturn.app.ui.screens.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -47,20 +47,20 @@ import com.freeturn.app.data.Provider
 import com.freeturn.app.ui.components.EmptyServersState
 import com.freeturn.app.ui.components.ServerRow
 import com.freeturn.app.ui.components.settingsItemShape
-import com.freeturn.app.viewmodel.SettingsViewModel
+import com.freeturn.app.ui.util.redact
 
 /**
  * Нижний лист серверов на главном: шапка активного сервера, бейдж провайдера и
  * сегментированный список (тот же expressive-стиль, что и «Настройки → Серверы»).
  * Лист только переключает и показывает: управление сервером — в его хабе (кнопка
  * настроек в строке, [onOpenServerSettings]), добавление — отдельным экраном.
+ * Чистый компонент: снимок и действия приходят снаружи.
  */
 @Composable
-fun ServersSheetContent(
-    settingsViewModel: SettingsViewModel,
+internal fun ServersSheetContent(
     snapshot: ServersSnapshot,
     privacyMode: Boolean = false,
-    onCollapse: () -> Unit = {},
+    onApplyServer: (String) -> Unit = {},
     onOpenServerSettings: (String) -> Unit = {}
 ) {
     val active = snapshot.active
@@ -161,12 +161,7 @@ fun ServersSheetContent(
                         shape = settingsItemShape(index, snapshot.list.size),
                         // Лист сам на surfaceContainerLow — строкам нужен контраст повыше.
                         inactiveContainer = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        onClick = {
-                            if (!isActive) {
-                                settingsViewModel.applyServer(p.id)
-                                onCollapse()
-                            }
-                        },
+                        onClick = { if (!isActive) onApplyServer(p.id) },
                         trailing = {
                             IconButton(onClick = { onOpenServerSettings(p.id) }) {
                                 Icon(
@@ -230,4 +225,3 @@ private fun providerLabel(value: String): String = when (value) {
     Provider.VK -> stringResource(R.string.provider_vk)
     else -> value
 }
-

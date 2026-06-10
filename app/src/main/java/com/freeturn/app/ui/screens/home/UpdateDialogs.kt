@@ -1,0 +1,123 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
+package com.freeturn.app.ui.screens.home
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import com.freeturn.app.R
+import com.freeturn.app.ui.HapticUtil
+import com.freeturn.app.viewmodel.UpdateState
+
+/**
+ * Диалоги цикла обновления приложения: доступно → качается → готово к установке.
+ * Чистый компонент: состояние и действия приходят снаружи.
+ */
+@Suppress("AssignedValueIsNeverRead")
+@Composable
+internal fun UpdateDialogs(
+    updateState: UpdateState,
+    onDownload: () -> Unit,
+    onInstall: () -> Unit,
+    onReset: () -> Unit
+) {
+    val context = LocalContext.current
+    var dismissed by rememberSaveable { mutableStateOf(false) }
+
+    when (val state = updateState) {
+        is UpdateState.Available -> if (!dismissed) {
+            AlertDialog(
+                onDismissRequest = { dismissed = true },
+                title = { Text(stringResource(R.string.update_available_title)) },
+                text = {
+                    Column {
+                        Text(stringResource(R.string.update_available, state.version))
+                        if (state.changelog.isNotEmpty()) {
+                            Spacer(Modifier.height(8.dp))
+                            Column(
+                                modifier = Modifier
+                                    .heightIn(max = 200.dp)
+                                    .verticalScroll(rememberScrollState())
+                            ) {
+                                Text(
+                                    state.changelog,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                        dismissed = true
+                        onDownload()
+                    }) { Text(stringResource(R.string.update_download)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { dismissed = true }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
+            )
+        }
+
+        is UpdateState.Downloading -> {
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text(stringResource(R.string.update_downloading_title)) },
+                text = {
+                    Column {
+                        Text(stringResource(R.string.update_downloading, state.progress))
+                        Spacer(Modifier.height(12.dp))
+                        LinearWavyProgressIndicator(
+                            progress = { state.progress / 100f },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                },
+                confirmButton = {}
+            )
+        }
+
+        is UpdateState.ReadyToInstall -> {
+            AlertDialog(
+                onDismissRequest = onReset,
+                title = { Text(stringResource(R.string.update_ready_title)) },
+                text = { Text(stringResource(R.string.update_ready_desc)) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                        onInstall()
+                    }) { Text(stringResource(R.string.update_install)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = onReset) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                }
+            )
+        }
+
+        else -> {}
+    }
+}

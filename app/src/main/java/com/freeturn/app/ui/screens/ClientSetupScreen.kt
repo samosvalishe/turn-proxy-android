@@ -63,6 +63,7 @@ import com.freeturn.app.ui.components.SettingsGroup
 import com.freeturn.app.ui.components.SettingsGroupItem
 import com.freeturn.app.ui.components.SettingsRowDivider
 import com.freeturn.app.ui.components.SettingsSwitchRow
+import com.freeturn.app.ui.util.redact
 import com.freeturn.app.viewmodel.ServerViewModel
 import com.freeturn.app.viewmodel.SettingsViewModel
 import kotlin.math.roundToInt

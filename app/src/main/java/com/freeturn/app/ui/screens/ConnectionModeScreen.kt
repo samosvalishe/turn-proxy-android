@@ -59,6 +59,7 @@ import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.ui.components.SettingsEntryRow
 import com.freeturn.app.ui.components.SettingsRowDivider
 import com.freeturn.app.ui.theme.extendedColorScheme
+import com.freeturn.app.ui.util.redact
 import com.freeturn.app.viewmodel.ProxyState
 import com.freeturn.app.viewmodel.ProxyViewModel
 import com.freeturn.app.viewmodel.SettingsViewModel

@@ -48,7 +48,7 @@ import com.freeturn.app.ui.screens.AdvancedScreen
 import com.freeturn.app.ui.screens.AppScreen
 import com.freeturn.app.ui.screens.ClientSetupScreen
 import com.freeturn.app.ui.screens.ConnectionModeScreen
-import com.freeturn.app.ui.screens.HomeScreen
+import com.freeturn.app.ui.screens.home.HomeScreen
 import com.freeturn.app.ui.screens.LogsScreen
 import com.freeturn.app.ui.screens.NerdScreen
 import com.freeturn.app.ui.screens.ServerDetailScreen

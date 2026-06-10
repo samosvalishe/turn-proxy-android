@@ -103,6 +103,7 @@ import com.freeturn.app.ui.components.SettingsSwitchRow
 import com.freeturn.app.ui.components.settingsItemShape
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.theme.extendedColorScheme
+import com.freeturn.app.ui.util.redact
 import com.freeturn.app.viewmodel.ServerHubStatus
 import com.freeturn.app.viewmodel.ServerViewModel
 import com.freeturn.app.viewmodel.SettingsViewModel
