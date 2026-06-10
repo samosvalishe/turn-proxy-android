@@ -44,7 +44,8 @@ class SshRepository(
     private val timeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
     private fun timestamp(): String = LocalTime.now().format(timeFormatter)
 
-    private fun appendSshLog(vararg lines: String) {
+    private fun appendSshLog(lines: List<String>) {
+        if (lines.isEmpty()) return
         _sshLog.update { current ->
             var next = current + lines
             if (next.size > 500) next = next.drop(next.size - 500)
@@ -52,18 +53,23 @@ class SshRepository(
         }
     }
 
+    private fun appendSshLog(vararg lines: String) = appendSshLog(lines.toList())
+
     private fun logHeader(label: String, target: String) {
         appendSshLog("", "=== $label [${timestamp()}] ===", "  ssh $target")
     }
 
     private fun logCmdResult(result: CmdResult) {
-        result.logs.forEach { appendSshLog(it) }
-        when (result) {
-            is CmdResult.Ok ->
-                result.kv.forEach { (k, v) -> appendSshLog("  $k=$v") }
-            is CmdResult.Err ->
-                appendSshLog("ERROR: ${result.message}")
+        // Одним обновлением состояния: построчный append на длинном выводе (журнал
+        // на 200 строк) дёргал подписчиков UI — бейдж и автоскролл — на каждую строку.
+        val batch = buildList {
+            addAll(result.logs)
+            when (result) {
+                is CmdResult.Ok -> result.kv.forEach { (k, v) -> add("  $k=$v") }
+                is CmdResult.Err -> add("ERROR: ${result.message}")
+            }
         }
+        appendSshLog(batch)
     }
 
     private suspend fun runCmd(cfg: SshConfig, label: String, cmd: ServerCommand): CmdResult {
@@ -81,7 +87,7 @@ class SshRepository(
             knownFingerprint = cfg.hostFingerprint.ifEmpty { null },
             sshKey = if (cfg.authType == "SSH_KEY") cfg.sshKey else ""
         )
-        result.lines().filter { it.isNotBlank() }.forEach { appendSshLog(it) }
+        appendSshLog(result.lines().filter { it.isNotBlank() })
         return result
     }
 
