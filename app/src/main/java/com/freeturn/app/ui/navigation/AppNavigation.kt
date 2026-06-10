@@ -44,6 +44,7 @@ import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.screens.CaptchaWebViewDialog
 import com.freeturn.app.ui.screens.AboutScreen
+import com.freeturn.app.ui.screens.AddServerScreen
 import com.freeturn.app.ui.screens.AdvancedScreen
 import com.freeturn.app.ui.screens.AppScreen
 import com.freeturn.app.ui.screens.ClientSetupScreen
@@ -68,10 +69,12 @@ object Routes {
     // Графы вкладок нижнего меню. У каждой вкладки свой back-stack: бар виден на всех
     // уровнях вложенности, повторный тап по активной вкладке возвращает в её корень.
     const val HOME_GRAPH = "home_graph"
+    const val ADD_GRAPH = "add_graph"
     const val SETTINGS_GRAPH = "settings_graph"
 
     const val HOME = "home"
     const val LOGS = "logs"
+    const val ADD_SERVER = "add_server"
 
     // Settings-флоу: Настройки → Серверы → [сервер] → подключение / сервер
     const val SETTINGS = "settings"
@@ -90,6 +93,14 @@ object Routes {
     fun clientSetup(id: String) = "client_setup/$id"
     fun serverManagement(id: String) = "server_management/$id"
     fun nerdInfo(id: String) = "nerd_info/$id"
+}
+
+private fun NavHostController.navigateToTab(graphRoute: String) {
+    navigate(graphRoute) {
+        popUpTo(graph.findStartDestination().id) { saveState = true }
+        launchSingleTop = true
+        restoreState = true
+    }
 }
 
 // MD3 emphasized-кривая + длительности навигационных переходов (единый источник).
@@ -137,12 +148,7 @@ fun AppNavigation(
                             navController.popBackStack(item.startRoute, inclusive = false)
                         } else {
                             HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
-                            navController.navigate(item.graphRoute) {
-                                // Сохраняем стек текущей вкладки, восстанавливаем целевую.
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
+                            navController.navigateToTab(item.graphRoute)
                         }
                     },
                     icon = {
@@ -247,12 +253,22 @@ private fun AppNavHost(
                     // Хаб сервера живёт в графе настроек — нижний бар подсветит «Настройки»,
                     // системный «назад» вернёт на главную.
                     onOpenServerSettings = { id -> navController.navigate(Routes.serverDetail(id)) },
-                    // CTA пустого состояния: список серверов (там же появится добавление).
-                    onAddServer = { navController.navigate(Routes.SERVERS_LIST) }
+                    // CTA пустого состояния — вкладка добавления сервера (tab-переход,
+                    // не push: иначе бар перестаёт возвращать на главную).
+                    onAddServer = { navController.navigateToTab(Routes.ADD_GRAPH) }
                 )
             }
             composable(Routes.LOGS) {
                 LogsScreen(proxyViewModel = proxyViewModel)
+            }
+        }
+
+        navigation(startDestination = Routes.ADD_SERVER, route = Routes.ADD_GRAPH) {
+            composable(Routes.ADD_SERVER) {
+                AddServerScreen(
+                    settingsViewModel = settingsViewModel,
+                    onServerCreated = { id -> navController.navigate(Routes.serverDetail(id)) }
+                )
             }
         }
 
@@ -392,5 +408,6 @@ private fun TelegramSubscribeDialog(onSubscribe: () -> Unit, onDismiss: () -> Un
 
 private val navItems = listOf(
     NavItem(Routes.HOME_GRAPH, Routes.HOME, R.string.nav_home, R.drawable.home_24px, R.drawable.home_outlined_24px),
+    NavItem(Routes.ADD_GRAPH, Routes.ADD_SERVER, R.string.nav_add, R.drawable.add_24px, R.drawable.add_24px),
     NavItem(Routes.SETTINGS_GRAPH, Routes.SETTINGS, R.string.nav_settings, R.drawable.settings_24px, R.drawable.settings_outlined_24px)
 )
