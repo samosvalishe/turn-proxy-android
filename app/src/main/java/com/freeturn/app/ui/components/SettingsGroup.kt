@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -29,6 +30,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -197,24 +199,29 @@ fun SettingsSwitchRow(
     }
 }
 
-/** Тональная иконка-кружок (Sunny) строки настроек. Один источник формы/размера. */
+/**
+ * Тональная иконка-кружок (Sunny) строки настроек. Один источник формы/размера.
+ * Цвета параметризованы под особые строки (danger → errorContainer).
+ */
 @Composable
-fun SettingsRowIcon(iconRes: Int, enabled: Boolean = true) {
+fun SettingsRowIcon(
+    iconRes: Int,
+    enabled: Boolean = true,
+    container: Color = MaterialTheme.colorScheme.secondaryContainer,
+    tint: Color = MaterialTheme.colorScheme.onSecondaryContainer
+) {
     // Disabled: гасим контейнер и тинт вместе с заголовком — строка не выглядит наполовину живой.
     val alpha = if (enabled) 1f else 0.38f
     Box(
         modifier = Modifier
             .size(40.dp)
-            .background(
-                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = alpha),
-                MaterialShapes.Sunny.toShape()
-            ),
+            .background(container.copy(alpha = alpha), MaterialShapes.Sunny.toShape()),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             painterResource(iconRes),
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = alpha),
+            tint = tint.copy(alpha = alpha),
             modifier = Modifier.size(22.dp)
         )
     }
@@ -267,6 +274,17 @@ fun SettingsEntryRow(
                 tint = if (enabled) baseTrailing else baseTrailing.copy(alpha = 0.38f)
             )
         }
+    }
+}
+
+/** Кнопка «назад» в шапке экранов настроек — один источник для всего settings-флоу. */
+@Composable
+fun SettingsBackButton(onBack: () -> Unit) {
+    IconButton(onClick = onBack) {
+        Icon(
+            painterResource(R.drawable.arrow_back_24px),
+            contentDescription = stringResource(R.string.back)
+        )
     }
 }
 
