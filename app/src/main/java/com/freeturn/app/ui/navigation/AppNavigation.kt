@@ -45,7 +45,9 @@ import androidx.navigation.compose.rememberNavController
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.screens.CaptchaWebViewDialog
+import com.freeturn.app.ui.screens.AboutScreen
 import com.freeturn.app.ui.screens.AdvancedScreen
+import com.freeturn.app.ui.screens.AppScreen
 import com.freeturn.app.ui.screens.ClientSetupScreen
 import com.freeturn.app.ui.screens.ConnectionModeScreen
 import com.freeturn.app.ui.screens.HomeScreen
@@ -80,6 +82,8 @@ object Routes {
 
     // Settings-флоу: Настройки → Серверы → [сервер] → подключение / сервер
     const val SETTINGS = "settings"
+    const val APP_SETTINGS = "app_settings"
+    const val ABOUT = "about"
     const val ADVANCED = "advanced"
     const val SERVERS_LIST = "servers_list"
     const val SERVER_DETAIL = "server_detail/{profileId}"
@@ -310,7 +314,10 @@ private fun AppNavHost(
                 HomeScreen(
                     settingsViewModel = settingsViewModel,
                     proxyViewModel = proxyViewModel,
-                    onOpenLogs = { navController.navigate(Routes.LOGS) }
+                    onOpenLogs = { navController.navigate(Routes.LOGS) },
+                    // Хаб сервера живёт в графе настроек — нижний бар подсветит «Настройки»,
+                    // системный «назад» вернёт на главную.
+                    onOpenServerSettings = { id -> navController.navigate(Routes.serverDetail(id)) }
                 )
             }
             composable(Routes.LOGS) {
@@ -323,8 +330,21 @@ private fun AppNavHost(
             composable(Routes.SETTINGS) {
                 SettingsScreen(
                     onOpenServers = { navController.navigate(Routes.SERVERS_LIST) },
-                    onOpenAdvanced = { navController.navigate(Routes.ADVANCED) }
+                    onOpenApp = { navController.navigate(Routes.APP_SETTINGS) },
+                    onOpenAdvanced = { navController.navigate(Routes.ADVANCED) },
+                    onOpenAbout = { navController.navigate(Routes.ABOUT) }
                 )
+            }
+
+            composable(Routes.APP_SETTINGS) {
+                AppScreen(
+                    settingsViewModel = settingsViewModel,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Routes.ABOUT) {
+                AboutScreen(onBack = { navController.popBackStack() })
             }
 
             composable(Routes.ADVANCED) {

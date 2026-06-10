@@ -40,16 +40,16 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.LinearWavyProgressIndicator
-import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -57,7 +57,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -91,7 +90,10 @@ import com.freeturn.app.data.Profile
 import com.freeturn.app.domain.server.ServerCommand
 import com.freeturn.app.domain.server.ServerOptions
 import com.freeturn.app.ui.HapticUtil
+import com.freeturn.app.ui.components.EmptyServersState
 import com.freeturn.app.ui.components.SectionLabel
+import com.freeturn.app.ui.components.ServerRow
+import com.freeturn.app.ui.components.SettingsBackButton
 import com.freeturn.app.ui.components.SettingsCard
 import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.ui.components.SettingsEntryRow
@@ -101,7 +103,6 @@ import com.freeturn.app.ui.components.SettingsSwitchRow
 import com.freeturn.app.ui.components.settingsItemShape
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.theme.extendedColorScheme
-import com.freeturn.app.ui.util.hapticClickable
 import com.freeturn.app.viewmodel.ServerHubStatus
 import com.freeturn.app.viewmodel.ServerViewModel
 import com.freeturn.app.viewmodel.SettingsViewModel
@@ -109,11 +110,13 @@ import com.freeturn.app.viewmodel.SshConnectionState
 import com.freeturn.app.viewmodel.serverSettingsAvailable
 
 
-/** Корневой экран настроек (нижнее меню). Пока единственный пункт — «Серверы». */
+/** Корневой экран настроек (нижнее меню): серверы, приложение, продвинутые, о проекте. */
 @Composable
 fun SettingsScreen(
     onOpenServers: () -> Unit,
-    onOpenAdvanced: () -> Unit
+    onOpenApp: () -> Unit,
+    onOpenAdvanced: () -> Unit,
+    onOpenAbout: () -> Unit
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
@@ -145,7 +148,7 @@ fun SettingsScreen(
                 // наружные углы большие. Новые пункты добавляются строкой в группу,
                 // при разрастании — разбиение на группы с SectionLabel.
                 SettingsGroup {
-                    SettingsGroupItem(0, 2) {
+                    SettingsGroupItem(0, 4) {
                         SettingsEntryRow(
                             iconRes = R.drawable.database_24px,
                             title = stringResource(R.string.settings_servers),
@@ -153,12 +156,28 @@ fun SettingsScreen(
                             onClick = onOpenServers
                         )
                     }
-                    SettingsGroupItem(1, 2) {
+                    SettingsGroupItem(1, 4) {
+                        SettingsEntryRow(
+                            iconRes = R.drawable.mobile_24px,
+                            title = stringResource(R.string.settings_app),
+                            subtitle = stringResource(R.string.settings_app_desc),
+                            onClick = onOpenApp
+                        )
+                    }
+                    SettingsGroupItem(2, 4) {
                         SettingsEntryRow(
                             iconRes = R.drawable.tune_24px,
                             title = stringResource(R.string.settings_advanced),
                             subtitle = stringResource(R.string.settings_advanced_desc),
                             onClick = onOpenAdvanced
+                        )
+                    }
+                    SettingsGroupItem(3, 4) {
+                        SettingsEntryRow(
+                            iconRes = R.drawable.info_24px,
+                            title = stringResource(R.string.settings_about),
+                            subtitle = stringResource(R.string.settings_about_desc),
+                            onClick = onOpenAbout
                         )
                     }
                 }
@@ -184,7 +203,7 @@ fun AdvancedScreen(
         topBar = {
             LargeFlexibleTopAppBar(
                 title = { Text(stringResource(R.string.settings_advanced)) },
-                navigationIcon = { BackButton(onBack) },
+                navigationIcon = { SettingsBackButton(onBack) },
                 scrollBehavior = scrollBehavior
             )
         },
@@ -234,7 +253,7 @@ fun ServersListScreen(
         topBar = {
             LargeFlexibleTopAppBar(
                 title = { Text(stringResource(R.string.settings_servers)) },
-                navigationIcon = { BackButton(onBack) },
+                navigationIcon = { SettingsBackButton(onBack) },
                 scrollBehavior = scrollBehavior
             )
         },
@@ -242,7 +261,7 @@ fun ServersListScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         if (snapshot.loaded && snapshot.list.isEmpty()) {
-            EmptyServers(modifier = Modifier.fillMaxSize().padding(padding))
+            EmptyServersState(modifier = Modifier.fillMaxSize().padding(padding))
             return@Scaffold
         }
         Column(
@@ -292,71 +311,14 @@ private fun ServerListRow(
         profile.client.serverAddress.takeIf { it.isNotBlank() }?.redact(privacyMode),
         stringResource(R.string.profile_has_ssh).takeIf { profile.ssh.ip.isNotBlank() }
     ).joinToString(" · ").ifBlank { "—" }
-
-    // «Активный» = выбранный профиль (а не статус SSH-подключения). Текстового бейджа нет —
-    // он сжимал заголовок на узких экранах; выбранность несёт тон контейнера
-    // (secondaryContainer, как у selected-элементов M3) + насыщенный аватар.
-    // Для TalkBack статус остаётся в contentDescription.
-    val activeBadge = stringResource(R.string.profile_active_badge)
-    val rowDesc = if (isActive) "${profile.name}, $activeBadge" else profile.name
-
-    val container = if (isActive) MaterialTheme.colorScheme.secondaryContainer
-    else MaterialTheme.colorScheme.surfaceContainerLow
-    val titleColor = if (isActive) MaterialTheme.colorScheme.onSecondaryContainer
-    else MaterialTheme.colorScheme.onSurface
-    val subColor = if (isActive) MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.8f)
-    else MaterialTheme.colorScheme.onSurfaceVariant
-    val iconContainer = if (isActive) MaterialTheme.colorScheme.primary
-    else MaterialTheme.colorScheme.surfaceContainerHighest
-    val iconTint = if (isActive) MaterialTheme.colorScheme.onPrimary
-    else MaterialTheme.colorScheme.onSurfaceVariant
-
-    Surface(shape = shape, color = container, modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .hapticClickable(HapticUtil.Pattern.CLICK, onClick = onClick)
-                .semantics { contentDescription = rowDesc }
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .background(iconContainer, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    painterResource(R.drawable.database_24px),
-                    contentDescription = null,
-                    tint = iconTint,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    profile.name,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = titleColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    sub,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = subColor,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Icon(
-                painterResource(R.drawable.chevron_right_24px),
-                contentDescription = null,
-                tint = subColor
-            )
-        }
-    }
+    ServerRow(
+        name = profile.name,
+        subtitle = sub,
+        isActive = isActive,
+        shape = shape,
+        onClick = onClick,
+        trailingIconRes = R.drawable.chevron_right_24px
+    )
 }
 
 /**
@@ -435,7 +397,7 @@ fun ServerDetailScreen(
                 subtitle = headerSubtitle?.let { sub ->
                     { Text(sub, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 },
-                navigationIcon = { BackButton(onBack) },
+                navigationIcon = { SettingsBackButton(onBack) },
                 scrollBehavior = scrollBehavior,
                 actions = {
                     Box {
@@ -949,7 +911,7 @@ fun NerdScreen(
         topBar = {
             LargeFlexibleTopAppBar(
                 title = { Text(stringResource(R.string.nerd_section_title)) },
-                navigationIcon = { BackButton(onBack) },
+                navigationIcon = { SettingsBackButton(onBack) },
                 scrollBehavior = scrollBehavior
             )
         },
@@ -1206,7 +1168,11 @@ private fun LogPane(text: String, color: Color = MaterialTheme.colorScheme.onSur
 
 /**
  * Единый SSH-лог: весь вывод команд сопряжения/управления + server.log (тянется кнопкой
- * «Журнал сервера») — всё идёт сюда через runCmd. Автопрокрутка к свежим строкам.
+ * «Журнал сервера») — всё идёт сюда через runCmd.
+ *
+ * Раскладка трёхэтажная, чтобы ничего не толкалось в одной строке: шапка (заголовок +
+ * счётчик строк), терминал, ряд действий во всю ширину. Терминал на inverseSurface —
+ * настоящая тёмная консоль в светлой теме, с приглашением «❯» и мигающим курсором.
  */
 @Composable
 private fun SshLogCard(
@@ -1221,7 +1187,10 @@ private fun SshLogCard(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Text(
                     stringResource(R.string.ssh_log_title),
@@ -1229,83 +1198,142 @@ private fun SshLogCard(
                     modifier = Modifier.weight(1f)
                 )
                 if (lines.isNotEmpty()) {
-                    IconButton(onClick = onClear) {
-                        Icon(
-                            painterResource(R.drawable.delete_24px),
-                            contentDescription = stringResource(R.string.clear)
-                        )
-                    }
-                }
-                if (canFetchJournal) {
-                    FilledTonalButton(onClick = onFetchJournal, enabled = !journalLoading) {
-                        if (journalLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp
-                            )
-                        } else {
-                            Icon(
-                                painterResource(R.drawable.cloud_download_24px),
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
+                    AnimatedContent(
+                        targetState = lines.size,
+                        transitionSpec = {
+                            (fadeIn() togetherWith fadeOut()).using(SizeTransform(clip = false))
+                        },
+                        label = "ssh_log_count"
+                    ) { count ->
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.secondaryContainer
+                        ) {
+                            Text(
+                                "$count",
+                                style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
+                                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                             )
                         }
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.ssh_log_fetch_journal))
                     }
                 }
             }
-            Spacer(Modifier.height(12.dp))
+
+            SshTerminalPane(lines)
+
+            // Действия отдельным рядом во всю ширину — в шапке им тесно на узких экранах.
+            if (canFetchJournal || lines.isNotEmpty()) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (canFetchJournal) {
+                        FilledTonalButton(
+                            onClick = onFetchJournal,
+                            enabled = !journalLoading,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            if (journalLoading) {
+                                LoadingIndicator(modifier = Modifier.size(22.dp))
+                            } else {
+                                Icon(
+                                    painterResource(R.drawable.cloud_download_24px),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.ssh_log_fetch_journal), maxLines = 1)
+                        }
+                    }
+                    if (lines.isNotEmpty()) {
+                        if (canFetchJournal) {
+                            FilledTonalIconButton(onClick = onClear) {
+                                Icon(
+                                    painterResource(R.drawable.delete_24px),
+                                    contentDescription = stringResource(R.string.clear)
+                                )
+                            }
+                        } else {
+                            // Оффлайн: журнал не потянуть, очистка — единственное действие.
+                            FilledTonalButton(onClick = onClear, modifier = Modifier.weight(1f)) {
+                                Icon(
+                                    painterResource(R.drawable.delete_24px),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.clear))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Консоль SSH-лога: тёмная (inverseSurface) моноширинная панель с приглашением «❯» и
+ * мигающим курсором в конце — пустой лог выглядит как ждущий терминал, а не дырка.
+ * Автопрокрутка к свежим строкам.
+ */
+@Composable
+private fun SshTerminalPane(lines: List<String>) {
+    // Тональные роли M3 — как у LogPane соседних карточек: панель живёт в теме
+    // (light/dark/dynamic color), консольность несут моно-шрифт, промпт и курсор.
+    val fg = MaterialTheme.colorScheme.onSurfaceVariant
+    val accent = MaterialTheme.colorScheme.primary
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        val scroll = rememberScrollState()
+        LaunchedEffect(lines.size) { scroll.scrollTo(scroll.maxValue) }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 88.dp, max = 400.dp)
+                .verticalScroll(scroll)
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+        ) {
+            val mono = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
             if (lines.isEmpty()) {
                 Text(
-                    stringResource(R.string.ssh_log_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    "# ${stringResource(R.string.ssh_log_empty)}",
+                    style = mono,
+                    color = fg.copy(alpha = 0.55f)
                 )
             } else {
-                LogPane(lines.joinToString("\n"), autoScroll = true)
+                // Склейка дорогая (кап 500 строк) — кэшируем по содержимому лога.
+                val text = remember(lines) { lines.joinToString("\n") }
+                Text(text, style = mono, color = fg)
+            }
+            Row {
+                Text("❯ ", style = mono, color = accent)
+                if (LocalReducedMotion.current) {
+                    Text("▍", style = mono, color = accent)
+                } else {
+                    // Альфа в draw-фазе через graphicsLayer: чтение анимации в композиции
+                    // рекомпозило бы строку на каждом кадре мигания.
+                    val blink = rememberInfiniteTransition(label = "ssh_cursor")
+                        .animateFloat(
+                            initialValue = 1f,
+                            targetValue = 0.1f,
+                            animationSpec = infiniteRepeatable(tween(600), RepeatMode.Reverse),
+                            label = "ssh_cursor_alpha"
+                        )
+                    Text(
+                        "▍",
+                        style = mono,
+                        color = accent,
+                        modifier = Modifier.graphicsLayer { alpha = blink.value }
+                    )
+                }
             }
         }
     }
 }
 
-@Composable
-private fun BackButton(onBack: () -> Unit) {
-    IconButton(onClick = onBack) {
-        Icon(
-            painterResource(R.drawable.arrow_back_24px),
-            contentDescription = stringResource(R.string.back)
-        )
-    }
-}
-
-@Composable
-private fun EmptyServers(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.padding(horizontal = 32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Surface(
-            shape = MaterialShapes.Cookie9Sided.toShape(),
-            color = MaterialTheme.colorScheme.primaryContainer,
-            modifier = Modifier.size(112.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                Icon(
-                    painterResource(R.drawable.database_outlined_24px),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.size(48.dp)
-                )
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-        Text(
-            stringResource(R.string.settings_empty_servers),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-    }
-}

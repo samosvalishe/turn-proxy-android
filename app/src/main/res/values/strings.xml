@@ -4,7 +4,6 @@
     <!-- HomeScreen -->
     <string name="nav_home">Главная</string>
     <string name="turn_proxy_title">Free Turn</string>
-    <string name="info_desc">Информация</string>
     <string name="proxy_active">Прокси активен</string>
     <string name="proxy_connecting">Подключение…</string>
     <string name="proxy_press_to_start">Нажмите для запуска</string>
@@ -21,7 +20,6 @@
     <string name="start_proxy">Запустить прокси</string>
     <string name="android_client">Android-клиент</string>
     <string name="proxy_core">Прокси-ядро</string>
-    <string name="btn_open">Открыть</string>
     <string name="reset_settings">Сбросить настройки</string>
     <string name="reset">Сбросить</string>
     <string name="reset_all_settings_title">Сбросить все настройки?</string>
@@ -140,7 +138,6 @@
     <!-- Update -->
     <string name="update_title">Обновление</string>
     <string name="update_check">Проверить</string>
-    <string name="update_tap_to_check">Нажмите для проверки</string>
     <string name="update_checking">Проверка…</string>
     <string name="update_available_title">Доступно обновление</string>
     <string name="update_available">Доступна версия %1$s</string>
@@ -188,21 +185,8 @@
     <string name="tg_not_now">Не сейчас</string>
 
     <!-- Profiles -->
-    <string name="profiles_empty_title">Пока нет сохранённых профилей</string>
-    <string name="profiles_empty_desc">Сохраните текущие настройки как профиль или импортируйте ссылку, чтобы переключаться между разными профилями.</string>
-    <string name="profile_save_current">Сохранить текущие настройки</string>
-    <string name="profile_save_dialog_title">Новый профиль</string>
-    <string name="profile_name_label">Название профиля</string>
-    <string name="profile_name_placeholder">Например, «Мой VPS»</string>
-    <string name="profile_save">Сохранить</string>
-    <string name="profile_rename">Переименовать</string>
     <string name="profile_delete">Удалить</string>
-    <string name="profile_delete_title">Удалить профиль?</string>
-    <string name="profile_delete_desc">Профиль «%1$s» будет удалён. Это действие нельзя отменить.</string>
-    <string name="profile_more">Ещё</string>
-    <string name="profile_default_name">Новый профиль</string>
-    <string name="profile_name_taken">Профиль с таким именем уже существует</string>
-    <string name="profile_unsaved_label">Несохранённая конфигурация</string>
+    <string name="profile_unsaved_label">Не сохранено</string>
 
     <!-- Notification & Tile -->
     <string name="notif_proxy_stop_action">Отключить</string>
@@ -256,7 +240,7 @@
     <string name="settings_title">Настройки</string>
     <string name="settings_servers">Серверы</string>
     <string name="settings_servers_desc">Управление добавленными серверами и их настройками</string>
-    <string name="settings_empty_servers">Нет добавленных серверов. Сохраните конфигурацию на главном экране.</string>
+    <string name="settings_empty_servers">Нет добавленных серверов</string>
     <string name="provider_vk_calls">VK Звонки</string>
     <string name="server_delete_confirm_title">Удалить сервер?</string>
     <string name="server_delete_confirm_desc">Сервер «%1$s» и все его настройки будут удалены из приложения.</string>
@@ -297,4 +281,19 @@
     <string name="load_wg_conf">Загрузить из файла</string>
     <string name="connection_config_section">Конфигурация туннеля</string>
     <string name="change_server">Сменить сервер</string>
+
+    <!-- Приложение -->
+    <string name="settings_app">Приложение</string>
+    <string name="settings_app_desc">Тема, приватность и обновления</string>
+    <string name="app_section_interface">Интерфейс</string>
+    <string name="app_section_updates">Обновления</string>
+    <string name="app_section_reset">Сброс</string>
+    <string name="app_reset_desc">Удалить все данные приложения</string>
+    <string name="update_current_version">Текущая версия %1$s</string>
+
+    <!-- О проекте -->
+    <string name="settings_about">О проекте</string>
+    <string name="settings_about_desc">Версия, описание и ссылки</string>
+    <string name="about_description">Free Turn проксирует WireGuard и Xray-трафик через публичные TURN-сервера. Открытый исходный код и никакой телеметрии: все настройки хранятся только на вашем устройстве.</string>
+    <string name="about_links">Ссылки</string>
 </resources>
