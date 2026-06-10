@@ -46,8 +46,7 @@ internal fun HomeEmptyState(
     modifier: Modifier = Modifier
 ) {
     val reducedMotion = LocalReducedMotion.current
-    // Едва заметное «дыхание» фигуры: декоративный живой акцент в духе expressive.
-    // При системном «Убрать анимации» — статично.
+    // Медленное вращение фигуры (оборот в минуту). При reduced-motion — статично.
     val rotation = if (reducedMotion) 0f else {
         val transition = rememberInfiniteTransition(label = "empty_breathe")
         val value by transition.animateFloat(

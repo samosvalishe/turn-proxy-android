@@ -199,11 +199,12 @@ fun HomeScreen(
                                     HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
                                     startProxyWithTunnel()
                                 }
-                                is ProxyState.Running, is ProxyState.Connecting, is ProxyState.Starting -> {
+                                // CaptchaRequired: прокси под капчей работает — тоггл его останавливает.
+                                is ProxyState.Running, is ProxyState.Connecting,
+                                is ProxyState.Starting, is ProxyState.CaptchaRequired -> {
                                     HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_OFF)
                                     proxyViewModel.stopProxy()
                                 }
-                                else -> {}
                             }
                         }
                     )

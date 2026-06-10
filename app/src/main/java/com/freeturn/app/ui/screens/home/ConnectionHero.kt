@@ -106,15 +106,16 @@ internal fun ConnectionHero(
     }
 }
 
-// Состояния героя. Captcha визуально живёт как Idle (играет иконка запуска),
-// её текст несёт строка статуса.
+// Состояния героя. CaptchaRequired — это Busy: прокси под капчей работает,
+// текст про капчу несёт строка статуса.
 private enum class HeroKind { Idle, Busy, Running, Error }
 
 private fun ProxyState.heroKind(): HeroKind = when (this) {
     is ProxyState.Running -> HeroKind.Running
-    is ProxyState.Starting, is ProxyState.Connecting -> HeroKind.Busy
+    is ProxyState.Starting, is ProxyState.Connecting,
+    is ProxyState.CaptchaRequired -> HeroKind.Busy
     is ProxyState.Error -> HeroKind.Error
-    else -> HeroKind.Idle
+    is ProxyState.Idle -> HeroKind.Idle
 }
 
 // Кнопка-тоггл
@@ -153,8 +154,7 @@ private fun HeroToggleButton(
         animationSpec = tween(500),
         label = "btn_fg"
     )
-    // Ambient glow: насыщенный акцент состояния, читается периферийным зрением
-    // раньше текста статуса.
+    // Ambient glow позади кнопки в акцентном цвете состояния.
     val glowColor by animateColorAsState(
         targetValue = when (kind) {
             HeroKind.Running -> extended.success
@@ -171,7 +171,7 @@ private fun HeroToggleButton(
         label = "btn_scale"
     )
 
-    // Морф формы: физически перетекающая фигура — фирменный expressive-жест.
+    // Морф формы кнопки между состояниями.
     val heroShape = rememberMorphingShape(
         target = when (kind) {
             HeroKind.Idle -> MaterialShapes.Cookie12Sided
@@ -182,7 +182,7 @@ private fun HeroToggleButton(
         reducedMotion = reducedMotion
     )
 
-    // Медленное вращение «солнца», пока идёт подключение, — кнопка живёт.
+    // Медленное вращение «солнца», пока идёт подключение.
     val rotation = if (kind == HeroKind.Busy && !reducedMotion) {
         val spin = rememberInfiniteTransition(label = "hero_spin")
         val angle by spin.animateFloat(

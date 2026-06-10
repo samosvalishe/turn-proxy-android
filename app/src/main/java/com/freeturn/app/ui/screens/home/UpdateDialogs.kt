@@ -31,7 +31,6 @@ import com.freeturn.app.viewmodel.UpdateState
  * Диалоги цикла обновления приложения: доступно → качается → готово к установке.
  * Чистый компонент: состояние и действия приходят снаружи.
  */
-@Suppress("AssignedValueIsNeverRead")
 @Composable
 internal fun UpdateDialogs(
     updateState: UpdateState,
@@ -40,12 +39,14 @@ internal fun UpdateDialogs(
     onReset: () -> Unit
 ) {
     val context = LocalContext.current
-    var dismissed by rememberSaveable { mutableStateOf(false) }
+    // Версия, для которой диалог «Доступно обновление» отклонён:
+    // следующая версия покажет диалог заново.
+    var dismissedVersion by rememberSaveable { mutableStateOf<String?>(null) }
 
     when (val state = updateState) {
-        is UpdateState.Available -> if (!dismissed) {
+        is UpdateState.Available -> if (dismissedVersion != state.version) {
             AlertDialog(
-                onDismissRequest = { dismissed = true },
+                onDismissRequest = { dismissedVersion = state.version },
                 title = { Text(stringResource(R.string.update_available_title)) },
                 text = {
                     Column {
@@ -69,12 +70,12 @@ internal fun UpdateDialogs(
                 confirmButton = {
                     TextButton(onClick = {
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                        dismissed = true
+                        dismissedVersion = state.version
                         onDownload()
                     }) { Text(stringResource(R.string.update_download)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { dismissed = true }) {
+                    TextButton(onClick = { dismissedVersion = state.version }) {
                         Text(stringResource(R.string.cancel))
                     }
                 }

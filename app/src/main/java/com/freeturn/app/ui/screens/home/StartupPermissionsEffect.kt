@@ -18,6 +18,9 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import kotlinx.coroutines.delay
 
+// Пауза перед системными диалогами: первый кадр экрана успевает отрисоваться.
+private const val PERMISSION_PROMPT_DELAY_MS = 400L
+
 /**
  * Стартовые разрешения главного экрана: уведомления (Android 13+), затем исключение
  * из оптимизации батареи. Цепочка: диалог нотификаций → его callback → диалог батареи,
@@ -40,7 +43,7 @@ internal fun RequestStartupPermissions() {
     }
 
     LaunchedEffect(Unit) {
-        delay(400) // даём экрану отрисоваться
+        delay(PERMISSION_PROMPT_DELAY_MS)
         val needsNotification = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
                 PackageManager.PERMISSION_GRANTED
