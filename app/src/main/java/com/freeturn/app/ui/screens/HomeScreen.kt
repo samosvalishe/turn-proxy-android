@@ -23,8 +23,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -32,18 +30,12 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.freeturn.app.R
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularWavyProgressIndicator
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearWavyProgressIndicator
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemColors
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.BottomSheetScaffold
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -52,7 +44,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberBottomSheetScaffoldState
-import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material3.rememberStandardBottomSheetState
 import android.Manifest
 import android.annotation.SuppressLint
@@ -73,13 +64,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -102,7 +91,8 @@ import androidx.core.net.toUri
 fun HomeScreen(
     settingsViewModel: SettingsViewModel,
     proxyViewModel: ProxyViewModel,
-    onOpenLogs: () -> Unit
+    onOpenLogs: () -> Unit,
+    onOpenServerSettings: (String) -> Unit
 ) {
     val context = LocalContext.current
     val proxyState by proxyViewModel.proxyState.collectAsStateWithLifecycle()
@@ -154,12 +144,7 @@ fun HomeScreen(
 
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
     val profilesSnapshot by settingsViewModel.profilesSnapshot.collectAsStateWithLifecycle()
-    val showBottomSheet = rememberSaveable { mutableStateOf(false) }
     val showSplitSheet = rememberSaveable { mutableStateOf(false) }
-    val bottomSheetState = rememberBottomSheetState(
-        initialValue = SheetValue.Hidden,
-        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded)
-    )
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     // Standard bottom sheet: свёрнутый peek = карточка активного профиля,
@@ -198,12 +183,18 @@ fun HomeScreen(
         sheetPeekHeight = 112.dp,
         sheetContainerColor = sheetColor,
         sheetContent = {
-            ProfilesSheetContent(
+            ServersSheetContent(
                 settingsViewModel = settingsViewModel,
                 snapshot = profilesSnapshot,
                 privacyMode = privacyMode,
                 onCollapse = {
                     scope.launch { sheetScaffoldState.bottomSheetState.partialExpand() }
+                },
+                onOpenServerSettings = { id ->
+                    // Сворачиваем лист перед уходом в хаб — вернувшись, юзер видит главный
+                    // экран, а не распахнутый список.
+                    scope.launch { sheetScaffoldState.bottomSheetState.partialExpand() }
+                    onOpenServerSettings(id)
                 }
             )
         },
@@ -224,12 +215,6 @@ fun HomeScreen(
                                 contentDescription = stringResource(R.string.open_logs)
                             )
                         }
-                    }
-                    IconButton(onClick = {
-                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                        showBottomSheet.value = true
-                    }) {
-                        Icon(painterResource(R.drawable.info_24px), contentDescription = stringResource(R.string.info_desc))
                     }
                 }
             )
@@ -330,21 +315,6 @@ fun HomeScreen(
             )
         }
         }
-        }
-    }
-
-    if (showBottomSheet.value) {
-        ModalBottomSheet(
-            onDismissRequest = { showBottomSheet.value = false },
-            sheetState = bottomSheetState,
-            containerColor = sheetColor
-        ) {
-            InfoBottomSheet(
-                settingsViewModel = settingsViewModel,
-                containerColor = sheetColor,
-                privacyMode = privacyMode,
-                onPrivacyModeChange = { settingsViewModel.setPrivacyMode(it) }
-            )
         }
     }
 
@@ -525,297 +495,6 @@ private fun ProxyToggleButton(state: ProxyState, onClick: () -> Unit) {
         }
     }
 }
-
-// Bottom sheet
-
-@Composable
-private fun InfoBottomSheet(
-    settingsViewModel: SettingsViewModel,
-    containerColor: Color,
-    privacyMode: Boolean,
-    onPrivacyModeChange: (Boolean) -> Unit,
-) {
-    val context = LocalContext.current
-    val uriHandler = LocalUriHandler.current
-    val dynamicTheme by settingsViewModel.dynamicTheme.collectAsStateWithLifecycle()
-    val updateState by settingsViewModel.updateState.collectAsStateWithLifecycle()
-    var showResetDialog by rememberSaveable { mutableStateOf(false) }
-
-    val appVersion = remember {
-        try { context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "—" }
-        catch (_: Exception) { "—" }
-    }
-
-    val listColors = ListItemDefaults.colors(containerColor = containerColor)
-
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxWidth()
-            .navigationBarsPadding()
-    ) {
-        // Обновление
-        item {
-            UpdateListItem(
-                state = updateState,
-                colors = listColors,
-                onCheck = {
-                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                    settingsViewModel.checkForUpdate()
-                },
-                onDownload = {
-                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                    settingsViewModel.downloadUpdate()
-                },
-                onInstall = {
-                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                    settingsViewModel.installUpdate()
-                }
-            )
-        }
-
-        item { HorizontalDivider() }
-
-        // Ссылки
-        item {
-            RepoLinkItem(
-                title = stringResource(R.string.android_client),
-                subtitle = "samosvalishe/turn-proxy-android",
-                url = "https://github.com/samosvalishe/turn-proxy-android",
-                containerColor = containerColor,
-                onHaptic = { HapticUtil.perform(context, HapticUtil.Pattern.SELECTION) },
-                onOpen = { uriHandler.openUri(it) }
-            )
-        }
-
-        item {
-            RepoLinkItem(
-                title = stringResource(R.string.proxy_core),
-                subtitle = "samosvalishe/free-turn-proxy",
-                url = "https://github.com/samosvalishe/free-turn-proxy",
-                containerColor = containerColor,
-                onHaptic = { HapticUtil.perform(context, HapticUtil.Pattern.SELECTION) },
-                onOpen = { uriHandler.openUri(it) }
-            )
-        }
-
-        item {
-            RepoLinkItem(
-                title = stringResource(R.string.tg_channel),
-                subtitle = null,
-                url = "https://t.me/+53nh4UNiSv5lNTgy",
-                containerColor = containerColor,
-                onHaptic = { HapticUtil.perform(context, HapticUtil.Pattern.SELECTION) },
-                onOpen = { uriHandler.openUri(it) }
-            )
-        }
-
-        item { HorizontalDivider() }
-
-        // Настройки интерфейса
-        item {
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.privacy_mode_title)) },
-                supportingContent = { Text(stringResource(R.string.privacy_mode_desc)) },
-                colors = listColors,
-                trailingContent = {
-                    androidx.compose.material3.Switch(
-                        checked = privacyMode,
-                        onCheckedChange = {
-                            HapticUtil.perform(
-                                context,
-                                if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF
-                            )
-                            onPrivacyModeChange(it)
-                        }
-                    )
-                }
-            )
-        }
-
-        item {
-            ListItem(
-                headlineContent = { Text(stringResource(R.string.dynamic_theme_title)) },
-                supportingContent = { Text(stringResource(R.string.dynamic_theme_desc)) },
-                colors = listColors,
-                trailingContent = {
-                    androidx.compose.material3.Switch(
-                        checked = dynamicTheme,
-                        onCheckedChange = {
-                            HapticUtil.perform(
-                                context,
-                                if (it) HapticUtil.Pattern.TOGGLE_ON else HapticUtil.Pattern.TOGGLE_OFF
-                            )
-                            settingsViewModel.setDynamicTheme(it)
-                        }
-                    )
-                }
-            )
-        }
-
-        item { HorizontalDivider() }
-
-        // Сброс
-        item {
-            ListItem(
-                headlineContent = {
-                    Text(
-                        stringResource(R.string.reset_settings),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                },
-                colors = listColors,
-                trailingContent = {
-                    Icon(
-                        painterResource(R.drawable.delete_24px),
-                        contentDescription = stringResource(R.string.reset),
-                        modifier = Modifier.size(20.dp),
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                },
-                modifier = Modifier.clickable {
-                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                    showResetDialog = true
-                }
-            )
-        }
-
-        item {
-            Text(
-                text = "v$appVersion",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp),
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-
-    if (showResetDialog) {
-        AlertDialog(
-            onDismissRequest = { showResetDialog = false },
-            title = { Text(stringResource(R.string.reset_all_settings_title)) },
-            text = { Text(stringResource(R.string.reset_all_settings_desc)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showResetDialog = false
-                        settingsViewModel.resetAllSettings()
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) { Text(stringResource(R.string.reset)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showResetDialog = false }) { Text(stringResource(R.string.cancel)) }
-            }
-        )
-    }
-}
-
-// Пункт обновления в bottom sheet
-
-@Composable
-private fun UpdateListItem(
-    state: UpdateState,
-    colors: ListItemColors,
-    onCheck: () -> Unit,
-    onDownload: () -> Unit,
-    onInstall: () -> Unit
-) {
-    val supportingText = when (state) {
-        is UpdateState.Idle -> stringResource(R.string.update_tap_to_check)
-        is UpdateState.Checking -> stringResource(R.string.update_checking)
-        is UpdateState.Available -> stringResource(R.string.update_available, state.version)
-        is UpdateState.Downloading -> stringResource(R.string.update_downloading, state.progress)
-        is UpdateState.ReadyToInstall -> stringResource(R.string.update_ready_desc_short)
-        is UpdateState.NoUpdate -> stringResource(R.string.update_no_update)
-        is UpdateState.Error -> stringResource(R.string.update_error, state.message)
-    }
-
-    ListItem(
-        headlineContent = {
-            Text(stringResource(R.string.update_title), style = MaterialTheme.typography.titleSmall)
-        },
-        supportingContent = {
-            Column {
-                Text(
-                    supportingText,
-                    color = if (state is UpdateState.Error) MaterialTheme.colorScheme.error
-                    else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (state is UpdateState.Downloading) {
-                    LinearWavyProgressIndicator(
-                        progress = { state.progress / 100f },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp)
-                    )
-                }
-            }
-        },
-        trailingContent = {
-            when (state) {
-                is UpdateState.Available -> TextButton(onClick = onDownload) {
-                    Text(stringResource(R.string.update_download))
-                }
-                is UpdateState.ReadyToInstall -> TextButton(onClick = onInstall) {
-                    Text(stringResource(R.string.update_install))
-                }
-                is UpdateState.Idle, is UpdateState.NoUpdate, is UpdateState.Error ->
-                    TextButton(onClick = onCheck) {
-                        Text(stringResource(R.string.update_check))
-                    }
-                else -> {}
-            }
-        },
-        colors = colors
-    )
-}
-
-// Общие компоненты
-
-@Composable
-private fun RepoLinkItem(
-    title: String,
-    subtitle: String?,
-    url: String,
-    containerColor: Color = MaterialTheme.colorScheme.surface,
-    onHaptic: () -> Unit,
-    onOpen: (String) -> Unit
-) {
-    Surface(
-        onClick = {
-            onHaptic()
-            onOpen(url)
-        },
-        color = containerColor
-    ) {
-        ListItem(
-            headlineContent = { Text(title) },
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            supportingContent = if (subtitle != null) ({
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }) else null,
-            trailingContent = {
-                Icon(
-                    painterResource(R.drawable.open_in_new_24px),
-                    contentDescription = stringResource(R.string.btn_open),
-                    modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            }
-        )
-    }
-}
-
 
 /**
  * Прилипшая к низу M3 «карточка» — единственная точка входа в управление профилями.

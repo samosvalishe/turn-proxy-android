@@ -29,7 +29,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
-import java.util.UUID
 
 class SettingsViewModel(
     private val prefs: AppPreferences,
@@ -134,16 +133,6 @@ class SettingsViewModel(
     // Во всех сеттерах read-modify-write выполняется ВНУТРИ profileMutex: чтение
     // current вне лока давало lost update — два параллельных сеттера читали один
     // снапшот, затем по очереди писали свой copy(), и второй затирал первого.
-    fun setProvider(value: String) {
-        viewModelScope.launch {
-            profileMutex.withLock {
-                val current = prefs.clientConfigFlow.first()
-                if (current.provider == value) return@withLock
-                persistClient(current.copy(provider = value))
-            }
-        }
-    }
-
     fun setSplitTunnelMode(value: String) {
         viewModelScope.launch {
             profileMutex.withLock {
@@ -172,32 +161,8 @@ class SettingsViewModel(
     }
 
     // --- Profiles ---
-    fun saveCurrentAsProfile(name: String) {
-        viewModelScope.launch {
-            profileMutex.withLock {
-                val current = prefs.profilesSnapshot.first()
-                val ssh = prefs.sshConfigFlow.first()
-                val client = prefs.clientConfigFlow.first()
-                val listen = prefs.proxyListenFlow.first()
-                val connect = prefs.proxyConnectFlow.first()
-                val server = prefs.serverOptsFlow.first()
-                val base = name.trim().ifBlank {
-                    serverAddrToProfileName(client.serverAddress)
-                }
-                val profile = Profile(
-                    id = UUID.randomUUID().toString(),
-                    name = uniqueProfileName(base, current.list, null),
-                    ssh = ssh,
-                    client = client,
-                    proxyListen = listen,
-                    proxyConnect = connect,
-                    server = server
-                )
-                prefs.saveProfiles(current.list + profile)
-                prefs.setActiveProfileId(profile.id)
-            }
-        }
-    }
+    // Создание профиля (сервера) ушло из листа на главном: появится отдельным
+    // экраном добавления сервера.
 
     private suspend fun mirrorActiveProfile() {
         val current = prefs.profilesSnapshot.first()
@@ -288,10 +253,6 @@ class SettingsViewModel(
             }
         }
     }
-
-    private fun serverAddrToProfileName(serverAddr: String): String =
-        serverAddr.substringBefore(':').takeIf { it.isNotBlank() }
-            ?: appContext.getString(com.freeturn.app.R.string.profile_default_name)
 
     private fun uniqueProfileName(base: String, existing: List<Profile>, excludingId: String?): String {
         val taken = existing
