@@ -7,9 +7,9 @@ import java.util.UUID
 
 /**
  * Именованный сервер: SSH-доступ + клиентские параметры + серверные опции.
- * Хранится сериализованным в DataStore. Активный сервер — это id из общего
- * списка; его SshConfig/ClientConfig дублируются в legacy-ключах prefs, чтобы
- * существующие экраны и ViewModel могли работать без переписывания.
+ * Список хранится сериализованным в DataStore (SERVERS_JSON) — единственный
+ * источник истины; конфиг активного сервера рантайм читает через производные
+ * флоу AppPreferences.
  */
 data class Server(
     val id: String = UUID.randomUUID().toString(),
@@ -18,7 +18,7 @@ data class Server(
     val client: ClientConfig = ClientConfig(),
     val proxyListen: String = "0.0.0.0:56000",
     val proxyConnect: String = "127.0.0.1:40537",
-    val opts: AppPreferences.ServerOpts = AppPreferences.ServerOpts()
+    val opts: ServerOpts = ServerOpts()
 )
 
 data class ServersSnapshot(
@@ -30,8 +30,7 @@ data class ServersSnapshot(
     val active: Server? get() = list.firstOrNull { it.id == activeId }
 }
 
-// JSON-ключи («server», «obfProfile», …) — legacy-схема хранения, не менять:
-// иначе сохранённые серверы пользователей не распарсятся.
+// Имена JSON-ключей — контракт с сохранёнными данными: менять только с миграцией.
 internal object ServerJson {
     fun encodeList(list: List<Server>): String {
         val arr = JSONArray()
@@ -91,7 +90,7 @@ internal object ServerJson {
         })
         put("proxyListen", p.proxyListen)
         put("proxyConnect", p.proxyConnect)
-        put("server", JSONObject().apply {
+        put("opts", JSONObject().apply {
             put("obfProfile", p.opts.obfProfile)
             put("obfKey", p.opts.obfKey)
         })
@@ -100,7 +99,7 @@ internal object ServerJson {
     private fun decode(o: JSONObject): Server {
         val sshO = o.optJSONObject("ssh") ?: JSONObject()
         val cliO = o.optJSONObject("client") ?: JSONObject()
-        val srvO = o.optJSONObject("server") ?: JSONObject()
+        val optsO = o.optJSONObject("opts") ?: JSONObject()
         return Server(
             id = o.optString("id").ifBlank { UUID.randomUUID().toString() },
             name = o.optString("name").ifBlank { "Без названия" },
@@ -154,11 +153,11 @@ internal object ServerJson {
             ),
             proxyListen = o.optString("proxyListen").ifBlank { "0.0.0.0:56000" },
             proxyConnect = o.optString("proxyConnect").ifBlank { "127.0.0.1:40537" },
-            opts = AppPreferences.ServerOpts(
-                obfProfile = srvO.optString("obfProfile", ObfProfile.NONE).let {
+            opts = ServerOpts(
+                obfProfile = optsO.optString("obfProfile", ObfProfile.NONE).let {
                     if (it in ObfProfile.ALL) it else ObfProfile.NONE
                 },
-                obfKey = srvO.optString("obfKey", "")
+                obfKey = optsO.optString("obfKey", "")
             )
         )
     }

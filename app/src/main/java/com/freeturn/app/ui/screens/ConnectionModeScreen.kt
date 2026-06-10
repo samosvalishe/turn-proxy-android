@@ -81,12 +81,12 @@ fun ConnectionModeScreen(
     onBack: (() -> Unit)? = null
 ) {
     val snapshot by settingsViewModel.serversSnapshot.collectAsStateWithLifecycle()
-    val legacyClient by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
+    val activeClient by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
     val proxyState by proxyViewModel.proxyState.collectAsStateWithLifecycle()
 
     val server = serverId?.let { id -> snapshot.list.firstOrNull { it.id == id } }
-    val saved = server?.client ?: legacyClient
+    val saved = server?.client ?: activeClient
     val isActive = serverId == null || serverId == snapshot.activeId
 
     fun clientEdit(transform: (ClientConfig) -> ClientConfig) {

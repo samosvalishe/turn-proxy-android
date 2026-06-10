@@ -13,7 +13,7 @@ object CoreArgs {
 
     fun client(
         cfg: ClientConfig,
-        srv: AppPreferences.ServerOpts,
+        srv: ServerOpts,
         carrierDns: String? = null,
     ): List<String> = buildList {
         add("-peer"); add(cfg.serverAddress)

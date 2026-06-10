@@ -1,21 +1,16 @@
-
+﻿
 
 package com.freeturn.app.data
 
 import android.content.Context
-import android.content.SharedPreferences
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.withContext
 import java.io.IOException
-import androidx.core.content.edit
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "app_prefs")
 
@@ -138,63 +133,11 @@ class AppPreferences(context: Context) {
     private val context = context.applicationContext
 
     companion object {
-        val SSH_IP = stringPreferencesKey("ssh_ip")
-        val SSH_PORT = intPreferencesKey("ssh_port")
-        val SSH_USER = stringPreferencesKey("ssh_user")
-        val SSH_AUTH_TYPE = stringPreferencesKey("ssh_auth_type")
-        val SSH_HOST_FP = stringPreferencesKey("ssh_host_fp")
-        val CLIENT_SERVER_ADDR = stringPreferencesKey("client_server_addr")
-        val CLIENT_VK_LINK = stringPreferencesKey("client_vk_link")
-        val CLIENT_PROVIDER = stringPreferencesKey("client_provider")
-        val CLIENT_THREADS = intPreferencesKey("client_threads")
-        val CLIENT_STREAMS_PER_CRED = intPreferencesKey("client_streams_per_cred")
-        val CLIENT_UDP = booleanPreferencesKey("client_udp")
-        val CLIENT_MANUAL_CAPTCHA = booleanPreferencesKey("client_manual_captcha")
-        val CLIENT_LOCAL_PORT = stringPreferencesKey("client_local_port")
-        val CLIENT_IS_RAW = booleanPreferencesKey("client_is_raw")
-        val CLIENT_RAW_CMD = stringPreferencesKey("client_raw_cmd")
-        val CLIENT_TCP_FORWARD = booleanPreferencesKey("client_tcp_forward")
-        val CLIENT_BOND = booleanPreferencesKey("client_bond")
-        val CLIENT_DEBUG = booleanPreferencesKey("client_debug")
-        val CLIENT_USE_CARRIER_DNS = booleanPreferencesKey("client_use_carrier_dns")
-        val CLIENT_DNS_MODE = stringPreferencesKey("client_dns_mode")
-        val CLIENT_CUSTOM_DNS = stringPreferencesKey("client_custom_dns")
-        val CLIENT_SYNC_SERVER = booleanPreferencesKey("client_sync_server")
-        val CLIENT_MAGIC_SWITCH = booleanPreferencesKey("client_magic_switch")
-        val CLIENT_MAGIC_TURN = stringPreferencesKey("client_magic_turn")
-        val CLIENT_TUNNEL_TRANSPORT = stringPreferencesKey("client_tunnel_transport")
-        val CLIENT_WG_CONFIG = stringPreferencesKey("client_wg_config")
-        val CLIENT_WG_TUNNEL_NAME = stringPreferencesKey("client_wg_tunnel_name")
-        val CLIENT_SPLIT_TUNNEL_MODE = stringPreferencesKey("client_split_tunnel_mode")
-        val CLIENT_SPLIT_TUNNEL_APPS = stringPreferencesKey("client_split_tunnel_apps")
-        val CLIENT_LOGS_ENABLED = booleanPreferencesKey("client_logs_enabled")
-        val PROXY_LISTEN = stringPreferencesKey("proxy_listen")
-        val PROXY_CONNECT = stringPreferencesKey("proxy_connect")
-        val SERVER_OBF_PROFILE = stringPreferencesKey("server_obf_profile")
-        val SERVER_OPTS_REV = intPreferencesKey("server_opts_rev")
         val DYNAMIC_THEME = booleanPreferencesKey("dynamic_theme")
         val NERD_MODE = booleanPreferencesKey("nerd_mode")
         val TG_SUBSCRIBE_SHOWN = booleanPreferencesKey("tg_subscribe_shown")
-        // Имена ключей legacy («profiles_json», «active_profile_id») — не менять,
-        // иначе сохранённые серверы пользователей потеряются при обновлении.
-        val SERVERS_JSON = stringPreferencesKey("profiles_json")
-        val ACTIVE_SERVER_ID = stringPreferencesKey("active_profile_id")
-    }
-
-    // Шифрованное хранилище для SSH-пароля и ключа (Android Keystore + AES-256)
-    // Подавляем предупреждения: стабильной замены EncryptedSharedPreferences пока нет
-    @Suppress("DEPRECATION")
-    private val encryptedPrefs: SharedPreferences by lazy {
-        val masterKey = MasterKey.Builder(context)
-            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-            .build()
-        EncryptedSharedPreferences.create(
-            context,
-            "secure_ssh_prefs",
-            masterKey,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
+        val SERVERS_JSON = stringPreferencesKey("servers_json")
+        val ACTIVE_SERVER_ID = stringPreferencesKey("active_server_id")
     }
 
     /** DataStore-флоу: IOException (битый файл) → дефолты, остальное пробрасываем. */
@@ -203,96 +146,40 @@ class AppPreferences(context: Context) {
             .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
             .map(transform)
 
-    val sshConfigFlow: Flow<SshConfig> = prefFlow { prefs ->
-            SshConfig(
-                ip = prefs[SSH_IP] ?: "",
-                port = prefs[SSH_PORT] ?: 22,
-                username = prefs[SSH_USER] ?: "root",
-                // Читаем из зашифрованного хранилища
-                password = encryptedPrefs.getString("ssh_pass", null) ?: "",
-                authType = prefs[SSH_AUTH_TYPE] ?: "PASSWORD",
-                sshKey = encryptedPrefs.getString("ssh_key", null) ?: "",
-                hostFingerprint = prefs[SSH_HOST_FP] ?: ""
-            )
-        }
-
-    val clientConfigFlow: Flow<ClientConfig> = prefFlow { prefs ->
-            ClientConfig(
-                serverAddress = prefs[CLIENT_SERVER_ADDR] ?: "",
-                vkLink = prefs[CLIENT_VK_LINK] ?: "",
-                provider = (prefs[CLIENT_PROVIDER] ?: Provider.VK).let {
-                    if (it in Provider.ALL) it else Provider.VK
-                },
-                threads = prefs[CLIENT_THREADS] ?: 4,
-                streamsPerCred = prefs[CLIENT_STREAMS_PER_CRED] ?: 10,
-                useUdp = prefs[CLIENT_UDP] ?: true,
-                manualCaptcha = prefs[CLIENT_MANUAL_CAPTCHA] ?: false,
-                localPort = prefs[CLIENT_LOCAL_PORT] ?: "127.0.0.1:9000",
-                isRawMode = prefs[CLIENT_IS_RAW] ?: false,
-                rawCommand = prefs[CLIENT_RAW_CMD] ?: "",
-                tcpForward = prefs[CLIENT_TCP_FORWARD] ?: false,
-                bond = prefs[CLIENT_BOND] ?: false,
-
-                debugMode = prefs[CLIENT_DEBUG] ?: false,
-                useCarrierDns = prefs[CLIENT_USE_CARRIER_DNS] ?: false,
-                dnsMode = (prefs[CLIENT_DNS_MODE] ?: DnsMode.AUTO).let {
-                    if (it in DnsMode.ALL) it else DnsMode.AUTO
-                },
-                customDns = prefs[CLIENT_CUSTOM_DNS] ?: "",
-                syncServerSwitches = prefs[CLIENT_SYNC_SERVER] ?: true,
-                magicSwitch = prefs[CLIENT_MAGIC_SWITCH] ?: false,
-                magicTurn = prefs[CLIENT_MAGIC_TURN] ?: "",
-                tunnelTransport = (prefs[CLIENT_TUNNEL_TRANSPORT] ?: TunnelTransport.NONE).let {
-                    val t = if (it in TunnelTransport.PERSISTED) it else TunnelTransport.NONE
-                    // Legacy: старый ClientSetup всегда писал WIREGUARD; пустой конфиг = туннель
-                    // не выбран → читаем как NONE (proxy), чтобы режим не показывался как VPN.
-                    if (t == TunnelTransport.WIREGUARD && prefs[CLIENT_WG_CONFIG].isNullOrBlank())
-                        TunnelTransport.NONE else t
-                },
-                wireGuardConfig = prefs[CLIENT_WG_CONFIG] ?: "",
-                wireGuardTunnelName = (prefs[CLIENT_WG_TUNNEL_NAME] ?: TunnelTransport.DEFAULT_TUNNEL_NAME)
-                    .ifBlank { TunnelTransport.DEFAULT_TUNNEL_NAME },
-                splitTunnelMode = (prefs[CLIENT_SPLIT_TUNNEL_MODE] ?: SplitTunnelMode.ALL).let {
-                    if (it in SplitTunnelMode.VALUES) it else SplitTunnelMode.ALL
-                },
-                splitTunnelApps = prefs[CLIENT_SPLIT_TUNNEL_APPS] ?: "",
-                logsEnabled = prefs[CLIENT_LOGS_ENABLED] ?: true
-            )
-        }
-
-    val proxyListenFlow: Flow<String> = prefFlow { prefs -> prefs[PROXY_LISTEN] ?: "0.0.0.0:56000" }
-
-    val proxyConnectFlow: Flow<String> = prefFlow { prefs -> prefs[PROXY_CONNECT] ?: "127.0.0.1:40537" }
-
-    /** Снимок серверных obf-опций. obfKey читается из шифрованного хранилища. */
-    data class ServerOpts(
-        /** Wire-профиль обфускации: none | rtpopus (-obf-profile). */
-        val obfProfile: String = ObfProfile.NONE,
-        /** 64-hex obf-ключ (-obf-key). Должен совпадать на клиенте и сервере. */
-        val obfKey: String = ""
-    ) {
-        /** Обфускация включена, когда выбран реальный профиль. */
-        val obfEnabled: Boolean get() = obfProfile != ObfProfile.NONE
+    /**
+     * Снимок: список серверов + id активного — единственный источник истины
+     * конфигурации. Один Flow, чтобы UI получал консистентную пару (нет окна,
+     * в котором активный id указывает на удалённый).
+     */
+    val serversSnapshot: Flow<ServersSnapshot> = prefFlow { prefs ->
+        ServersSnapshot(
+            list = ServerJson.decodeList(prefs[SERVERS_JSON]),
+            activeId = prefs[ACTIVE_SERVER_ID]?.takeIf { it.isNotBlank() },
+            loaded = true
+        )
     }
 
-    val serverOptsFlow: Flow<ServerOpts> = prefFlow { prefs ->
-            ServerOpts(
-                obfProfile = (prefs[SERVER_OBF_PROFILE] ?: ObfProfile.NONE).let {
-                    if (it in ObfProfile.ALL) it else ObfProfile.NONE
-                },
-                obfKey = encryptedPrefs.getString("server_obf_key", null) ?: ""
-            )
-        }
+    // --- Конфиг активного сервера ---
+    // Производные от serversSnapshot: их читает рантайм (ProxyService, оркестратор,
+    // SSH). Без активного сервера отдают дефолты — запускать в этом случае нечего.
 
-    suspend fun saveServerOpts(opts: ServerOpts) {
-        withContext(Dispatchers.IO) {
-            encryptedPrefs.edit { putString("server_obf_key", opts.obfKey) }
-        }
-        context.dataStore.edit { prefs ->
-            prefs[SERVER_OBF_PROFILE] = opts.obfProfile
-            prefs[SERVER_OPTS_REV] = (prefs[SERVER_OPTS_REV] ?: 0) + 1
-        }
-    }
+    private val activeServerFlow: Flow<Server?> =
+        serversSnapshot.map { it.active }.distinctUntilChanged()
+
+    val sshConfigFlow: Flow<SshConfig> =
+        activeServerFlow.map { it?.ssh ?: SshConfig() }.distinctUntilChanged()
+
+    val clientConfigFlow: Flow<ClientConfig> =
+        activeServerFlow.map { it?.client ?: ClientConfig() }.distinctUntilChanged()
+
+    val proxyListenFlow: Flow<String> =
+        activeServerFlow.map { it?.proxyListen ?: "0.0.0.0:56000" }.distinctUntilChanged()
+
+    val proxyConnectFlow: Flow<String> =
+        activeServerFlow.map { it?.proxyConnect ?: "127.0.0.1:40537" }.distinctUntilChanged()
+
+    val serverOptsFlow: Flow<ServerOpts> =
+        activeServerFlow.map { it?.opts ?: ServerOpts() }.distinctUntilChanged()
 
     val dynamicThemeFlow: Flow<Boolean> = prefFlow { prefs -> prefs[DYNAMIC_THEME] ?: true }
 
@@ -301,10 +188,74 @@ class AppPreferences(context: Context) {
 
     val tgSubscribeShownFlow: Flow<Boolean> = prefFlow { prefs -> prefs[TG_SUBSCRIBE_SHOWN] ?: false }
 
-    /** Заменяет весь список серверов. */
-    suspend fun saveServers(list: List<Server>) {
+    // --- CRUD серверов ---
+    // Каждая операция — одна транзакция dataStore.edit: атомарный read-modify-write,
+    // параллельные записи не теряются и не оставляют активный id без сервера.
+
+    /** Атомарно правит сервер по id. true — сервер найден и изменился. */
+    suspend fun updateServer(id: String, transform: (Server) -> Server): Boolean {
+        var changed = false
         context.dataStore.edit { prefs ->
-            prefs[SERVERS_JSON] = ServerJson.encodeList(list)
+            val list = ServerJson.decodeList(prefs[SERVERS_JSON])
+            val updated = list.map { if (it.id == id) transform(it) else it }
+            changed = updated != list
+            if (changed) prefs[SERVERS_JSON] = ServerJson.encodeList(updated)
+        }
+        return changed
+    }
+
+    /** Атомарно правит активный сервер. true — активный есть и изменился. */
+    suspend fun updateActiveServer(transform: (Server) -> Server): Boolean {
+        var changed = false
+        context.dataStore.edit { prefs ->
+            val activeId = prefs[ACTIVE_SERVER_ID]?.takeIf { it.isNotBlank() } ?: return@edit
+            val list = ServerJson.decodeList(prefs[SERVERS_JSON])
+            val updated = list.map { if (it.id == activeId) transform(it) else it }
+            changed = updated != list
+            if (changed) prefs[SERVERS_JSON] = ServerJson.encodeList(updated)
+        }
+        return changed
+    }
+
+    /**
+     * Создаёт пустой сервер с уникальным именем и возвращает его id.
+     * Первый сервер в списке сразу становится активным.
+     */
+    suspend fun addServer(baseName: String): String {
+        val server = Server(name = baseName.trim())
+        context.dataStore.edit { prefs ->
+            val list = ServerJson.decodeList(prefs[SERVERS_JSON])
+            val named = server.copy(name = uniqueServerName(server.name, list))
+            prefs[SERVERS_JSON] = ServerJson.encodeList(list + named)
+            if (list.isEmpty()) prefs[ACTIVE_SERVER_ID] = named.id
+        }
+        return server.id
+    }
+
+    /** Переименовывает сервер. Пустое имя оставляет текущее; занятое получает « (2)». */
+    suspend fun renameServer(id: String, name: String) {
+        context.dataStore.edit { prefs ->
+            val list = ServerJson.decodeList(prefs[SERVERS_JSON])
+            val target = list.firstOrNull { it.id == id } ?: return@edit
+            val unique = uniqueServerName(name.trim().ifBlank { target.name }, list, excludingId = id)
+            if (unique == target.name) return@edit
+            prefs[SERVERS_JSON] =
+                ServerJson.encodeList(list.map { if (it.id == id) it.copy(name = unique) else it })
+        }
+    }
+
+    /** Удаляет сервер; если он был активным — активным становится первый из оставшихся. */
+    suspend fun deleteServer(id: String) {
+        context.dataStore.edit { prefs ->
+            val list = ServerJson.decodeList(prefs[SERVERS_JSON])
+            val remaining = list.filterNot { it.id == id }
+            if (remaining.size == list.size) return@edit
+            prefs[SERVERS_JSON] = ServerJson.encodeList(remaining)
+            if (prefs[ACTIVE_SERVER_ID] == id) {
+                val next = remaining.firstOrNull()
+                if (next == null) prefs.remove(ACTIVE_SERVER_ID)
+                else prefs[ACTIVE_SERVER_ID] = next.id
+            }
         }
     }
 
@@ -315,61 +266,24 @@ class AppPreferences(context: Context) {
         }
     }
 
+    private fun uniqueServerName(base: String, existing: List<Server>, excludingId: String? = null): String {
+        val taken = existing
+            .filter { it.id != excludingId }
+            .map { it.name.trim().lowercase() }
+            .toSet()
+        if (base.lowercase() !in taken) return base
+        var i = 2
+        while ("$base ($i)".lowercase() in taken) i++
+        return "$base ($i)"
+    }
+
+    /** SSH-конфиг активного сервера. */
     suspend fun saveSshConfig(config: SshConfig) {
-        // Чувствительные данные — в зашифрованное хранилище
-        withContext(Dispatchers.IO) {
-            encryptedPrefs.edit {
-                putString("ssh_pass", config.password)
-                    .putString("ssh_key", config.sshKey)
-            }
-        }
-        // Остальное — в DataStore; удаляем устаревшие незашифрованные значения
-        context.dataStore.edit { prefs ->
-            prefs[SSH_IP] = config.ip
-            prefs[SSH_PORT] = config.port
-            prefs[SSH_USER] = config.username
-            prefs[SSH_AUTH_TYPE] = config.authType
-            prefs[SSH_HOST_FP] = config.hostFingerprint
-        }
+        updateActiveServer { it.copy(ssh = config) }
     }
 
     suspend fun saveSshFingerprint(fingerprint: String) {
-        context.dataStore.edit { prefs -> prefs[SSH_HOST_FP] = fingerprint }
-    }
-
-    suspend fun saveClientConfig(config: ClientConfig) {
-        context.dataStore.edit { prefs ->
-            prefs[CLIENT_SERVER_ADDR] = config.serverAddress
-            prefs[CLIENT_VK_LINK] = config.vkLink
-            prefs[CLIENT_PROVIDER] = config.provider
-            prefs[CLIENT_THREADS] = config.threads
-            prefs[CLIENT_STREAMS_PER_CRED] = config.streamsPerCred
-            prefs[CLIENT_UDP] = config.useUdp
-            prefs[CLIENT_MANUAL_CAPTCHA] = config.manualCaptcha
-            prefs[CLIENT_LOCAL_PORT] = config.localPort
-            prefs[CLIENT_IS_RAW] = config.isRawMode
-            prefs[CLIENT_RAW_CMD] = config.rawCommand
-            prefs[CLIENT_TCP_FORWARD] = config.tcpForward
-            prefs[CLIENT_BOND] = config.bond
-            prefs[CLIENT_DEBUG] = config.debugMode
-            prefs[CLIENT_USE_CARRIER_DNS] = config.useCarrierDns
-            prefs[CLIENT_DNS_MODE] = if (config.dnsMode in DnsMode.ALL) config.dnsMode else DnsMode.AUTO
-            prefs[CLIENT_CUSTOM_DNS] = config.customDns.trim()
-            prefs[CLIENT_SYNC_SERVER] = config.syncServerSwitches
-            prefs[CLIENT_MAGIC_SWITCH] = config.magicSwitch
-            prefs[CLIENT_MAGIC_TURN] = config.magicTurn.trim()
-            prefs[CLIENT_TUNNEL_TRANSPORT] =
-                if (config.tunnelTransport in TunnelTransport.PERSISTED) config.tunnelTransport
-                else TunnelTransport.NONE
-            prefs[CLIENT_WG_CONFIG] = config.wireGuardConfig.trim()
-            prefs[CLIENT_WG_TUNNEL_NAME] =
-                config.wireGuardTunnelName.trim().ifBlank { TunnelTransport.DEFAULT_TUNNEL_NAME }
-            prefs[CLIENT_SPLIT_TUNNEL_MODE] =
-                if (config.splitTunnelMode in SplitTunnelMode.VALUES) config.splitTunnelMode
-                else SplitTunnelMode.ALL
-            prefs[CLIENT_SPLIT_TUNNEL_APPS] = config.splitTunnelApps.trim()
-            prefs[CLIENT_LOGS_ENABLED] = config.logsEnabled
-        }
+        updateActiveServer { it.copy(ssh = it.ssh.copy(hostFingerprint = fingerprint)) }
     }
 
     suspend fun setDynamicTheme(enabled: Boolean) {
@@ -384,30 +298,8 @@ class AppPreferences(context: Context) {
         context.dataStore.edit { prefs -> prefs[TG_SUBSCRIBE_SHOWN] = true }
     }
 
-    suspend fun saveProxyConfig(listen: String, connect: String) {
-        context.dataStore.edit { prefs ->
-            prefs[PROXY_LISTEN] = listen
-            prefs[PROXY_CONNECT] = connect
-        }
-    }
-
-    /**
-     * Снимок: список + id активного. Объединено в один Flow, чтобы UI получал
-     * консистентную пару (нет окна, в котором активный id указывает на удалённый).
-     */
-    val serversSnapshot: Flow<ServersSnapshot> = prefFlow { prefs ->
-            ServersSnapshot(
-                list = ServerJson.decodeList(prefs[SERVERS_JSON]),
-                activeId = prefs[ACTIVE_SERVER_ID]?.takeIf { it.isNotBlank() },
-                loaded = true
-            )
-        }
-
-    /** Полный сброс: DataStore + EncryptedSharedPreferences. */
+    /** Полный сброс настроек. */
     suspend fun resetAll() {
         context.dataStore.edit { it.clear() }
-        withContext(Dispatchers.IO) {
-            encryptedPrefs.edit { clear() }
-        }
     }
 }

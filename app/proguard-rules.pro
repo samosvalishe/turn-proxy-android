@@ -23,14 +23,10 @@
     volatile <fields>;
 }
 
-# ── Android Security Crypto (EncryptedSharedPreferences) ──────────────────────
--keep class androidx.security.crypto.** { *; }
-
 # ── DataStore ─────────────────────────────────────────────────────────────────
 -keep class androidx.datastore.** { *; }
 
-# ── Tink (транзитивная зависимость security-crypto) ───────────────────────────
-# Аннотационные библиотеки не включены в runtime, предупреждения безопасно подавить
+# ── Compile-only аннотации (errorprone/javax) не включены в runtime ───────────
 -dontwarn com.google.errorprone.annotations.CanIgnoreReturnValue
 -dontwarn com.google.errorprone.annotations.CheckReturnValue
 -dontwarn com.google.errorprone.annotations.Immutable

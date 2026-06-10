@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.freeturn.app.data.AppPreferences
+import com.freeturn.app.data.ServerOpts
 import com.freeturn.app.data.SshConfig
 import com.freeturn.app.domain.ProxyOrchestrator
 import com.freeturn.app.domain.SshRepository
@@ -33,8 +34,8 @@ class ServerViewModel(
     val sshLog: StateFlow<List<String>> = sshRepository.sshLog
     val journalLoading: StateFlow<Boolean> = sshRepository.journalLoading
 
-    val serverOpts: StateFlow<AppPreferences.ServerOpts> = prefs.serverOptsFlow
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppPreferences.ServerOpts())
+    val serverOpts: StateFlow<ServerOpts> = prefs.serverOptsFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ServerOpts())
 
     val sshConfig: StateFlow<SshConfig> = prefs.sshConfigFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SshConfig())
@@ -97,11 +98,10 @@ class ServerViewModel(
             val outcome = sshRepository.installServer()
             if (outcome is com.freeturn.app.domain.InstallOutcome.Success) {
                 if (outcome.stage == "downloaded") {
-                    val current = prefs.serverOptsFlow.first()
-                    if (current.obfKey.isBlank()) {
+                    if (prefs.serverOptsFlow.first().obfKey.isBlank()) {
                         val key = sshRepository.generateObfKey()
                         if (!key.isNullOrBlank()) {
-                            prefs.saveServerOpts(current.copy(obfKey = key))
+                            prefs.updateActiveServer { it.copy(opts = it.opts.copy(obfKey = key)) }
                         }
                     }
                 }
@@ -148,12 +148,9 @@ class ServerViewModel(
             _isRegeneratingObfKey.value = true
             try {
                 val key = sshRepository.generateObfKey() ?: return@launch
-                val current = prefs.serverOptsFlow.first()
-                val next = current.copy(obfKey = key)
-                prefs.saveServerOpts(next)
-                
-                val clientConfig = prefs.clientConfigFlow.first()
-                if (clientConfig.syncServerSwitches) orchestrator.restartServerIfRunning()
+                prefs.updateActiveServer { it.copy(opts = it.opts.copy(obfKey = key)) }
+
+                if (prefs.clientConfigFlow.first().syncServerSwitches) orchestrator.restartServerIfRunning()
                 orchestrator.restartProxyIfRunning()
             } finally {
                 _isRegeneratingObfKey.value = false

@@ -9,7 +9,6 @@ import com.freeturn.app.ProxyServiceState
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.ClientConfig
 import com.freeturn.app.data.ObfProfile
-import com.freeturn.app.data.Server
 import com.freeturn.app.data.ServersSnapshot
 import com.freeturn.app.domain.AppUpdater
 import com.freeturn.app.domain.LocalProxyManager
@@ -17,6 +16,7 @@ import com.freeturn.app.domain.ProxyOrchestrator
 import com.freeturn.app.domain.SshRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -72,8 +72,6 @@ class SettingsViewModel(
     private val _privacyMode = MutableStateFlow(false)
     val privacyMode: StateFlow<Boolean> = _privacyMode.asStateFlow()
 
-    private val serverMutex = Mutex()
-
     // Дебаунс быстрых тыков тоггла синка: persist мгновенный, а дорогой сетевой
     // side-effect (SSH stop+start + рестарт прокси) откладывается и коалесцируется.
     private val syncSideEffectMutex = Mutex()
@@ -106,110 +104,58 @@ class SettingsViewModel(
         viewModelScope.launch { prefs.setTgSubscribeShown() }
     }
 
-    // expectedActiveId — сервер, который правил экран. Сменился за время дебаунса —
-    // сейв отбрасываем, иначе старые поля затрут чужой сервер. null — legacy-режим.
+    /**
+     * Сохраняет client-конфиг сервера, который редактировал экран. expectedActiveId —
+     * id на момент начала правки (null — активный сейчас): дебаунс-сейв после смены
+     * активного уходит в свой сервер, а не затирает новый активный.
+     */
     fun saveClientConfig(config: ClientConfig, expectedActiveId: String? = null) {
         viewModelScope.launch {
-            val saved = serverMutex.withLock {
-                val activeId = prefs.serversSnapshot.first().activeId
-                if (expectedActiveId != null && expectedActiveId != activeId) return@withLock false
-                persistClient(config)
-                true
+            val targetId = expectedActiveId
+                ?: prefs.serversSnapshot.first().activeId ?: return@launch
+            if (!prefs.updateServer(targetId) { it.copy(client = config) }) return@launch
+            if (targetId == prefs.serversSnapshot.first().activeId) {
+                ProxyServiceState.setLogsEnabled(config.logsEnabled)
             }
-            if (saved) ProxyServiceState.setLogsEnabled(config.logsEnabled)
         }
     }
 
-    // Во всех сеттерах read-modify-write выполняется ВНУТРИ serverMutex: чтение
-    // current вне лока давало lost update — два параллельных сеттера читали один
-    // снапшот, затем по очереди писали свой copy(), и второй затирал первого.
     fun setSplitTunnelMode(value: String) {
         viewModelScope.launch {
-            serverMutex.withLock {
-                val current = prefs.clientConfigFlow.first()
-                if (current.splitTunnelMode == value) return@withLock
-                persistClient(current.copy(splitTunnelMode = value))
+            prefs.updateActiveServer {
+                it.copy(client = it.client.copy(splitTunnelMode = value))
             }
         }
     }
 
     fun setSplitTunnelApps(value: String) {
         viewModelScope.launch {
-            serverMutex.withLock {
-                val current = prefs.clientConfigFlow.first()
-                val trimmed = value.trim()
-                if (current.splitTunnelApps == trimmed) return@withLock
-                persistClient(current.copy(splitTunnelApps = trimmed))
+            val trimmed = value.trim()
+            prefs.updateActiveServer {
+                it.copy(client = it.client.copy(splitTunnelApps = trimmed))
             }
-        }
-    }
-
-    fun saveProxyServerConfig(listen: String, connect: String) {
-        viewModelScope.launch {
-            serverMutex.withLock { prefs.saveProxyConfig(listen, connect); mirrorActiveServer() }
         }
     }
 
     // --- Servers ---
-    // Создание сервера ушло из листа на главном: появится отдельным
-    // экраном добавления сервера.
 
-    private suspend fun mirrorActiveServer() {
-        val current = prefs.serversSnapshot.first()
-        val activeId = current.activeId ?: return
-        val ssh = prefs.sshConfigFlow.first()
-        val client = prefs.clientConfigFlow.first()
-        val listen = prefs.proxyListenFlow.first()
-        val connect = prefs.proxyConnectFlow.first()
-        val serverOpts = prefs.serverOptsFlow.first()
-        val updated = current.list.map {
-            if (it.id == activeId)
-                it.copy(
-                    ssh = ssh,
-                    client = client,
-                    proxyListen = listen,
-                    proxyConnect = connect,
-                    opts = serverOpts
-                )
-            else it
-        }
-        if (updated != current.list) prefs.saveServers(updated)
-    }
-
-    // Пишет legacy + зеркалит в активный сервер. Только под serverMutex; НЕ из
-    // applyServer/deleteServer (там грузится снимок, mirror словил бы гонку).
-    private suspend fun persistClient(config: ClientConfig) {
-        prefs.saveClientConfig(config)
-        mirrorActiveServer()
-    }
+    /**
+     * Создаёт пустой сервер (хранилище гарантирует уникальное имя и активирует
+     * первый) и возвращает id. Запись идёт в viewModelScope: уход с экрана до
+     * завершения её не отменяет.
+     */
+    suspend fun addServer(name: String): String =
+        viewModelScope.async { prefs.addServer(name) }.await()
 
     fun renameServer(id: String, name: String) {
-        viewModelScope.launch {
-            serverMutex.withLock {
-                val current = prefs.serversSnapshot.first()
-                val target = current.list.firstOrNull { it.id == id } ?: return@withLock
-                val base = name.trim().ifBlank { target.name }
-                val unique = uniqueServerName(base, current.list, id)
-                val updated = current.list.map {
-                    if (it.id == id) it.copy(name = unique) else it
-                }
-                prefs.saveServers(updated)
-            }
-        }
+        viewModelScope.launch { prefs.renameServer(id, name) }
     }
 
     fun applyServer(id: String) {
         viewModelScope.launch {
-            val target = serverMutex.withLock {
-                val current = prefs.serversSnapshot.first()
-                val t = current.list.firstOrNull { it.id == id } ?: return@withLock null
-                prefs.saveSshConfig(t.ssh)
-                prefs.saveClientConfig(t.client)
-                prefs.saveProxyConfig(t.proxyListen, t.proxyConnect)
-                prefs.saveServerOpts(t.opts)
-                prefs.setActiveServerId(t.id)
-                t
-            } ?: return@launch
+            val target = prefs.serversSnapshot.first().list.firstOrNull { it.id == id }
+                ?: return@launch
+            prefs.setActiveServerId(target.id)
 
             val serverRunning = (sshRepository.serverState.value as? ServerState.Known)?.running == true
             if (serverRunning) orchestrator.restartServerIfRunning()
@@ -225,69 +171,26 @@ class SettingsViewModel(
     }
 
     fun deleteServer(id: String) {
-        viewModelScope.launch {
-            serverMutex.withLock {
-                val current = prefs.serversSnapshot.first()
-                val remaining = current.list.filterNot { it.id == id }
-                prefs.saveServers(remaining)
-                if (current.activeId == id) {
-                    val next = remaining.firstOrNull()
-                    prefs.setActiveServerId(next?.id)
-                    if (next != null) {
-                        prefs.saveSshConfig(next.ssh)
-                        prefs.saveClientConfig(next.client)
-                        prefs.saveProxyConfig(next.proxyListen, next.proxyConnect)
-                        prefs.saveServerOpts(next.opts)
-                    }
-                }
-            }
-        }
+        viewModelScope.launch { prefs.deleteServer(id) }
     }
 
-    private fun uniqueServerName(base: String, existing: List<Server>, excludingId: String?): String {
-        val taken = existing
-            .filter { it.id != excludingId }
-            .map { it.name.trim().lowercase() }
-            .toSet()
-        val trimmed = base.trim()
-        if (trimmed.lowercase() !in taken) return trimmed
-        var i = 2
-        while ("$trimmed ($i)".lowercase() in taken) i++
-        return "$trimmed ($i)"
-    }
-
-    // --- Edit-by-id (новый Settings-флоу) ---
     // Правит client-конфиг сервера по id, НЕ требуя его активации. Для активного
-    // сервера дополнительно зеркалит в legacy-ключи (рантаймовое ядро их читает) и
-    // обновляет глобальный флаг логов. Для неактивного — пишет только сохранённый
-    // снимок, рантайм не трогается (нужно для редактирования неактивных серверов).
+    // дополнительно обновляет глобальный флаг логов (его читает рантайм).
     fun updateServerClient(id: String, transform: (ClientConfig) -> ClientConfig) {
         viewModelScope.launch {
-            var mirrored: ClientConfig? = null
-            serverMutex.withLock {
-                val snap = prefs.serversSnapshot.first()
-                val target = snap.list.firstOrNull { it.id == id } ?: return@withLock
-                val updated = transform(target.client)
-                if (updated == target.client) return@withLock
-                val list = snap.list.map { if (it.id == id) it.copy(client = updated) else it }
-                prefs.saveServers(list)
-                if (id == snap.activeId) {
-                    prefs.saveClientConfig(updated)
-                    mirrored = updated
-                }
+            if (!prefs.updateServer(id) { it.copy(client = transform(it.client)) }) return@launch
+            val snap = prefs.serversSnapshot.first()
+            snap.active?.takeIf { it.id == id }?.let {
+                ProxyServiceState.setLogsEnabled(it.client.logsEnabled)
             }
-            mirrored?.let { ProxyServiceState.setLogsEnabled(it.logsEnabled) }
         }
     }
 
     // --- Server & Proxy Switches (TcpForward, Bond, Obf, Sync) ---
     fun setBond(enabled: Boolean) {
         viewModelScope.launch {
-            val changed = serverMutex.withLock {
-                val current = prefs.clientConfigFlow.first()
-                if (current.bond == enabled) return@withLock false
-                persistClient(current.copy(bond = enabled))
-                true
+            val changed = prefs.updateActiveServer {
+                it.copy(client = it.client.copy(bond = enabled))
             }
             if (changed) orchestrator.restartProxyIfRunning()
         }
@@ -295,11 +198,8 @@ class SettingsViewModel(
 
     fun setSyncServerSwitches(enabled: Boolean) {
         viewModelScope.launch {
-            val changed = serverMutex.withLock {
-                val current = prefs.clientConfigFlow.first()
-                if (current.syncServerSwitches == enabled) return@withLock false
-                persistClient(current.copy(syncServerSwitches = enabled))
-                true
+            val changed = prefs.updateActiveServer {
+                it.copy(client = it.client.copy(syncServerSwitches = enabled))
             }
             if (!changed) return@launch
             // Дебаунс: отменяем отложенный side-effect, перепланируем. delay — окно
@@ -344,20 +244,14 @@ class SettingsViewModel(
                 if (obfProfile != ObfProfile.NONE && trimmedKey.isBlank() && sync)
                     sshRepository.generateObfKey()?.takeIf { it.isNotBlank() }
                 else null
-            var changed = false
-            serverMutex.withLock {
-                if (prefs.proxyListenFlow.first() != listen || prefs.proxyConnectFlow.first() != connect) {
-                    prefs.saveProxyConfig(listen, connect); changed = true
-                }
-                val client = prefs.clientConfigFlow.first()
-                if (client.tcpForward != tcpForward) {
-                    prefs.saveClientConfig(client.copy(tcpForward = tcpForward)); changed = true
-                }
-                val opts = prefs.serverOptsFlow.first()
-                val effKey = trimmedKey.ifBlank { generatedKey ?: opts.obfKey }
-                val nextOpts = opts.copy(obfProfile = obfProfile, obfKey = effKey)
-                if (nextOpts != opts) { prefs.saveServerOpts(nextOpts); changed = true }
-                if (changed) mirrorActiveServer()
+            val changed = prefs.updateActiveServer { s ->
+                val effKey = trimmedKey.ifBlank { generatedKey ?: s.opts.obfKey }
+                s.copy(
+                    proxyListen = listen,
+                    proxyConnect = connect,
+                    client = s.client.copy(tcpForward = tcpForward),
+                    opts = s.opts.copy(obfProfile = obfProfile, obfKey = effKey)
+                )
             }
             if (changed) {
                 if (sync) orchestrator.restartServerIfRunning()
@@ -368,9 +262,9 @@ class SettingsViewModel(
 
     /**
      * Apply-модель «Настроек сервера» для НЕактивного сервера (sync OFF): серверные
-     * параметры тут клиент-локальны, поэтому пишем ТОЛЬКО снимок сервера по id — ни
-     * legacy-ключи, ни рантайм (SSH/прокси активного сервера) не трогаем. Без живого SSH
-     * obf-ключ на сервере не генерим: пустой остаётся пустым (клиент стартует как есть).
+     * параметры тут клиент-локальны, поэтому пишем только снимок сервера по id —
+     * рантайм (SSH/прокси активного сервера) не трогаем. Без живого SSH obf-ключ
+     * на сервере не генерим: пустой остаётся пустым (клиент стартует как есть).
      */
     fun updateServerConfig(
         id: String,
@@ -381,18 +275,14 @@ class SettingsViewModel(
         obfKey: String
     ) {
         viewModelScope.launch {
-            serverMutex.withLock {
-                val snap = prefs.serversSnapshot.first()
-                val target = snap.list.firstOrNull { it.id == id } ?: return@withLock
+            prefs.updateServer(id) { target ->
                 val effKey = obfKey.trim().ifBlank { target.opts.obfKey }
-                val next = target.copy(
+                target.copy(
                     proxyListen = listen,
                     proxyConnect = connect,
                     client = target.client.copy(tcpForward = tcpForward),
                     opts = target.opts.copy(obfProfile = obfProfile, obfKey = effKey)
                 )
-                if (next == target) return@withLock
-                prefs.saveServers(snap.list.map { if (it.id == id) next else it })
             }
         }
     }

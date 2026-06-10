@@ -12,7 +12,6 @@ lifecycleViewmodelCompose = "2.10.0"
 coreSplashscreen = "1.2.0"
 jsch = "2.28.0"
 coroutinesAndroid = "1.11.0"
-securityCrypto = "1.1.0"
 bouncycastle = "1.84"
 koin = "4.2.1"
 wireguardTunnel = "1.0.20260102"
@@ -34,7 +33,6 @@ androidx-datastore-preferences = { group = "androidx.datastore", name = "datasto
 androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycleViewmodelCompose" }
 androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycleViewmodelCompose" }
 androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
-androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
 jsch = { group = "com.github.mwiede", name = "jsch", version.ref = "jsch" }
 # mwiede/jsch 2.x использует Bouncy Castle (не net.i2p.eddsa) для ed25519/ed448,
 # curve25519-sha256 и chacha20-poly1305. На Android (нет Java 15 EdDSA) без него

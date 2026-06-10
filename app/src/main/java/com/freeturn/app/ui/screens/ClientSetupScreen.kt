@@ -73,28 +73,27 @@ import kotlinx.coroutines.delay
 fun ClientSetupScreen(
     settingsViewModel: SettingsViewModel,
     serverViewModel: ServerViewModel,
-    // null = legacy-режим (сервер ещё не создан, пишем в legacy-ключи).
-    // не-null = редактируем конкретный сервер по id (Settings-флоу).
+    // null = активный сервер; не-null = конкретный сервер по id (Settings-флоу).
     serverId: String? = null,
     onBack: (() -> Unit)? = null
 ) {
     val snapshot by settingsViewModel.serversSnapshot.collectAsStateWithLifecycle()
-    val legacyClient by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
+    val activeClient by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
     val sshConfig by serverViewModel.sshConfig.collectAsStateWithLifecycle()
     val serverState by serverViewModel.serverState.collectAsStateWithLifecycle()
-    val legacyProxyListen by settingsViewModel.proxyListen.collectAsStateWithLifecycle()
+    val activeProxyListen by settingsViewModel.proxyListen.collectAsStateWithLifecycle()
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
 
-    // Источник данных: конкретный сервер по id либо legacy-конфиг.
+    // Источник данных: конкретный сервер по id либо активный.
     val server = serverId?.let { id -> snapshot.list.firstOrNull { it.id == id } }
-    val saved = server?.client ?: legacyClient
-    // Активный сервер (или legacy-режим) рулит живым рантаймом: SSH-сессия, рестарты,
-    // sync с сервером. Для неактивного редактируем только хранимые данные.
+    val saved = server?.client ?: activeClient
+    // Активный сервер рулит живым рантаймом: SSH-сессия, рестарты, sync с сервером.
+    // Для неактивного редактируем только хранимые данные.
     val isActive = serverId == null || serverId == snapshot.activeId
     val effSshIp = server?.ssh?.ip ?: sshConfig.ip
-    val effProxyListen = server?.proxyListen ?: legacyProxyListen
+    val effProxyListen = server?.proxyListen ?: activeProxyListen
 
-    // Единая точка записи client-конфига: сервер by-id либо legacy.
+    // Единая точка записи client-конфига: сервер by-id либо активный.
     fun clientEdit(transform: (ClientConfig) -> ClientConfig) {
         if (serverId != null) {
             settingsViewModel.updateServerClient(serverId, transform)
@@ -131,8 +130,8 @@ fun ClientSetupScreen(
     }
 
     // Авто-сохранение с дебаунсом 600 мс для текстовых полей и ползунков.
-    // clientEdit сам маршрутизирует запись в сервер by-id либо в legacy и под
-    // mutex сверяет цель — защита от гонки переключения за время дебаунса.
+    // clientEdit пишет по id редактируемого сервера — смена активного за время
+    // дебаунса не затирает чужой конфиг.
     LaunchedEffect(
         serverAddress, vkLink, threads, streamsPerCred, localPort, magicTurn, customDns
     ) {

@@ -58,7 +58,6 @@ dependencies {
     implementation(libs.jsch)
     implementation(libs.bouncycastle)
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.androidx.security.crypto)
     implementation(libs.wireguard.tunnel)
 
     implementation(libs.androidx.core.ktx)

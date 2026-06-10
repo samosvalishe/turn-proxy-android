@@ -88,30 +88,29 @@ fun ServerManagementScreen(
     settingsViewModel: SettingsViewModel,
     // Кнопка смены сервера (overflow ⋮).
     onEditConnection: (() -> Unit)? = null,
-    // null = legacy. Не-null = настройки конкретного сервера по id (Settings).
+    // null = активный сервер; не-null = настройки конкретного сервера по id (Settings).
     serverId: String? = null,
     onBack: () -> Unit
 ) {
     val snapshot by settingsViewModel.serversSnapshot.collectAsStateWithLifecycle()
     val server = serverId?.let { id -> snapshot.list.firstOrNull { it.id == id } }
     // Живая SSH-сессия и состояние сервера принадлежат активному серверу. Управлять
-    // ядром можно только когда редактируемый сервер активен (legacy-режим без id
-    // считается активным).
+    // ядром можно только когда редактируемый сервер активен.
     val isActive = serverId == null || serverId == snapshot.activeId
     val sshState by serverViewModel.sshState.collectAsStateWithLifecycle()
     val serverState by serverViewModel.serverState.collectAsStateWithLifecycle()
     val sshConfig by serverViewModel.sshConfig.collectAsStateWithLifecycle()
-    val legacyListen by settingsViewModel.proxyListen.collectAsStateWithLifecycle()
-    val legacyConnect by settingsViewModel.proxyConnect.collectAsStateWithLifecycle()
-    val savedListen = server?.proxyListen ?: legacyListen
-    val savedConnect = server?.proxyConnect ?: legacyConnect
+    val activeListen by settingsViewModel.proxyListen.collectAsStateWithLifecycle()
+    val activeConnect by settingsViewModel.proxyConnect.collectAsStateWithLifecycle()
+    val savedListen = server?.proxyListen ?: activeListen
+    val savedConnect = server?.proxyConnect ?: activeConnect
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
     val clientCfg by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
     val serverOpts by serverViewModel.serverOpts.collectAsStateWithLifecycle()
     val isRegen by serverViewModel.isRegeneratingObfKey.collectAsStateWithLifecycle()
 
-    // Источник серверных черновиков: активный сервер рулит ЖИВЫМ конфигом (legacy/global —
-    // его обновляет regen на сервере), неактивный — снимком сервера by-id (sync OFF, клиент-локально).
+    // Источник серверных черновиков: активный сервер рулит живым конфигом (его
+    // обновляет regen на сервере), неактивный — снимком by-id (sync OFF, клиент-локально).
     val effClient = if (isActive) clientCfg else (server?.client ?: clientCfg)
     val effServer = if (isActive) serverOpts else (server?.opts ?: serverOpts)
 
