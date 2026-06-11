@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.runtime.Composable
@@ -150,17 +151,19 @@ fun AppNavigation(
     var showTgDialog by rememberSaveable { mutableStateOf(!initialTgSubscribeShown) }
 
     // Все маршруты живут внутри графов-вкладок — бар виден всегда.
-    val layoutType = NavigationSuiteScaffoldDefaults
-        .calculateFromAdaptiveInfo(currentWindowAdaptiveInfo())
+    // navigationSuiteType (а не layoutType) — expressive-дефолт: на телефоне компактный
+    // ShortNavigationBar (64dp вместо 80dp), бар без подписей не выглядит пустым.
+    val suiteType = NavigationSuiteScaffoldDefaults
+        .navigationSuiteType(currentWindowAdaptiveInfo())
 
     val context = LocalContext.current
 
     NavigationSuiteScaffold(
-        layoutType = layoutType,
-        navigationSuiteItems = {
+        navigationSuiteType = suiteType,
+        navigationItems = {
             navItems.forEach { item ->
                 val selected = destination?.hierarchy?.any { it.route == item.graphRoute } == true
-                item(
+                NavigationSuiteItem(
                     selected = selected,
                     onClick = {
                         if (selected) {
@@ -181,7 +184,7 @@ fun AppNavigation(
                             )
                         }
                     },
-                    label = { Text(stringResource(item.labelResId)) }
+                    label = null
                 )
             }
         }
