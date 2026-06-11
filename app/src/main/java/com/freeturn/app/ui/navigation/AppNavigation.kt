@@ -56,6 +56,7 @@ import com.freeturn.app.ui.screens.ServerDetailScreen
 import com.freeturn.app.ui.screens.ServerManagementScreen
 import com.freeturn.app.ui.screens.ServersListScreen
 import com.freeturn.app.ui.screens.SettingsScreen
+import com.freeturn.app.ui.screens.ShareScreen
 import com.freeturn.app.ui.screens.SshSetupScreen
 import com.freeturn.app.ui.screens.setup.ServerSetupScreen
 import com.freeturn.app.viewmodel.ProxyState
@@ -70,10 +71,12 @@ object Routes {
     // Графы вкладок нижнего меню. У каждой вкладки свой back-stack: бар виден на всех
     // уровнях вложенности, повторный тап по активной вкладке возвращает в её корень.
     const val HOME_GRAPH = "home_graph"
+    const val SHARE_GRAPH = "share_graph"
     const val ADD_GRAPH = "add_graph"
     const val SETTINGS_GRAPH = "settings_graph"
 
     const val HOME = "home"
+    const val SHARE = "share"
     const val LOGS = "logs"
     const val ADD_SERVER = "add_server"
     const val SELF_HOSTED_SETUP = "self_hosted_setup"
@@ -272,6 +275,13 @@ private fun AppNavHost(
             }
         }
 
+        // Вкладка «Поделиться»: пока заглушка «Скоро».
+        navigation(startDestination = Routes.SHARE, route = Routes.SHARE_GRAPH) {
+            composable(Routes.SHARE) {
+                ShareScreen()
+            }
+        }
+
         // Вкладка «+»: мастер self-hosted живёт целиком в этом графе. Кросс-графовый
         // push (хаб из вкладки «+») ломал restoreState при переключении вкладок —
         // сервер создаётся мастером, в конце переходим на главную.
@@ -439,6 +449,7 @@ private fun TelegramSubscribeDialog(onSubscribe: () -> Unit, onDismiss: () -> Un
 
 private val navItems = listOf(
     NavItem(Routes.HOME_GRAPH, Routes.HOME, R.string.nav_home, R.drawable.home_24px, R.drawable.home_outlined_24px),
-    NavItem(Routes.ADD_GRAPH, Routes.ADD_SERVER, R.string.nav_add, R.drawable.add_24px, R.drawable.add_24px),
-    NavItem(Routes.SETTINGS_GRAPH, Routes.SETTINGS, R.string.nav_settings, R.drawable.settings_24px, R.drawable.settings_outlined_24px)
+    NavItem(Routes.SHARE_GRAPH, Routes.SHARE, R.string.nav_share, R.drawable.share_24px, R.drawable.share_outlined_24px),
+    NavItem(Routes.SETTINGS_GRAPH, Routes.SETTINGS, R.string.nav_settings, R.drawable.settings_24px, R.drawable.settings_outlined_24px),
+    NavItem(Routes.ADD_GRAPH, Routes.ADD_SERVER, R.string.nav_add, R.drawable.add_24px, R.drawable.add_24px)
 )

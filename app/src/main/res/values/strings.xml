@@ -11,6 +11,12 @@
     <string name="home_empty_desc">Добавьте сервер, чтобы запустить прокси</string>
     <string name="home_add_server">Добавить сервер</string>
 
+    <!-- ShareScreen -->
+    <string name="nav_share">Поделиться</string>
+    <string name="share_title">Поделиться</string>
+    <string name="share_soon_title">Скоро</string>
+    <string name="share_soon_desc">Здесь появится возможность делиться доступом к серверу</string>
+
     <!-- AddServerScreen -->
     <string name="nav_add">Добавить</string>
     <string name="add_server_title">Соединение</string>
