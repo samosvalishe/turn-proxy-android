@@ -21,7 +21,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.ui.HapticUtil
-import com.freeturn.app.viewmodel.UpdateState
+import com.freeturn.app.domain.UpdateState
 
 /**
  * Диалоги цикла обновления приложения: доступно → качается → готово к установке.

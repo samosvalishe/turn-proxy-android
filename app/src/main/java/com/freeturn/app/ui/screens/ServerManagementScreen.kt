@@ -74,8 +74,8 @@ import com.freeturn.app.ui.components.SettingsFieldSlot
 import com.freeturn.app.ui.components.SettingsRowDivider
 import com.freeturn.app.ui.util.copyToClipboard
 import com.freeturn.app.ui.util.redact
-import com.freeturn.app.viewmodel.ServerState
-import com.freeturn.app.viewmodel.SshConnectionState
+import com.freeturn.app.domain.ServerState
+import com.freeturn.app.domain.SshConnectionState
 import com.freeturn.app.viewmodel.ServerViewModel
 import com.freeturn.app.viewmodel.SettingsViewModel
 import com.freeturn.app.viewmodel.serverSettingsAvailable

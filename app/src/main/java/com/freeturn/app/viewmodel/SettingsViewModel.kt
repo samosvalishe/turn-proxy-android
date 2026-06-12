@@ -15,6 +15,7 @@ import com.freeturn.app.domain.AppUpdater
 import com.freeturn.app.domain.LocalProxyManager
 import com.freeturn.app.domain.ProxyOrchestrator
 import com.freeturn.app.domain.SshRepository
+import com.freeturn.app.domain.UpdateState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay

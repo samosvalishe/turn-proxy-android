@@ -66,7 +66,7 @@ import androidx.compose.ui.semantics.stateDescription
 import com.freeturn.app.ui.screens.setup.BusyProgressIndicator
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.viewmodel.ServerViewModel
-import com.freeturn.app.viewmodel.SshConnectionState
+import com.freeturn.app.domain.SshConnectionState
 import com.freeturn.app.viewmodel.SettingsViewModel
 
 @Composable

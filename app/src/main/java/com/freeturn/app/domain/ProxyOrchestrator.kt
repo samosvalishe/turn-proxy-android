@@ -4,7 +4,6 @@ import com.freeturn.app.ProxyServiceState
 import com.freeturn.app.data.AppPreferences
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
-import com.freeturn.app.viewmodel.ServerState
 
 class ProxyOrchestrator(
     private val prefs: AppPreferences,

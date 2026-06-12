@@ -69,7 +69,7 @@ import com.freeturn.app.ui.components.SettingsRowIcon
 import com.freeturn.app.ui.components.SettingsSwitchRow
 import com.freeturn.app.ui.util.hapticClickable
 import com.freeturn.app.viewmodel.SettingsViewModel
-import com.freeturn.app.viewmodel.UpdateState
+import com.freeturn.app.domain.UpdateState
 
 // Экраны «Приложение» и «О проекте» — бывшее содержимое инфо-шита главного экрана,
 // разложенное по разделам настроек на общих settings-блоках.

@@ -61,7 +61,7 @@ import com.freeturn.app.ui.components.SettingsFieldSlot
 import com.freeturn.app.ui.components.SettingsRowDivider
 import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.ui.util.redact
-import com.freeturn.app.viewmodel.ProxyState
+import com.freeturn.app.domain.ProxyState
 import com.freeturn.app.viewmodel.ProxyViewModel
 import com.freeturn.app.viewmodel.SettingsViewModel
 import kotlinx.coroutines.Dispatchers

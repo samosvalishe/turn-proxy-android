@@ -8,7 +8,6 @@ import com.freeturn.app.ProxyService
 import com.freeturn.app.ProxyServiceState
 import com.freeturn.app.StartupResult
 import com.freeturn.app.data.ClientConfig
-import com.freeturn.app.viewmodel.ProxyState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow

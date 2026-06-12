@@ -8,6 +8,8 @@ import com.freeturn.app.data.ObfProfile
 import com.freeturn.app.data.ServerOpts
 import com.freeturn.app.data.SshConfig
 import com.freeturn.app.domain.ProxyOrchestrator
+import com.freeturn.app.domain.ServerState
+import com.freeturn.app.domain.SshConnectionState
 import com.freeturn.app.domain.SshRepository
 import com.freeturn.app.ui.HapticUtil
 import kotlinx.coroutines.flow.SharingStarted

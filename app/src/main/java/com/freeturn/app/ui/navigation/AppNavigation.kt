@@ -65,7 +65,7 @@ import com.freeturn.app.ui.screens.share.QrScannerScreen
 import com.freeturn.app.ui.screens.share.ShareScreen
 import com.freeturn.app.ui.screens.SshSetupScreen
 import com.freeturn.app.ui.screens.setup.ServerSetupScreen
-import com.freeturn.app.viewmodel.ProxyState
+import com.freeturn.app.domain.ProxyState
 import com.freeturn.app.viewmodel.SettingsViewModel
 import com.freeturn.app.viewmodel.ProxyViewModel
 import com.freeturn.app.viewmodel.ServerViewModel

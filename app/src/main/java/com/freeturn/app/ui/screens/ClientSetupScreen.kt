@@ -102,7 +102,7 @@ fun ClientSetupScreen(
         }
     }
 
-    val serverKnown = serverState as? com.freeturn.app.viewmodel.ServerState.Known
+    val serverKnown = serverState as? com.freeturn.app.domain.ServerState.Known
     // TCP-форвард: в sync-режиме у активного сервера берём реальное состояние из probe
     // (если запущен), иначе — сохранённое значение клиента. Нужно лишь для показа Bond.
     val syncOn = saved.syncServerSwitches

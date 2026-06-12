@@ -7,8 +7,6 @@ import com.freeturn.app.domain.server.CmdResult
 import com.freeturn.app.domain.server.ServerCommand
 import com.freeturn.app.domain.server.ServerControl
 import com.freeturn.app.domain.server.ServerOptions
-import com.freeturn.app.viewmodel.ServerState
-import com.freeturn.app.viewmodel.SshConnectionState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

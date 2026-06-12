@@ -45,7 +45,7 @@ import com.freeturn.app.R
 import com.freeturn.app.data.SplitTunnelMode
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.ui.screens.SplitTunnelModal
-import com.freeturn.app.viewmodel.ProxyState
+import com.freeturn.app.domain.ProxyState
 import com.freeturn.app.viewmodel.ProxyViewModel
 import com.freeturn.app.viewmodel.SettingsViewModel
 import kotlinx.coroutines.launch

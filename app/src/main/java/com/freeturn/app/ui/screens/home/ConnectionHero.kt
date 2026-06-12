@@ -65,7 +65,7 @@ import androidx.graphics.shapes.toPath
 import com.freeturn.app.R
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.theme.extendedColorScheme
-import com.freeturn.app.viewmodel.ProxyState
+import com.freeturn.app.domain.ProxyState
 
 /**
  * Герой главного экрана: кнопка-тоггл с морфом MaterialShapes по состоянию
