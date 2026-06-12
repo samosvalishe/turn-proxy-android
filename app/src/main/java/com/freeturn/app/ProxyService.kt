@@ -21,6 +21,9 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.CoreArgs
+import com.freeturn.app.domain.CoreConnectionTracker
+import com.freeturn.app.domain.CoreLogEvent
+import com.freeturn.app.domain.CoreLogParser
 import com.freeturn.app.domain.WireGuardTunnelManager
 import java.io.BufferedReader
 import java.io.File
@@ -29,7 +32,6 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
-import java.util.regex.Pattern
 import kotlin.random.Random
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -55,27 +57,6 @@ class ProxyService : Service() {
         private const val CHANNEL_CAPTCHA = "CaptchaChannel"
         private const val NOTIF_ID_FG = 1
         private const val NOTIF_ID_CAPTCHA = 2
-        // Жёстко привязываемся к строке-объявлению капчи в бинарнике, чтобы
-        // случайные localhost-URL в других логах не открывали диалог.
-        // Новое ядро (manual_captcha.go) пишет "manually open this URL: <url>".
-        // Старое — "Open this URL in your browser: <url>". Поддерживаем оба, чтобы
-        // приложение работало с кастомным ядром, оставшимся у пользователя.
-        private val CAPTCHA_URL_REGEX =
-            Pattern.compile("""(?:manually open this URL|Open this URL in your browser):\s*(https?://\S+)""")
-
-        // События жизненного цикла соединений, публикуемые ядром (client/main.go).
-        // UDP-релей: несколько потоков со своим [STREAM N], у каждого свой Established/Closed.
-        private val STREAM_ESTABLISHED_REGEX =
-            Pattern.compile("""\[STREAM (\d+)\] Established DTLS connection""")
-        private val STREAM_CLOSED_REGEX =
-            Pattern.compile("""\[STREAM (\d+)\] Closed DTLS connection""")
-        // TCP-режим (-mode tcp): ядро само пишет агрегированное число активных сессий.
-        private val TCP_ACTIVE_REGEX =
-            Pattern.compile("""\[session \d+\] (?:connected|disconnected) \(active: (\d+)\)""")
-        // TCP-режим: целевое число сессий приходит в этой строке до первого connected.
-        // Новое ядро (tcpfwd.go): "TCP mode: waiting for sessions to connect (total: N)...".
-        private val TCP_TOTAL_REGEX =
-            Pattern.compile("""TCP mode: waiting for sessions to connect \(total: (\d+)\)""")
         // Даём TURN-туннелю «устаканиться» перед поднятием WireGuard поверх него.
         private const val WIREGUARD_START_DELAY_MS = 2_000L
         // Игнорируем сетевые события первые секунды после регистрации колбэка —
@@ -239,26 +220,15 @@ class ProxyService : Service() {
         // --- Трекинг активных соединений для индикации состояния в UI. ---
         // UDP-релей (-mode udp): каждый поток логирует свой [STREAM N] Established/Closed
         // парой (defer Closed ставится ДО логирования Established, см. client/main.go).
-        // Считаем именно инкрементами, а не множеством уникальных ID: в ядре есть
-        // особенность — первый поток запускается с id=1 и цикл снова итерируется
-        // с i=1, из-за чего один streamID дублируется при -n N. Для счётчика это
-        // безопасно (на два Established придёт два Closed), для Set это давало
-        // бы заниженное число активных (N-1 вместо N).
-        var udpActive = 0
         // Для UDP-релея целевое число потоков известно из конфига (-n). Если threads == 0,
         // ядро запускает один поток, считаем total = 1.
-        val udpTotal = if (cfg.isRawMode) 0 else if (cfg.threads > 0) cfg.threads else 1
-        var tcpActive = 0
-        var tcpTotal = 0
-        var isTcp = cfg.tcpForward
+        val tracker = CoreConnectionTracker(
+            udpTotal = if (cfg.isRawMode) 0 else if (cfg.threads > 0) cfg.threads else 1,
+            tcpMode = cfg.tcpForward
+        )
 
         fun publishStats() {
-            val stats = if (isTcp) {
-                ConnectionStats(tcpActive, tcpTotal)
-            } else {
-                ConnectionStats(udpActive, udpTotal)
-            }
-            ProxyServiceState.setConnectionStats(stats)
+            ProxyServiceState.setConnectionStats(ConnectionStats(tracker.active, tracker.total))
             if (currentBaseStatus == getString(R.string.proxy_active)) {
                 buildAndShowNotification()
             }
@@ -307,66 +277,36 @@ class ProxyService : Service() {
                     val l = line
                     ProxyServiceState.addLog(l)
 
-                    // Детекция URL ручной капчи. Каждый раз выдаём новый sessionId,
-                    // чтобы диалог пересоздавал WebView, даже если URL не поменялся
-                    // (бинарник всегда использует http://localhost:8765).
-                    val captchaMatcher = CAPTCHA_URL_REGEX.matcher(l)
-                    if (captchaMatcher.find()) {
-                        val url = captchaMatcher.group(1)!!
-                        captchaSessionCounter += 1
-                        ProxyServiceState.setCaptchaSession(
-                            CaptchaSession(url, captchaSessionCounter)
-                        )
-                        // Показываем нотификацию только если предыдущая капча уже закрыта.
-                        // Бинарник может выдать несколько URL подряд за одну авторизацию —
-                        // не плодим спам.
-                        if (!captchaNotificationActive) {
-                            showCaptchaNotification()
-                            captchaNotificationActive = true
-                        }
-                    }
-
-                    // Капча-сессия закончилась: бинарник либо завершил auth-чейн
-                    // (Failed/Success), либо сама капча провалилась (timeout). Закрываем
-                    // диалог — следующая капча-сессия откроет его заново через новый sessionId.
-                    if (ProxyServiceState.captchaSession.value != null && (
-                            l.contains("[VK Auth] Failed") ||
-                            l.contains("[VK Auth] Success") ||
-                            (l.contains("[Captcha]") && l.contains("failed"))
-                        )) {
-                        ProxyServiceState.setCaptchaSession(null)
-                        cancelCaptchaNotification()
-                    }
-
-                    // Парсинг событий жизненного цикла соединений. Обновляем stats
-                    // и используем первое "реально подключилось" как сигнал успешного старта.
+                    // Разбор строки — в CoreLogParser (чистая логика, под юнит-тестами);
+                    // здесь только реакция на события.
+                    val events = CoreLogParser.parse(l)
                     var statsChanged = false
-                    STREAM_ESTABLISHED_REGEX.matcher(l).let { m ->
-                        if (m.find()) {
-                            udpActive += 1
-                            statsChanged = true
-                            isTcp = false
+                    for (event in events) when (event) {
+                        // Детекция URL ручной капчи. Каждый раз выдаём новый sessionId,
+                        // чтобы диалог пересоздавал WebView, даже если URL не поменялся
+                        // (бинарник всегда использует http://localhost:8765).
+                        is CoreLogEvent.CaptchaUrl -> {
+                            captchaSessionCounter += 1
+                            ProxyServiceState.setCaptchaSession(
+                                CaptchaSession(event.url, captchaSessionCounter)
+                            )
+                            // Показываем нотификацию только если предыдущая капча уже закрыта.
+                            // Бинарник может выдать несколько URL подряд за одну авторизацию —
+                            // не плодим спам.
+                            if (!captchaNotificationActive) {
+                                showCaptchaNotification()
+                                captchaNotificationActive = true
+                            }
                         }
-                    }
-                    STREAM_CLOSED_REGEX.matcher(l).let { m ->
-                        if (m.find()) {
-                            if (udpActive > 0) udpActive -= 1
-                            statsChanged = true
+                        // Закрываем диалог — следующая капча-сессия откроет его заново
+                        // через новый sessionId.
+                        CoreLogEvent.CaptchaResolved -> {
+                            if (ProxyServiceState.captchaSession.value != null) {
+                                ProxyServiceState.setCaptchaSession(null)
+                                cancelCaptchaNotification()
+                            }
                         }
-                    }
-                    TCP_TOTAL_REGEX.matcher(l).let { m ->
-                        if (m.find()) {
-                            tcpTotal = m.group(1)!!.toInt()
-                            isTcp = true
-                            statsChanged = true
-                        }
-                    }
-                    TCP_ACTIVE_REGEX.matcher(l).let { m ->
-                        if (m.find()) {
-                            tcpActive = m.group(1)!!.toInt()
-                            isTcp = true
-                            statsChanged = true
-                        }
+                        else -> if (tracker.apply(event)) statsChanged = true
                     }
                     if (statsChanged) publishStats()
 
@@ -375,19 +315,9 @@ class ProxyService : Service() {
                     // запуск неудачным. Первая строка без этих маркеров больше не
                     // трактуется как Success (ядро могло написать "Connecting..."
                     // и только потом упасть).
-                    //
-                    // ВАЖНО: не матчим подстроку "rate limit" — Go-сторона выводит
-                    // её в кулдаун-логах ("identity cooldown", "VK throttle ...
-                    // trying next") как рабочую часть retry-цикла, не как ошибку.
-                    // Финальная неудача — "all VK credentials failed".
                     if (!startupEmitted) {
-                        val lower = l.lowercase()
-                        val hasFatal = lower.startsWith("panic:") ||
-                            lower.startsWith("fatal error:") ||
-                            lower.contains("all vk credentials failed") ||
-                            lower.contains("fatal_captcha")
-                        val hasConnection = (isTcp && tcpActive > 0) ||
-                            (!isTcp && udpActive > 0)
+                        val hasFatal = events.any { it is CoreLogEvent.FatalStartup }
+                        val hasConnection = tracker.hasConnection
                         when {
                             hasFatal -> {
                                 ProxyServiceState.setStartupResult(StartupResult.Failed(l))
@@ -433,7 +363,8 @@ class ProxyService : Service() {
                     }
 
                     // compareAndSet гарантирует единственный postDelayed даже при параллельных quota-ошибках
-                    if (isQuotaError(l) && sessionKillScheduled.compareAndSet(false, true)) {
+                    if (events.any { it is CoreLogEvent.QuotaError } &&
+                        sessionKillScheduled.compareAndSet(false, true)) {
                         ProxyServiceState.addLog(">>> QUOTA ERROR — сброс сессии через 2с")
                         handler.postDelayed({
                             sessionKillScheduled.set(false)
@@ -748,9 +679,6 @@ class ProxyService : Service() {
     }
 
     // Helpers
-
-    private fun isQuotaError(line: String): Boolean =
-        line.lowercase().contains("quota")
 
     /**
      * DNS активной сети (оператор/Wi-Fi). Возвращает comma-separated список IP,
