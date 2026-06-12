@@ -60,7 +60,9 @@ import com.freeturn.app.ui.screens.ServerDetailScreen
 import com.freeturn.app.ui.screens.ServerManagementScreen
 import com.freeturn.app.ui.screens.ServersListScreen
 import com.freeturn.app.ui.screens.SettingsScreen
-import com.freeturn.app.ui.screens.ShareScreen
+import com.freeturn.app.ui.screens.share.ImportSheet
+import com.freeturn.app.ui.screens.share.QrScannerScreen
+import com.freeturn.app.ui.screens.share.ShareScreen
 import com.freeturn.app.ui.screens.SshSetupScreen
 import com.freeturn.app.ui.screens.setup.ServerSetupScreen
 import com.freeturn.app.viewmodel.ProxyState
@@ -87,6 +89,7 @@ object Routes {
     const val LOGS = "logs"
     const val ADD_SERVER = "add_server"
     const val SELF_HOSTED_SETUP = "self_hosted_setup"
+    const val QR_SCANNER = "qr_scanner"
 
     // Settings-флоу: Настройки → Серверы → [сервер] → подключение / сервер
     const val SETTINGS = "settings"
@@ -207,6 +210,12 @@ fun AppNavigation(
         )
     }
 
+    // Импорт по freeturn://-ссылке поверх любого экрана (deep link / QR / вставка):
+    // sheet управляется ImportViewModel через LinkImportBus, NavController не участвует.
+    ImportSheet(
+        onImported = { navController.navigateToTab(Routes.HOME_GRAPH) }
+    )
+
     // Диалог капчи поверх любого экрана. Оборачиваем в key(sessionId), чтобы для
     // каждой новой капча-сессии Compose пересоздавал диалог и WebView грузил URL заново
     // (бинарник цикличит креды и для каждой выдаёт новую капчу с тем же localhost-URL).
@@ -305,10 +314,18 @@ private fun AppNavHost(
             }
         }
 
-        // Вкладка «Поделиться»: пока заглушка «Скоро».
+        // Вкладка «Поделиться»: выдача доступа по ссылке (пир на сервере по SSH).
         navigation(startDestination = Routes.SHARE, route = Routes.SHARE_GRAPH) {
-            composable(Routes.SHARE) {
-                ShareScreen()
+            composable(Routes.SHARE) { entry ->
+                // Начальную загрузку share-info стартуем после конца enter-перехода:
+                // morph-индикатор и slide одновременно роняют кадры. Производное от
+                // реального состояния анимации, не таймер (reduced-motion → сразу).
+                val settled = transition.currentState == transition.targetState
+                ShareScreen(
+                    screenSettled = settled,
+                    // CTA пустого состояния — вкладка добавления (tab-переход, как у Home).
+                    onAddServer = { if (entry.isResumed()) navController.navigateToTab(Routes.ADD_GRAPH) }
+                )
             }
         }
 
@@ -328,8 +345,12 @@ private fun AppNavHost(
                             navController.navigateToTab(Routes.SETTINGS_GRAPH)
                             navController.navigate(Routes.serverDetail(id)) { launchSingleTop = true }
                         }
-                    }
+                    },
+                    onScanQr = { if (entry.isResumed()) navController.navigate(Routes.QR_SCANNER) }
                 )
+            }
+            composable(Routes.QR_SCANNER) {
+                QrScannerScreen(onBack = { navController.popBackStack() })
             }
             composable(Routes.SELF_HOSTED_SETUP) {
                 ServerSetupScreen(

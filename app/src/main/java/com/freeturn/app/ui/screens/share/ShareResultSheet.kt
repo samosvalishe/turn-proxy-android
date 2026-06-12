@@ -1,0 +1,225 @@
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class
+)
+
+package com.freeturn.app.ui.screens.share
+
+import android.content.Intent
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import com.freeturn.app.R
+import com.freeturn.app.data.ObfProfile
+import com.freeturn.app.data.share.ShareInfo
+import com.freeturn.app.ui.HapticUtil
+import com.freeturn.app.ui.components.QrCode
+import com.freeturn.app.ui.theme.LocalReducedMotion
+import com.freeturn.app.ui.util.copyToClipboard
+import com.freeturn.app.viewmodel.ShareResult
+
+/**
+ * Длиннее QR не рисуем (нечитаемые мелкие модули) — остаются share sheet и
+ * копирование. Типовая ссылка с WG-conf ~700 символов, запас двукратный.
+ */
+private const val QR_MAX_CHARS = 1200
+
+/** Result-sheet после создания/повторной выдачи доступа: QR + share + копировать. */
+@Composable
+fun ShareResultSheet(result: ShareResult, shareInfo: ShareInfo?, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val reducedMotion = LocalReducedMotion.current
+    // Лист сразу на полную высоту (без peek-промежутка) — QR крупный, кнопки внизу.
+    val sheetState = rememberBottomSheetState(
+        initialValue = SheetValue.Hidden,
+        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded)
+    )
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        contentWindowInsets = { WindowInsets(0, 0, 0, 0) }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text(
+                stringResource(R.string.share_result_title, result.userName),
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center
+            )
+
+            // Протокол — по факту выданного доступа (result.wg), обфускация — из share-info.
+            val obfOn = shareInfo?.let {
+                it.obfProfile.isNotEmpty() && it.obfProfile != ObfProfile.NONE
+            } ?: false
+            ProtocolPill(wg = result.wg, obfOn = obfOn)
+
+            Text(
+                stringResource(R.string.share_result_desc),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+
+            // QR — самосайзится: квадрат до 320dp по ширине листа.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (result.link.length <= QR_MAX_CHARS) {
+                    var shown by remember { mutableStateOf(false) }
+                    LaunchedEffect(Unit) { shown = true }
+                    val visible = shown || reducedMotion
+                    val scale by animateFloatAsState(
+                        targetValue = if (visible) 1f else 0.85f,
+                        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
+                        label = "qr_scale"
+                    )
+                    val alpha by animateFloatAsState(
+                        targetValue = if (visible) 1f else 0f,
+                        label = "qr_alpha"
+                    )
+                    QrCode(
+                        content = result.link,
+                        modifier = Modifier
+                            .widthIn(max = 320.dp)
+                            .fillMaxWidth()
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                                this.alpha = alpha
+                            }
+                    )
+                }
+            }
+
+            // Только иконки: copy/share узнаваемы без подписей, подпись — в a11y.
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                FilledTonalIconButton(
+                    onClick = {
+                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                        // Ссылка несёт WG PrivateKey и obf-ключ — прячем из превью буфера.
+                        context.copyToClipboard("freeturn link", result.link, sensitive = true)
+                    },
+                    modifier = Modifier.size(56.dp)
+                ) {
+                    Icon(
+                        painterResource(R.drawable.content_copy_24px),
+                        contentDescription = stringResource(R.string.share_result_copy)
+                    )
+                }
+                FilledIconButton(
+                    onClick = {
+                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                        val send = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, result.link)
+                        }
+                        context.startActivity(
+                            Intent.createChooser(send, null)
+                        )
+                    },
+                    modifier = Modifier.size(56.dp)
+                ) {
+                    Icon(
+                        painterResource(R.drawable.share_24px),
+                        contentDescription = stringResource(R.string.share_result_share)
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Протокол выданного доступа + признак обфускации — пилюлями над QR. */
+@Composable
+private fun ProtocolPill(wg: Boolean, obfOn: Boolean) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
+            Row(
+                modifier = Modifier.padding(start = 12.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    painterResource(if (wg) R.drawable.vpn_key_24px else R.drawable.public_24px),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(16.dp)
+                )
+                Text(
+                    stringResource(if (wg) R.string.share_protocol_wg else R.string.share_protocol_proxy),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            }
+        }
+        if (obfOn) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
+                Row(
+                    modifier = Modifier.padding(start = 10.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        painterResource(R.drawable.check_circle_24px),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        stringResource(R.string.share_chip_obf),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
