@@ -52,3 +52,24 @@ object ServerOutputParser {
         }
     }
 }
+
+/** Ошибка серверной команды; message — текст из скрипта/SSH для UI. */
+class ServerCommandException(message: String) : Exception(message)
+
+/** Текст ошибки + хвост LOG-строк скрипта: без него «wg-quick failed» недиагностируем. */
+fun CmdResult.Err.errMessage(): String {
+    val tail = logs.takeLast(2).filter { it.isNotBlank() }
+    return if (tail.isEmpty()) message else message + "\n" + tail.joinToString("\n")
+}
+
+fun CmdResult.Err.toFailure(): Result<Nothing> =
+    Result.failure(ServerCommandException(errMessage()))
+
+fun CmdResult.asUnit(): Result<Unit> = when (this) {
+    is CmdResult.Ok -> Result.success(Unit)
+    is CmdResult.Err -> toFailure()
+}
+
+/** base64 → UTF-8 текст; битое значение → null. */
+fun decodeBase64(s: String): String? =
+    runCatching { String(java.util.Base64.getDecoder().decode(s.trim()), Charsets.UTF_8) }.getOrNull()

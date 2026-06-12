@@ -2,8 +2,6 @@
 
 package com.freeturn.app.ui.screens
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -41,6 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.ui.theme.extendedColorScheme
+import com.freeturn.app.ui.util.copyToClipboard
 import com.freeturn.app.viewmodel.ProxyViewModel
 
 @Composable
@@ -64,8 +63,7 @@ fun LogsScreen(proxyViewModel: ProxyViewModel) {
                 actions = {
                     IconButton(
                         onClick = {
-                            val cm = context.getSystemService(ClipboardManager::class.java)
-                            cm.setPrimaryClip(ClipData.newPlainText("proxy_logs", logs.joinToString("\n")))
+                            context.copyToClipboard("proxy_logs", logs.joinToString("\n"))
                             HapticUtil.perform(context, HapticUtil.Pattern.SUCCESS)
                         },
                         enabled = logs.isNotEmpty()

@@ -72,6 +72,7 @@ import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.ui.components.SettingsControlLabel
 import com.freeturn.app.ui.components.SettingsFieldSlot
 import com.freeturn.app.ui.components.SettingsRowDivider
+import com.freeturn.app.ui.util.copyToClipboard
 import com.freeturn.app.ui.util.redact
 import com.freeturn.app.viewmodel.ServerState
 import com.freeturn.app.viewmodel.SshConnectionState
@@ -402,8 +403,7 @@ fun ServerManagementScreen(
                                         if (effServer.obfKey.isNotBlank() && !privacyMode) {
                                             IconButton(onClick = {
                                                 HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                                                val cm = context.getSystemService(android.content.ClipboardManager::class.java)
-                                                cm?.setPrimaryClip(android.content.ClipData.newPlainText("obf-key", effServer.obfKey))
+                                                context.copyToClipboard("obf-key", effServer.obfKey, sensitive = true)
                                             }) {
                                                 Icon(
                                                     painterResource(R.drawable.content_copy_24px),

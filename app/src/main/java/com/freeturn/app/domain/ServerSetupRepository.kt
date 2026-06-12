@@ -7,7 +7,9 @@ import com.freeturn.app.domain.server.CmdResult
 import com.freeturn.app.domain.server.ServerCommand
 import com.freeturn.app.domain.server.ServerControl
 import com.freeturn.app.domain.server.ServerOptions
-import java.util.Base64
+import com.freeturn.app.domain.server.asUnit
+import com.freeturn.app.domain.server.decodeBase64
+import com.freeturn.app.domain.server.toFailure
 
 /**
  * SSH-операции мастера добавления self-hosted сервера. Собственный [SSHManager] и
@@ -40,14 +42,14 @@ class ServerSetupRepository(context: Context) {
     /** Проверка SSH-доступа + probe. Ошибка SSH/скрипта — failure с текстом. */
     suspend fun probe(cfg: SshConfig): Result<ProbeResult> =
         when (val r = control.run(cfg, ServerCommand.Probe)) {
-            is CmdResult.Err -> Result.failure(SetupCommandException(errMessage(r)))
+            is CmdResult.Err -> r.toFailure()
             is CmdResult.Ok -> Result.success(
                 ProbeResult(wgPort = r.kv["WG_PORT"]?.toIntOrNull())
             )
         }
 
     suspend fun install(cfg: SshConfig): Result<Unit> =
-        asUnit(control.run(cfg, ServerCommand.Install))
+        control.run(cfg, ServerCommand.Install).asUnit()
 
     suspend fun wgSetup(
         cfg: SshConfig,
@@ -56,7 +58,7 @@ class ServerSetupRepository(context: Context) {
         adopt: Boolean = false
     ): Result<WgSetupResult> =
         when (val r = control.run(cfg, ServerCommand.WgSetup(port, endpoint, adopt))) {
-            is CmdResult.Err -> Result.failure(SetupCommandException(errMessage(r)))
+            is CmdResult.Err -> r.toFailure()
             is CmdResult.Ok -> Result.success(
                 WgSetupResult(
                     port = r.kv["WG_PORT"]?.toIntOrNull() ?: port,
@@ -67,22 +69,5 @@ class ServerSetupRepository(context: Context) {
         }
 
     suspend fun startServer(cfg: SshConfig, opts: ServerOptions): Result<Unit> =
-        asUnit(control.run(cfg, ServerCommand.Start(opts)))
-
-    private fun asUnit(r: CmdResult): Result<Unit> = when (r) {
-        is CmdResult.Ok -> Result.success(Unit)
-        is CmdResult.Err -> Result.failure(SetupCommandException(errMessage(r)))
-    }
-
-    /** Текст ошибки + хвост LOG-строк скрипта: без него «wg-quick failed» недиагностируем. */
-    private fun errMessage(r: CmdResult.Err): String {
-        val tail = r.logs.takeLast(2).filter { it.isNotBlank() }
-        return if (tail.isEmpty()) r.message else r.message + "\n" + tail.joinToString("\n")
-    }
-
-    private fun decodeBase64(s: String): String? =
-        runCatching { String(Base64.getDecoder().decode(s.trim()), Charsets.UTF_8) }.getOrNull()
+        control.run(cfg, ServerCommand.Start(opts)).asUnit()
 }
-
-/** Ошибка серверной команды мастера; message — текст из скрипта/SSH для UI. */
-class SetupCommandException(message: String) : Exception(message)
