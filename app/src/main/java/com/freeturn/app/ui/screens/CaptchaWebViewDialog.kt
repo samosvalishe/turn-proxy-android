@@ -34,7 +34,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.core.net.toUri
 import com.freeturn.app.R
 
 /** Разрешённые схемы для топ-навигации внутри капча-WebView. */
@@ -131,13 +130,6 @@ fun CaptchaWebViewDialog(
                                         request: WebResourceRequest?
                                     ): Boolean {
                                         val scheme = request?.url?.scheme?.lowercase()
-                                        return scheme !in ALLOWED_SCHEMES
-                                    }
-
-                                    @Deprecated("API < 24")
-                                    @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
-                                    override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
-                                        val scheme = url?.toUri()?.scheme?.lowercase()
                                         return scheme !in ALLOWED_SCHEMES
                                     }
 

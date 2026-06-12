@@ -1,9 +1,6 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Base.Theme.FreeTurn" parent="Theme.AppCompat.DayNight.NoActionBar">
-        <!-- Customize your dark theme here. -->
-        <!-- <item name="colorPrimary">@color/my_dark_primary</item> -->
-    </style>
+<resources>
+    <!-- Тёмная половина ручного DayNight (см. values/themes.xml). -->
+    <style name="Base.Theme.FreeTurn" parent="android:Theme.Material.NoActionBar" />
 
     <!-- Splash screen theme (Core Splash Screen API) — dark variant -->
     <style name="Theme.FreeTurn.Splash" parent="Theme.SplashScreen">

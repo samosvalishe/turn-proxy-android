@@ -146,10 +146,7 @@ internal object ServerJson {
                 magicSwitch = cliO.optBoolean("magicSwitch", false),
                 magicTurn = cliO.optString("magicTurn"),
                 tunnelTransport = cliO.optString("tunnelTransport", TunnelTransport.NONE).let {
-                    val t = if (it in TunnelTransport.PERSISTED) it else TunnelTransport.NONE
-                    // Legacy: WIREGUARD c пустым конфигом = туннель не выбран → NONE (proxy).
-                    if (t == TunnelTransport.WIREGUARD && cliO.optString("wireGuardConfig").isBlank())
-                        TunnelTransport.NONE else t
+                    if (it in TunnelTransport.PERSISTED) it else TunnelTransport.NONE
                 },
                 wireGuardConfig = cliO.optString("wireGuardConfig"),
                 wireGuardTunnelName = cliO.optString("wireGuardTunnelName").ifBlank { TunnelTransport.DEFAULT_TUNNEL_NAME },

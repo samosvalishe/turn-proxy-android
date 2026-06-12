@@ -9,10 +9,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import android.os.Build
-import androidx.annotation.RequiresApi
 
-@RequiresApi(Build.VERSION_CODES.N)
 class ProxyTileService : TileService() {
 
     private var scope: CoroutineScope? = null
