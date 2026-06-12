@@ -30,6 +30,17 @@ WG_CONF="$WG_DIR/$WG_IFACE.conf"
 WG_NET="10.13.13"
 WG_CLIENT_CONF="$PREFIX/wireguard-client.conf"
 
+# Шаринг (peer-*): клиентские conf выданных пиров, имя пира — маркер
+# "# ft-user: <base64(name)>" внутри блока [Peer] в серверном conf.
+SHARE_DIR="$PREFIX/share"
+PEERS_LOCK="$PREFIX/peers.lock"
+
+# Авторизация по Client ID: allowlist clients.json (флаг -clients-file сервера,
+# hot-reload — рестарт не нужен). cid гостя ↔ WG-пир связывается файлом
+# $SHARE_DIR/<pub_fs>.cid; cid владельца хранится в owner.cid.
+CLIENTSFILE="$PREFIX/clients.json"
+OWNERCIDFILE="$PREFIX/owner.cid"
+
 log()  { echo "LOG: $*"; }
 emit() { echo "$1=$2"; }
 die()  { echo "ERR=$*"; echo "RESULT=err"; trap - EXIT; exit 1; }
@@ -390,6 +401,9 @@ ARG_TAIL=80
 ARG_WG_PORT=""
 ARG_WG_ENDPOINT=""
 ARG_WG_ADOPT=""
+ARG_NAME_B64=""
+ARG_PUBKEY=""
+ARG_CLIENT_ID=""
 
 parse_args() {
     while [ $# -gt 0 ]; do
@@ -430,6 +444,21 @@ parse_args() {
                 ARG_WG_ADOPT="${1#*=}"
                 [[ "$ARG_WG_ADOPT" =~ ^[01]$ ]] || die "bad --adopt (need 0|1)"
                 ;;
+            --name-b64=*)
+                # Имя пира всегда ходит как base64(UTF-8) — юникод/кавычки не трогают shell.
+                # 256 = имя до ~190 байт UTF-8 (клиент режет до 64 символов).
+                ARG_NAME_B64="${1#*=}"
+                [[ "$ARG_NAME_B64" =~ ^[A-Za-z0-9+/=]{1,256}$ ]] || die "bad --name-b64"
+                ;;
+            --pubkey=*)
+                ARG_PUBKEY="${1#*=}"
+                [[ "$ARG_PUBKEY" =~ ^[A-Za-z0-9+/]{43}=$ ]] || die "bad --pubkey (need wg base64)"
+                ;;
+            --client-id=*)
+                # Формат автогена ядра: 16 байт → 32 hex.
+                ARG_CLIENT_ID="${1#*=}"
+                [[ "$ARG_CLIENT_ID" =~ ^[0-9a-fA-F]{32}$ ]] || die "bad --client-id (need 32 hex)"
+                ;;
             *) die "unknown arg: $1" ;;
         esac
         shift
@@ -456,6 +485,12 @@ _write_args_file() {
             echo "$ARG_OBF_PROFILE"
             echo "-obf-key"
             echo "$ARG_OBF_KEY"
+        fi
+        # Авторизация включается только когда владелец передал свой cid —
+        # cmd_start уже посадил его в allowlist (иначе lockout самого себя).
+        if [ -n "$ARG_CLIENT_ID" ]; then
+            echo "-clients-file"
+            echo "$CLIENTSFILE"
         fi
     } >> "$tmp"
     mv -f "$tmp" "$ARGSFILE"
@@ -524,6 +559,7 @@ cmd_start_nohup() {
     fi
     local args=(-listen "$ARG_LISTEN" -connect "$ARG_CONNECT")
     [ "$ARG_MODE" = "tcp" ] && args+=(-mode tcp)
+    [ -n "$ARG_CLIENT_ID" ] && args+=(-clients-file "$CLIENTSFILE")
     if [ "$ARG_OBF_PROFILE" != "none" ] && [ -n "$ARG_OBF_KEY" ]; then
         umask 077
         printf '%s' "$ARG_OBF_KEY" > "$OBFFILE"
@@ -614,11 +650,14 @@ _wg_sync_live_peer() {  # IFACE
         || log "warning: wg set $iface failed - restart wg-quick@$iface manually"
 }
 
-# Добавляет отдельного пира в СУЩЕСТВУЮЩИЙ conf и пишет клиентский конфиг.
-# _wg_add_peer CONF_PATH IFACE; код 1 — нестандартный conf (нет PrivateKey/Address),
-# вызывающий продолжает без клиентского конфига.
-_wg_add_peer() {
-    local conf="$1" iface="$2"
+# Генерит ключи и добавляет пира в СУЩЕСТВУЮЩИЙ conf: маркер-строка — первой
+# строкой блока [Peer], клиентский конфиг — в OUT_PATH. Результат — в глобалах
+# NEW_PEER_PUB / NEW_PEER_IP. _wg_new_peer CONF_PATH IFACE OUT_PATH MARKER;
+# код 1 — нестандартный conf (нет PrivateKey/Address), вызывающий решает сам.
+NEW_PEER_PUB=""
+NEW_PEER_IP=""
+_wg_new_peer() {
+    local conf="$1" iface="$2" out="$3" marker="$4"
     local srv_priv srv_pub addr base used i candidate cli_priv cli_pub
     srv_priv=$(sed -n 's/^[[:space:]]*PrivateKey[[:space:]]*=[[:space:]]*//p' "$conf" | head -n1 | tr -d ' \r')
     [ -n "$srv_priv" ] || return 1
@@ -643,7 +682,7 @@ _wg_add_peer() {
     cat >> "$conf" <<EOF
 
 [Peer]
-# free-turn-proxy client (конфиг: $WG_CLIENT_CONF)
+$marker
 PublicKey = $cli_pub
 AllowedIPs = $candidate/32
 EOF
@@ -654,7 +693,7 @@ EOF
     fi
 
     ( umask 077
-      cat > "$WG_CLIENT_CONF" <<EOF
+      cat > "$out" <<EOF
 [Interface]
 PrivateKey = $cli_priv
 Address = $candidate/32
@@ -667,17 +706,21 @@ Endpoint = $ARG_WG_ENDPOINT
 PersistentKeepalive = 25
 EOF
     )
+    NEW_PEER_PUB="$cli_pub"
+    NEW_PEER_IP="$candidate"
     return 0
 }
 
-_emit_wg_client_conf() {
-    [ -f "$WG_CLIENT_CONF" ] || return 0
+_emit_conf_b64() {  # FILE KEY
+    [ -f "$1" ] || return 0
     if ! command -v base64 >/dev/null 2>&1; then
-        log "(base64 unavailable - import client conf manually: $WG_CLIENT_CONF)"
+        log "(base64 unavailable - import client conf manually: $1)"
         return 0
     fi
-    emit WG_CLIENT_CONF_B64 "$(base64 < "$WG_CLIENT_CONF" | tr -d '\n')"
+    emit "$2" "$(base64 < "$1" | tr -d '\n')"
 }
+
+_emit_wg_client_conf() { _emit_conf_b64 "$WG_CLIENT_CONF" WG_CLIENT_CONF_B64; }
 
 cmd_wg_setup() {
     parse_args "$@"
@@ -705,7 +748,8 @@ cmd_wg_setup() {
             rm -f "$WG_CLIENT_CONF"
         fi
         if [ ! -f "$WG_CLIENT_CONF" ]; then
-            _wg_add_peer "$conf" "$iface" \
+            _wg_new_peer "$conf" "$iface" "$WG_CLIENT_CONF" \
+                "# free-turn-proxy client (конфиг: $WG_CLIENT_CONF)" \
                 || log "cannot add peer to $conf - import client conf manually"
         fi
         if [ -f "$WG_CLIENT_CONF" ]; then _wg_sync_live_peer "$iface"; fi
@@ -823,6 +867,393 @@ EOF
     trap - EXIT
 }
 
+# ── Шаринг доступа (peer-*, client-*) ───────────────────────────────────────
+# Именованные пиры для выдачи доступа другим людям. Имя — base64-маркер внутри
+# блока [Peer]; клиентский conf пира хранится в $SHARE_DIR для повторной выдачи.
+# Каждый гость дополнительно получает Client ID в allowlist (comment = имя).
+
+# clients.json правится только встроенными командами бинарника: атомарная
+# запись, формат файла владеет ядро, сервер подхватывает hot-reload'ом.
+_clients_add() {  # ID COMMENT
+    local bin
+    bin=$(binpath)
+    [ -x "$bin" ] || die "server binary not installed; run install first"
+    CLIENTS_FILE="$CLIENTSFILE" "$bin" clients add "$1" "$2" >/dev/null \
+        || die "clients add failed"
+}
+
+# Best-effort: отзыв WG-пира не должен падать из-за allowlist.
+_clients_remove_soft() {  # ID
+    local bin
+    bin=$(binpath)
+    [ -x "$bin" ] || return 0
+    CLIENTS_FILE="$CLIENTSFILE" "$bin" clients remove "$1" >/dev/null 2>&1 || true
+}
+
+_name_from_b64() {  # B64 → текст (битый base64 → пусто)
+    printf '%s' "$1" | base64 -d 2>/dev/null || true
+}
+
+_pub_fs() {  # wg-pubkey → имя файла (base64 '/'+'=' недопустимы в путях)
+    printf '%s' "$1" | tr '/+' '_-' | tr -d '='
+}
+
+# pubkey пира самого владельца (из wireguard-client.conf мастера). Пусто, если
+# conf отсутствует или нечитаем.
+_self_pub() {
+    [ -f "$WG_CLIENT_CONF" ] || return 0
+    local cli_priv
+    cli_priv=$(sed -n 's/^[[:space:]]*PrivateKey[[:space:]]*=[[:space:]]*//p' "$WG_CLIENT_CONF" | head -n1 | tr -d ' \r')
+    [ -n "$cli_priv" ] || return 0
+    printf '%s' "$cli_priv" | wg pubkey 2>/dev/null || true
+}
+
+# Первый conf в /etc/wireguard (как в cmd_wg_setup); пусто, если бэкенда нет.
+# die здесь нельзя: вызывается из $(), ERR= ушёл бы в переменную вместо stdout.
+_share_conf() {
+    ls "$WG_DIR"/*.conf 2>/dev/null | head -n1 || true
+}
+
+# 0, если блок [Peer] с этим PublicKey несёт маркер "# ft-user:" (выдан приложением).
+_peer_marked() {  # CONF PUBKEY
+    awk -v key="$2" '
+        function check() { if (hit && marked) ok = 1 }
+        /^[ \t]*\[/ { check(); hit = 0; marked = 0; next }
+        /^[ \t]*# ft-user: / { marked = 1 }
+        {
+            line = $0; gsub(/[ \t\r]/, "", line)
+            if (line == "PublicKey=" key) hit = 1
+        }
+        END { check(); exit ok ? 0 : 1 }
+    ' "$1"
+}
+
+# Фактические параметры запущенного сервера — для построения share-ссылки на
+# клиенте. Источник: run.args (systemd) либо cmdline процесса (nohup-легаси).
+# Локальный снапшот приложения может протухнуть при выключенном sync — здесь
+# всегда серверная правда.
+cmd_share_info() {
+    if ls "$WG_DIR"/*.conf >/dev/null 2>&1; then
+        emit WG_BACKEND yes
+    else
+        emit WG_BACKEND no
+    fi
+    local mode="" obf="" key=""
+    if [ -f "$ARGSFILE" ]; then
+        # run.args: по одному аргументу на строку — значение идёт строкой после флага.
+        mode=$(awk 'prev=="-mode"{print;exit}{prev=$0}' "$ARGSFILE")
+        mode=${mode:-udp}
+        obf=$(awk 'prev=="-obf-profile"{print;exit}{prev=$0}' "$ARGSFILE")
+        key=$(awk 'prev=="-obf-key"{print;exit}{prev=$0}' "$ARGSFILE")
+    else
+        local cmdline
+        cmdline=$(current_cmdline)
+        if [ -n "$cmdline" ]; then
+            if echo "$cmdline" | grep -q -- "-mode tcp"; then mode=tcp; else mode=udp; fi
+            obf=$(echo "$cmdline" | sed -nE 's/.*-obf-profile[= ]+([a-z]+).*/\1/p')
+            key=$(echo "$cmdline" | sed -nE 's/.*-obf-key[= ]+([0-9a-fA-F]{64}).*/\1/p')
+        fi
+    fi
+    [ -n "$mode" ] && emit MODE "$mode"
+    [ -n "$obf" ] && emit OBF_PROFILE "$obf"
+    [ -n "$key" ] && emit OBF_KEY "$key"
+    echo "RESULT=ok"
+    trap - EXIT
+}
+
+cmd_peer_add() {
+    parse_args "$@"
+    [ -n "$ARG_NAME_B64" ] || die "--name-b64 required"
+    [ -n "$ARG_WG_ENDPOINT" ] || die "--endpoint required"
+    command -v wg >/dev/null 2>&1 || die "wireguard-tools not installed"
+    # Ссылка без conf бессмысленна — проверяем до любых мутаций.
+    command -v base64 >/dev/null 2>&1 || die "base64 not available on server"
+    local conf iface
+    conf=$(_share_conf)
+    [ -n "$conf" ] || die "no wireguard backend"
+    iface=$(basename "$conf" .conf)
+    mkdir -p "$SHARE_DIR"
+    chmod 700 "$SHARE_DIR"
+
+    # Сначала allowlist: его откат (clients remove) дешевле, чем выкусывание
+    # уже применённого пира из conf и интерфейса.
+    if [ -n "$ARG_CLIENT_ID" ]; then
+        _clients_add "$ARG_CLIENT_ID" "$(_name_from_b64 "$ARG_NAME_B64")"
+    fi
+
+    # Best-effort lock: два параллельных peer-add не должны раздать один IP.
+    if command -v flock >/dev/null 2>&1; then
+        exec 9>"$PEERS_LOCK"
+        flock 9 || true
+    fi
+
+    local tmp
+    tmp=$(mktemp "$SHARE_DIR/.new.XXXXXX") || { _clients_remove_soft "$ARG_CLIENT_ID"; die "mktemp failed"; }
+    if ! _wg_new_peer "$conf" "$iface" "$tmp" "# ft-user: $ARG_NAME_B64"; then
+        rm -f "$tmp"
+        _clients_remove_soft "$ARG_CLIENT_ID"
+        die "cannot add peer to $conf"
+    fi
+    local stored="$SHARE_DIR/$(_pub_fs "$NEW_PEER_PUB").conf"
+    mv -f "$tmp" "$stored"
+    chmod 600 "$stored"
+
+    # cid-маппинг рядом с conf: по нему peer-remove отзовёт и Client ID,
+    # а peer-conf вернёт его при re-share.
+    if [ -n "$ARG_CLIENT_ID" ]; then
+        printf '%s\n' "$ARG_CLIENT_ID" > "$SHARE_DIR/$(_pub_fs "$NEW_PEER_PUB").cid"
+        chmod 600 "$SHARE_DIR/$(_pub_fs "$NEW_PEER_PUB").cid"
+        emit CLIENT_ID "$ARG_CLIENT_ID"
+    fi
+
+    emit PEER_PUB "$NEW_PEER_PUB"
+    emit PEER_IP "$NEW_PEER_IP"
+    _emit_conf_b64 "$stored" WG_CLIENT_CONF_B64
+    echo "RESULT=ok"
+    trap - EXIT
+}
+
+# WG-пиры из conf: PEER_<i>_* + PEER_COUNT + SELF_PUB. Без WG-бэкенда — PEER_COUNT=0.
+_emit_peers() {
+    local conf
+    conf=$(_share_conf)
+    if [ -z "$conf" ]; then
+        emit PEER_COUNT 0
+        return 0
+    fi
+    command -v wg >/dev/null 2>&1 || die "wireguard-tools not installed"
+    local iface
+    iface=$(basename "$conf" .conf)
+
+    # pubkey→epoch последнего handshake (пусто, если интерфейс не поднят).
+    local hs
+    hs=$(wg show "$iface" latest-handshakes 2>/dev/null || true)
+
+    local i=0 in_peer=0 pub="" name="" ip=""
+    _flush_peer() {
+        [ "$in_peer" = "1" ] && [ -n "$pub" ] || { pub=""; name=""; ip=""; return 0; }
+        emit "PEER_${i}_PUB" "$pub"
+        [ -n "$name" ] && emit "PEER_${i}_NAME_B64" "$name"
+        [ -n "$ip" ] && emit "PEER_${i}_IP" "$ip"
+        local h
+        h=$(printf '%s\n' "$hs" | awk -v p="$pub" '$1==p{print $2}')
+        [ -n "$h" ] && emit "PEER_${i}_HS" "$h"
+        if [ -f "$SHARE_DIR/$(_pub_fs "$pub").conf" ]; then
+            emit "PEER_${i}_CONF" yes
+        else
+            emit "PEER_${i}_CONF" no
+        fi
+        i=$((i + 1))
+        pub=""; name=""; ip=""
+    }
+
+    # Чистка строки через parameter expansion: пайплайн tr|sed на каждую строку
+    # conf — это сотни форков на больших списках пиров.
+    local raw line val
+    while IFS= read -r raw || [ -n "$raw" ]; do
+        line=${raw//$'\r'/}
+        line=${line#"${line%%[![:space:]]*}"}
+        line=${line%"${line##*[![:space:]]}"}
+        case "$line" in
+            "["*)
+                _flush_peer
+                case "$line" in
+                    \[[Pp]eer\]) in_peer=1 ;;
+                    *) in_peer=0 ;;
+                esac
+                ;;
+            "# ft-user: "*)
+                [ "$in_peer" = "1" ] && name="${line#\# ft-user: }"
+                ;;
+            PublicKey*=*)
+                [ "$in_peer" = "1" ] && { val=${line#*=}; pub=${val// /}; }
+                ;;
+            AllowedIPs*=*)
+                if [ "$in_peer" = "1" ] && [ -z "$ip" ]; then
+                    val=${line#*=}
+                    val=${val%%,*}
+                    val=${val%%/*}
+                    ip=${val// /}
+                fi
+                ;;
+        esac
+    done < "$conf"
+    _flush_peer
+
+    emit PEER_COUNT "$i"
+    local self_pub
+    self_pub=$(_self_pub)
+    [ -n "$self_pub" ] && emit SELF_PUB "$self_pub"
+    return 0
+}
+
+cmd_peer_conf() {
+    parse_args "$@"
+    [ -n "$ARG_PUBKEY" ] || die "--pubkey required"
+    command -v base64 >/dev/null 2>&1 || die "base64 not available on server"
+    local stored="$SHARE_DIR/$(_pub_fs "$ARG_PUBKEY").conf"
+    [ -f "$stored" ] || die "no stored conf for this peer"
+    # cid пира — из маппинга. Пир без cid (выдан до введения allowlist):
+    # регистрируем переданный кандидат, чтобы повторная ссылка работала
+    # и при включённом -clients-file.
+    local cidfile="$SHARE_DIR/$(_pub_fs "$ARG_PUBKEY").cid" cid=""
+    [ -f "$cidfile" ] && cid=$(tr -d ' \r\n' < "$cidfile")
+    if [ -z "$cid" ] && [ -n "$ARG_CLIENT_ID" ]; then
+        _clients_add "$ARG_CLIENT_ID" "$(_name_from_b64 "$ARG_NAME_B64")"
+        printf '%s\n' "$ARG_CLIENT_ID" > "$cidfile"
+        chmod 600 "$cidfile"
+        cid="$ARG_CLIENT_ID"
+    fi
+    [ -n "$cid" ] && emit CLIENT_ID "$cid"
+    _emit_conf_b64 "$stored" WG_CLIENT_CONF_B64
+    echo "RESULT=ok"
+    trap - EXIT
+}
+
+cmd_peer_remove() {
+    parse_args "$@"
+    [ -n "$ARG_PUBKEY" ] || die "--pubkey required"
+    command -v wg >/dev/null 2>&1 || die "wireguard-tools not installed"
+    local conf iface
+    conf=$(_share_conf)
+    [ -n "$conf" ] || die "no wireguard backend"
+    iface=$(basename "$conf" .conf)
+
+    local self_pub
+    self_pub=$(_self_pub)
+    [ -n "$self_pub" ] && [ "$ARG_PUBKEY" = "$self_pub" ] && die "cannot remove owner peer"
+
+    # Отзыв Client ID по cid-маппингу — в обеих ветках: пир мог быть уже
+    # вырезан из conf при упавшем прошлом вызове (идемпотентный повтор).
+    local cidfile="$SHARE_DIR/$(_pub_fs "$ARG_PUBKEY").cid"
+    if [ -f "$cidfile" ]; then
+        _clients_remove_soft "$(tr -d ' \r\n' < "$cidfile")"
+        rm -f "$cidfile"
+    fi
+
+    # Есть ли такой пир в conf вообще (идемпотентность: нет → REMOVED=no).
+    if ! awk -v key="$ARG_PUBKEY" \
+        '{ line=$0; gsub(/[ \t\r]/,"",line); if (line=="PublicKey="key) found=1 } END { exit found?0:1 }' \
+        "$conf"; then
+        emit REMOVED no
+        echo "RESULT=ok"
+        trap - EXIT
+        return
+    fi
+
+    # Adopted-сетап без wireguard-client.conf: владельца не опознать по pubkey,
+    # поэтому удаляем только пиры с маркером ft-user (выданные приложением).
+    [ -z "$self_pub" ] && ! _peer_marked "$conf" "$ARG_PUBKEY" && die "cannot remove unmanaged peer"
+
+    if command -v flock >/dev/null 2>&1; then
+        mkdir -p "$PREFIX"
+        exec 9>"$PEERS_LOCK"
+        flock 9 || true
+    fi
+
+    # Вырезаем блок [Peer] с этим PublicKey целиком (заголовок + строки до
+    # следующей секции, включая маркер-комментарий внутри блока).
+    local tmp="$conf.tmp"
+    awk -v key="$ARG_PUBKEY" '
+        function flushbuf() { for (j = 0; j < n; j++) print buf[j]; n = 0 }
+        /^[ \t]*\[/ {
+            if (insec) { if (drop) n = 0; flushbuf() }
+            insec = 1; drop = 0
+            buf[n++] = $0
+            next
+        }
+        {
+            if (!insec) { print; next }
+            buf[n++] = $0
+            line = $0; gsub(/[ \t\r]/, "", line)
+            if (line == "PublicKey=" key) drop = 1
+        }
+        END { if (insec) { if (drop) n = 0; flushbuf() } }
+    ' "$conf" > "$tmp" || { rm -f "$tmp"; die "conf rewrite failed"; }
+    chmod 600 "$tmp" 2>/dev/null || true
+    mv -f "$tmp" "$conf"
+
+    if wg show "$iface" >/dev/null 2>&1; then
+        wg set "$iface" peer "$ARG_PUBKEY" remove 2>/dev/null || true
+    fi
+    rm -f "$SHARE_DIR/$(_pub_fs "$ARG_PUBKEY").conf"
+
+    emit REMOVED yes
+    echo "RESULT=ok"
+    trap - EXIT
+}
+
+# Доступ без WG-пира (tcp/Xray-бэкенд): гость существует только в allowlist.
+cmd_client_add() {
+    parse_args "$@"
+    [ -n "$ARG_CLIENT_ID" ] || die "--client-id required"
+    [ -n "$ARG_NAME_B64" ] || die "--name-b64 required"
+    _clients_add "$ARG_CLIENT_ID" "$(_name_from_b64 "$ARG_NAME_B64")"
+    echo "RESULT=ok"
+    trap - EXIT
+}
+
+# Гости из allowlist, не привязанные к WG-пирам: CLIENT_<i>_* + CLIENT_COUNT.
+# Владелец и cid'ы с .cid-маппингом отфильтрованы — их показывает блок пиров.
+_emit_clients() {
+    local bin
+    bin=$(binpath)
+    [ -x "$bin" ] || die "server binary not installed; run install first"
+    local owner=""
+    [ -f "$OWNERCIDFILE" ] && owner=$(tr -d ' \r\n' < "$OWNERCIDFILE")
+    local mapped="" f
+    if [ -d "$SHARE_DIR" ]; then
+        for f in "$SHARE_DIR"/*.cid; do
+            [ -f "$f" ] || continue
+            mapped="$mapped $(tr -d ' \r\n' < "$f")"
+        done
+    fi
+    # Формат строки `clients list`: " - <id> (Comment: <текст>)" (handleClientsCommand
+    # ядра). Имя наружу — base64: KEY=VALUE-протокол не переживёт '=' и переносы.
+    # Exit-код бинарника проверяем: тихий пустой список неотличим от «гостей нет».
+    local out
+    out=$(CLIENTS_FILE="$CLIENTSFILE" "$bin" clients list 2>/dev/null) || die "clients list failed"
+    local i=0 line id comment
+    while IFS= read -r line; do
+        case "$line" in " - "*) ;; *) continue ;; esac
+        id=${line#" - "}
+        id=${id%% *}
+        [ -n "$id" ] || continue
+        [ "$id" = "$owner" ] && continue
+        case " $mapped " in *" $id "*) continue ;; esac
+        emit "CLIENT_${i}_ID" "$id"
+        comment=$(printf '%s' "$line" | sed -nE 's/^ - [^ ]+ \(Comment: (.*)\)$/\1/p')
+        [ -n "$comment" ] && emit "CLIENT_${i}_NAME_B64" "$(printf '%s' "$comment" | base64 | tr -d '\n')"
+        i=$((i + 1))
+    done <<< "$out"
+    emit CLIENT_COUNT "$i"
+    return 0
+}
+
+# Пиры + allowlist-гости одним вызовом: вкладке «Пользователи» нужны оба
+# набора, две отдельные SSH-сессии стримили скрипт дважды.
+cmd_share_list() {
+    _emit_peers
+    _emit_clients
+    echo "RESULT=ok"
+    trap - EXIT
+}
+
+cmd_client_remove() {
+    parse_args "$@"
+    [ -n "$ARG_CLIENT_ID" ] || die "--client-id required"
+    if [ -f "$OWNERCIDFILE" ] && [ "$(tr -d ' \r\n' < "$OWNERCIDFILE")" = "$ARG_CLIENT_ID" ]; then
+        die "cannot remove owner client id"
+    fi
+    local bin
+    bin=$(binpath)
+    [ -x "$bin" ] || die "server binary not installed; run install first"
+    CLIENTS_FILE="$CLIENTSFILE" "$bin" clients remove "$ARG_CLIENT_ID" >/dev/null \
+        || die "clients remove failed"
+    echo "RESULT=ok"
+    trap - EXIT
+}
+
 _kill_old_services() {
     log "stopping old services (vk-turn-proxy) if any"
     if has_systemd; then
@@ -851,6 +1282,16 @@ cmd_start() {
     parse_args "$@"
     [ -n "$ARG_LISTEN" ]  || die "--listen required"
     [ -n "$ARG_CONNECT" ] || die "--connect required"
+
+    # Владелец сидится в allowlist ДО запуска с -clients-file — иначе после
+    # включения авторизации он сам не подключится. И ДО остановки сервера:
+    # старый бинарник без сабкоманды clients умрёт здесь, не уронив рабочий
+    # процесс fuser'ом.
+    if [ -n "$ARG_CLIENT_ID" ]; then
+        _clients_add "$ARG_CLIENT_ID" "owner"
+        printf '%s\n' "$ARG_CLIENT_ID" > "$OWNERCIDFILE"
+        chmod 600 "$OWNERCIDFILE"
+    fi
 
     _kill_old_services
     _open_firewall
@@ -925,6 +1366,13 @@ main() {
         probe)        cmd_probe ;;
         install)      cmd_install "$@" ;;
         wg-setup)     cmd_wg_setup "$@" ;;
+        share-info)   cmd_share_info ;;
+        share-list)   cmd_share_list ;;
+        peer-add)     cmd_peer_add "$@" ;;
+        peer-conf)    cmd_peer_conf "$@" ;;
+        peer-remove)  cmd_peer_remove "$@" ;;
+        client-add)   cmd_client_add "$@" ;;
+        client-remove) cmd_client_remove "$@" ;;
         start)        cmd_start "$@" ;;
         stop)         cmd_stop ;;
         logs)         cmd_logs "$@" ;;

@@ -3,6 +3,8 @@ package com.freeturn.app.domain.server
 import android.content.Context
 import com.freeturn.app.SSHManager
 import com.freeturn.app.data.SshConfig
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Запускает [ServerCommand] на удалённом хосте, стримя `free-turn-control.sh`
@@ -27,8 +29,10 @@ class ServerControl(
         return "bash -s -- $quoted"
     }
 
-    suspend fun run(cfg: SshConfig, cmd: ServerCommand): CmdResult {
-        if (cfg.ip.isBlank()) return CmdResult.Err("no SSH config", emptyList())
+    suspend fun run(cfg: SshConfig, cmd: ServerCommand): CmdResult = withContext(Dispatchers.IO) {
+        if (cfg.ip.isBlank()) return@withContext CmdResult.Err("no SSH config", emptyList())
+        // Сборка команды + ленивое чтение 52KB-скрипта (assets) и парсинг вывода —
+        // всё на IO: первый SSH-вызов не блокирует главный поток (фриз при открытии).
         val output = ssh.executeWithStdin(
             ip = cfg.ip,
             port = cfg.port,
@@ -39,7 +43,7 @@ class ServerControl(
             knownFingerprint = cfg.hostFingerprint.ifEmpty { null },
             sshKey = if (cfg.authType == SshConfig.AUTH_SSH_KEY) cfg.sshKey else ""
         )
-        return ServerOutputParser.parse(output)
+        ServerOutputParser.parse(output)
     }
 
     /**
