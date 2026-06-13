@@ -38,6 +38,7 @@ import com.freeturn.app.ui.components.SettingsCard
 import com.freeturn.app.ui.components.SettingsFieldSlot
 import com.freeturn.app.viewmodel.ImportViewModel
 import org.koin.androidx.compose.koinViewModel
+import com.freeturn.app.ui.theme.Spacing
 
 /**
  * Sheet импорта по freeturn://-ссылке. Живёт на уровне AppNavigation поверх
@@ -71,10 +72,10 @@ fun ImportSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = Spacing.xxl)
                 .navigationBarsPadding()
-                .padding(bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(bottom = Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg)
         ) {
             if (state.saved) {
                 ImportSuccess(onDone = {

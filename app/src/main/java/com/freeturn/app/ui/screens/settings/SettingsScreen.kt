@@ -24,7 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
 import com.freeturn.app.ui.components.SettingsBackButton
@@ -35,6 +34,7 @@ import com.freeturn.app.ui.components.SettingsGroup
 import com.freeturn.app.ui.components.SettingsGroupItem
 import com.freeturn.app.ui.components.SettingsSwitchRow
 import com.freeturn.app.viewmodel.SettingsViewModel
+import com.freeturn.app.ui.theme.Spacing
 
 /** Корневой экран настроек (нижнее меню): серверы, приложение, продвинутые, о проекте. */
 @Composable
@@ -67,8 +67,8 @@ fun SettingsScreen(
                 modifier = Modifier
                     .widthIn(max = SettingsContentMaxWidth)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
             ) {
                 // Сегментированная группа (M3 expressive): пункты с микро-зазором,
                 // наружные углы большие. Новые пункты добавляются строкой в группу,
@@ -146,8 +146,8 @@ fun AdvancedScreen(
                 modifier = Modifier
                     .widthIn(max = SettingsContentMaxWidth)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
             ) {
                 SettingsCard {
                     SettingsSwitchRow(

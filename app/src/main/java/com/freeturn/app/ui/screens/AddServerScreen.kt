@@ -59,6 +59,7 @@ import com.freeturn.app.ui.components.SettingsGroupItem
 import com.freeturn.app.ui.components.SettingsRowIcon
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import com.freeturn.app.ui.theme.Spacing
 
 /**
  * Экран «Добавить сервер» (вкладка «+»). Self-hosted уводит в мастер установки
@@ -104,7 +105,7 @@ fun AddServerScreen(
                 modifier = Modifier
                     .widthIn(max = SettingsContentMaxWidth)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.md)
             ) {
                 PasteLinkField(
                     onPaste = {
@@ -216,9 +217,9 @@ private fun PasteLinkField(onPaste: () -> Unit) {
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+            modifier = Modifier.padding(start = Spacing.xl, end = Spacing.sm, top = Spacing.sm, bottom = Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
             Icon(
                 painterResource(R.drawable.link_24px),
@@ -253,9 +254,9 @@ private fun SoonMethodRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
     ) {
         SettingsRowIcon(iconRes, enabled = false)
         Column(modifier = Modifier.weight(1f)) {
@@ -284,7 +285,7 @@ private fun SoonBadge() {
             stringResource(R.string.add_soon_badge),
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onTertiaryContainer,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+            modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs)
         )
     }
 }

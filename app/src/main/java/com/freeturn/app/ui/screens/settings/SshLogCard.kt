@@ -47,6 +47,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.ui.theme.LocalReducedMotion
+import com.freeturn.app.ui.theme.Spacing
 
 /**
  * Единый SSH-лог: весь вывод команд сопряжения/управления + server.log (тянется кнопкой
@@ -70,8 +71,8 @@ internal fun SshLogCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(Spacing.xl),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 Text(
@@ -95,7 +96,7 @@ internal fun SshLogCard(
                                 "$count",
                                 style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
                                 color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs)
                             )
                         }
                     }
@@ -107,7 +108,7 @@ internal fun SshLogCard(
             // Действия отдельным рядом во всю ширину — в шапке им тесно на узких экранах.
             if (canFetchJournal || lines.isNotEmpty()) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     if (canFetchJournal) {
@@ -179,7 +180,7 @@ private fun SshTerminalPane(lines: List<String>) {
                 .fillMaxWidth()
                 .heightIn(min = 88.dp, max = 400.dp)
                 .verticalScroll(scroll)
-                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .padding(horizontal = Spacing.md, vertical = Spacing.md)
         ) {
             val mono = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
             if (lines.isEmpty()) {

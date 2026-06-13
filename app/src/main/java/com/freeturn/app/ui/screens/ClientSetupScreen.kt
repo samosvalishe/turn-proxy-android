@@ -68,6 +68,7 @@ import com.freeturn.app.viewmodel.ServerViewModel
 import com.freeturn.app.viewmodel.SettingsViewModel
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
+import com.freeturn.app.ui.theme.Spacing
 
 @Composable
 fun ClientSetupScreen(
@@ -183,8 +184,8 @@ fun ClientSetupScreen(
                 modifier = Modifier
                     .widthIn(max = SettingsContentMaxWidth)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
             ) {
                 // --- Подключение: адреса сервера/звонка/локальный ---
                 SectionLabel(stringResource(R.string.connection_title))

@@ -34,6 +34,7 @@ import com.freeturn.app.ui.components.SettingsFieldSlot
 import com.freeturn.app.ui.components.SettingsRowIcon
 import com.freeturn.app.viewmodel.ShareUiState
 import com.freeturn.app.viewmodel.ShareViewModel
+import com.freeturn.app.ui.theme.Spacing
 
 /**
  * Суб-вкладка «Соединение»: имя нового пользователя + сервер. Сам запуск выдачи —
@@ -49,7 +50,7 @@ fun ShareConnectionTab(
     onRetryInfo: () -> Unit
 ) {
     val context = LocalContext.current
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
         Text(
             stringResource(R.string.share_connection_desc),
             style = MaterialTheme.typography.bodyMedium,
@@ -79,7 +80,7 @@ fun ShareConnectionTab(
         )
 
         // WG-сервер умеет оба типа доступа → выбор. Прокси-only сервер — просто статус.
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             SectionLabel(
                 stringResource(
                     if (state.canChooseMode) R.string.share_access_type
@@ -137,9 +138,9 @@ private fun ShareProtocolCard(state: ShareUiState, onRetryInfo: () -> Unit) {
     SettingsCard {
         when {
             state.infoLoading -> Row(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(Spacing.lg),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(Spacing.md)
             ) {
                 // Shape-morph лоадер — тот же expressive-почерк, что у героя. Не дёргает
                 // enter-слайд: загрузка стартует уже после перехода (см. ShareScreen).
@@ -177,13 +178,13 @@ private fun ShareProtocolCard(state: ShareUiState, onRetryInfo: () -> Unit) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                            .padding(Spacing.lg),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.md)
                     ) {
                         // Заголовок: тональная иконка (цвет зависит от режима) + название.
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
                         ) {
                             SettingsRowIcon(
                                 iconRes = if (wg) R.drawable.vpn_key_24px else R.drawable.public_24px,

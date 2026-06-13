@@ -68,6 +68,7 @@ import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.viewmodel.ServerViewModel
 import com.freeturn.app.domain.SshConnectionState
 import com.freeturn.app.viewmodel.SettingsViewModel
+import com.freeturn.app.ui.theme.Spacing
 
 @Composable
 fun SshSetupScreen(
@@ -180,8 +181,8 @@ fun SshSetupScreen(
                 modifier = Modifier
                     .widthIn(max = SettingsContentMaxWidth)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
             ) {
                 if (!isConnecting) {
                     SshFormFields(
@@ -230,9 +231,9 @@ private fun ConnectionProgressCard(step: String) {
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(24.dp),
+            modifier = Modifier.padding(Spacing.xxl),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            verticalArrangement = Arrangement.spacedBy(Spacing.xl)
         ) {
             BusyProgressIndicator()
 
@@ -242,7 +243,7 @@ private fun ConnectionProgressCard(step: String) {
                 textAlign = TextAlign.Center
             )
 
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 steps.forEachIndexed { index, label ->
                     val isDone = index < currentIndex
                     val isActive = index == currentIndex

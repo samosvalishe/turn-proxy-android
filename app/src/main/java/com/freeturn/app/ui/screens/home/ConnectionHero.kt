@@ -66,6 +66,7 @@ import com.freeturn.app.R
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.domain.ProxyState
+import com.freeturn.app.ui.theme.Spacing
 
 /**
  * Герой главного экрана: кнопка-тоггл с морфом MaterialShapes по состоянию
@@ -263,7 +264,7 @@ private fun StatusLabel(state: ProxyState, reducedMotion: Boolean) {
             style = MaterialTheme.typography.titleMedium,
             color = color,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 32.dp)
+            modifier = Modifier.padding(horizontal = Spacing.xxxl)
         )
     }
     if (reducedMotion) {
@@ -314,7 +315,7 @@ private fun StatsPill(state: ProxyState, kind: HeroKind, uptimeText: String?) {
                     // tnum: тикающий таймер и счётчик не «дышат» по ширине.
                     style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                    modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm)
                 )
             }
         }

@@ -43,6 +43,7 @@ import com.freeturn.app.ui.components.SettingsRowDivider
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.viewmodel.SetupConfigDraft
+import com.freeturn.app.ui.theme.Spacing
 
 /**
  * Шаг 2 мастера — опросник: режим (VPN/Proxy), бэкенд (WG-детект/порт), внешний порт
@@ -350,8 +351,8 @@ private fun DuplicateHostPanel() {
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(Spacing.lg),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
             Icon(
                 painterResource(R.drawable.info_24px),
@@ -380,8 +381,8 @@ private fun WgStatusPanel(found: Boolean, title: String, desc: String) {
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(Spacing.md),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
             Icon(
                 painterResource(if (found) R.drawable.check_circle_24px else R.drawable.cloud_download_24px),
@@ -390,7 +391,7 @@ private fun WgStatusPanel(found: Boolean, title: String, desc: String) {
                        else MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp)
             )
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
                 Text(
                     title,
                     style = MaterialTheme.typography.titleSmall,

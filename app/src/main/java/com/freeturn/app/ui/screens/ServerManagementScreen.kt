@@ -79,6 +79,7 @@ import com.freeturn.app.domain.SshConnectionState
 import com.freeturn.app.viewmodel.ServerViewModel
 import com.freeturn.app.viewmodel.SettingsViewModel
 import com.freeturn.app.viewmodel.serverSettingsAvailable
+import com.freeturn.app.ui.theme.Spacing
 
 @Composable
 fun ServerManagementScreen(
@@ -236,8 +237,8 @@ fun ServerManagementScreen(
                 modifier = Modifier
                     .widthIn(max = SettingsContentMaxWidth)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
             ) {
                 // Неактивный сервер + sync ON: серверные правки нужно пушить на сервер, а
                 // живая SSH-сессия принадлежит активному. Предлагаем сделать активным.
@@ -300,7 +301,7 @@ fun ServerManagementScreen(
                             stringResource(R.string.sync_off_banner),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onErrorContainer,
-                            modifier = Modifier.padding(16.dp)
+                            modifier = Modifier.padding(Spacing.lg)
                         )
                     }
                 }
@@ -475,9 +476,9 @@ private fun HeroCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(24.dp),
+            modifier = Modifier.padding(Spacing.xxl),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg)
         ) {
             Icon(painterResource(iconRes), contentDescription = null, tint = iconTint)
             Text(title, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)

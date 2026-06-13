@@ -43,7 +43,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
 import com.freeturn.app.domain.SshConnectionState
@@ -61,6 +60,7 @@ import com.freeturn.app.viewmodel.ServerHubStatus
 import com.freeturn.app.viewmodel.ServerViewModel
 import com.freeturn.app.viewmodel.SettingsViewModel
 import com.freeturn.app.viewmodel.serverSettingsAvailable
+import com.freeturn.app.ui.theme.Spacing
 
 /**
  * Детальный экран сервера — плоский хаб: шапка-сводка, вход в настройки провайдера
@@ -240,8 +240,8 @@ fun ServerDetailScreen(
                 modifier = Modifier
                     .widthIn(max = SettingsContentMaxWidth)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
             ) {
                 if (server != null) {
                     // SSH не настроен → синхронизировать нечего: тоггл гасим и держим OFF.

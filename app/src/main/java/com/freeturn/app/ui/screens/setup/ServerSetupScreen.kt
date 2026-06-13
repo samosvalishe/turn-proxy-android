@@ -80,6 +80,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.androidx.compose.koinViewModel
+import com.freeturn.app.ui.theme.Spacing
 
 /**
  * Мастер «Свой сервер»: SSH → опросник → установка. Сервер появляется в списке
@@ -271,8 +272,8 @@ fun ServerSetupScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.lg)
                 ) {
                     when (step) {
                         SetupStep.Ssh -> SetupSshStep(
@@ -319,9 +320,9 @@ fun ServerSetupScreen(
 private fun StepProgressCapsules(current: Int, total: Int = 3) {
     val description = stringResource(R.string.setup_step_counter, current + 1, total)
     Row(
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs),
         modifier = Modifier
-            .padding(top = 6.dp)
+            .padding(top = Spacing.sm)
             .width(96.dp)
             // Капсулы декоративны — TalkBack читает «Шаг N из M».
             .clearAndSetSemantics { contentDescription = description }

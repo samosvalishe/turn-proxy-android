@@ -49,6 +49,7 @@ import com.freeturn.app.domain.ProxyState
 import com.freeturn.app.viewmodel.ProxyViewModel
 import com.freeturn.app.viewmodel.SettingsViewModel
 import kotlinx.coroutines.launch
+import com.freeturn.app.ui.theme.Spacing
 
 /**
  * Главный экран — тонкий слой над ViewModel: собирает состояния, держит
@@ -222,7 +223,7 @@ fun HomeScreen(
                         },
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
-                            .padding(bottom = 12.dp)
+                            .padding(bottom = Spacing.md)
                     )
                 }
             }

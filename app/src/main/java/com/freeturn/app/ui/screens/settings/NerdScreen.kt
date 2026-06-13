@@ -52,6 +52,7 @@ import com.freeturn.app.ui.util.redact
 import com.freeturn.app.viewmodel.ServerHubStatus
 import com.freeturn.app.viewmodel.ServerViewModel
 import com.freeturn.app.viewmodel.SettingsViewModel
+import com.freeturn.app.ui.theme.Spacing
 
 /** Тег релиза приходит и как "1.0.3", и как "v1.0.3" — нормализуем без "vv". */
 private fun versionLabel(version: String): String = "v${version.removePrefix("v")}"
@@ -107,8 +108,8 @@ fun NerdScreen(
                 modifier = Modifier
                     .widthIn(max = SettingsContentMaxWidth)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
             ) {
                 if (server != null) {
                     NerdContent(
@@ -198,8 +199,8 @@ private fun CoreStateCard(online: ServerHubStatus.Online, privacyMode: Boolean) 
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(Spacing.xl),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
             Text(stringResource(R.string.nerd_core_state), style = MaterialTheme.typography.titleMedium)
             // Одно логичное состояние: «работает» уже подразумевает «установлено».
@@ -223,7 +224,7 @@ private fun NerdStateRow(label: String, value: String, mono: Boolean = false) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
     ) {
         Text(
             label,
@@ -257,8 +258,8 @@ private fun LaunchParamsCard(server: Server, privacyMode: Boolean) {
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier.padding(Spacing.xl),
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg)
         ) {
             Text(stringResource(R.string.nerd_launch_params), style = MaterialTheme.typography.titleMedium)
             LaunchParamBlock(stringResource(R.string.nerd_launch_server), serverCmd)
@@ -269,7 +270,7 @@ private fun LaunchParamsCard(server: Server, privacyMode: Boolean) {
 
 @Composable
 private fun LaunchParamBlock(label: String, commandLine: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Text(
             label,
             style = MaterialTheme.typography.bodyMedium,
@@ -339,7 +340,7 @@ private fun LogPane(text: String, color: Color = MaterialTheme.colorScheme.onSur
                 .fillMaxWidth()
                 .heightIn(max = 400.dp)
                 .verticalScroll(scroll)
-                .padding(10.dp)
+                .padding(Spacing.md)
         )
     }
 }

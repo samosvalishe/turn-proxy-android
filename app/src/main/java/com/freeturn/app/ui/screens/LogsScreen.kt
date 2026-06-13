@@ -41,6 +41,7 @@ import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.ui.util.copyToClipboard
 import com.freeturn.app.viewmodel.ProxyViewModel
+import com.freeturn.app.ui.theme.Spacing
 
 @Composable
 fun LogsScreen(proxyViewModel: ProxyViewModel) {
@@ -148,13 +149,13 @@ private fun LogLine(line: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 3.dp),
+            .padding(horizontal = Spacing.lg, vertical = Spacing.xs),
         verticalAlignment = Alignment.Top
     ) {
         if (isHeader || isError || isWarning || isSuccess) {
             Box(
                 modifier = Modifier
-                    .padding(top = 5.dp, end = 6.dp)
+                    .padding(top = Spacing.xs, end = Spacing.sm)
                     .size(5.dp)
                     .background(textColor, CircleShape)
             )

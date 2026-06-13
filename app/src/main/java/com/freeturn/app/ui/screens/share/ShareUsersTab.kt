@@ -48,6 +48,7 @@ import com.freeturn.app.ui.components.SettingsRowIcon
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.viewmodel.ShareUiState
+import com.freeturn.app.ui.theme.Spacing
 
 /** Пир считается онлайн, если хендшейк был не позже 3 минут назад (WG re-key ~2 мин). */
 private const val ONLINE_WINDOW_SEC = 180L
@@ -67,7 +68,7 @@ fun ShareUsersTab(
     onReshareClient: (SharedClient) -> Unit,
     onRevokeClient: (SharedClient) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
         ServerSelector(
             servers = state.sshServers,
             selected = state.selectedServer,
@@ -174,9 +175,9 @@ private fun UserRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 16.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
+            .padding(start = Spacing.lg, end = Spacing.xs, top = Spacing.md, bottom = Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
     ) {
         Box {
             SettingsRowIcon(R.drawable.person_24px)

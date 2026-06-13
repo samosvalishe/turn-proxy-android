@@ -57,6 +57,7 @@ import com.freeturn.app.ui.components.AppIcon
 import com.freeturn.app.ui.components.installedInternetApps
 import com.freeturn.app.ui.components.toPackageSet
 import com.freeturn.app.viewmodel.SettingsViewModel
+import com.freeturn.app.ui.theme.Spacing
 
 /**
  * Общий модальный лист split-tunneling. Один источник для главного экрана и экрана
@@ -126,14 +127,14 @@ fun SplitTunnelSheetContent(
         modifier = Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(top = 8.dp, bottom = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(top = Spacing.sm, bottom = Spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = HorizontalPadding),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -218,8 +219,8 @@ private fun LockedBanner(modifier: Modifier = Modifier) {
         modifier = modifier
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(

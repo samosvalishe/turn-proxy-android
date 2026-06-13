@@ -48,7 +48,6 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -65,6 +64,7 @@ import com.google.mlkit.vision.common.InputImage
 import org.koin.compose.koinInject
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import com.freeturn.app.ui.theme.Spacing
 
 /**
  * QR-сканер импорта freeturn://-ссылки. Валидная ссылка уходит в [LinkImportBus]
@@ -238,13 +238,13 @@ private fun CameraPreview(onResult: (String) -> Unit) {
             shape = MaterialTheme.shapes.small,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 32.dp, start = 24.dp, end = 24.dp)
+                .padding(bottom = Spacing.xxxl, start = Spacing.xxl, end = Spacing.xxl)
         ) {
             Text(
                 text = stringResource(R.string.scanner_hint),
                 color = MaterialTheme.colorScheme.inverseOnSurface,
                 style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.sm)
             )
         }
     }
@@ -266,7 +266,7 @@ private fun CameraPermissionGate(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 32.dp),
+            .padding(horizontal = Spacing.xxxl),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -283,7 +283,7 @@ private fun CameraPermissionGate(
                 Text(stringResource(R.string.scanner_permission_open_settings))
             }
         } else {
-            Button(onClick = onRequest, modifier = Modifier.padding(top = 16.dp)) {
+            Button(onClick = onRequest, modifier = Modifier.padding(top = Spacing.lg)) {
                 Text(stringResource(R.string.scanner_permission_grant))
             }
         }

@@ -15,13 +15,13 @@ import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.unit.dp
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import com.freeturn.app.ui.theme.Spacing
 
 /**
  * QR-код для [content] на белой карточке (чёрный на белом — максимум контраста
@@ -46,7 +46,7 @@ fun QrCode(content: String, modifier: Modifier = Modifier) {
                 filterQuality = FilterQuality.None,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp)
+                    .padding(Spacing.lg)
             )
         }
     }

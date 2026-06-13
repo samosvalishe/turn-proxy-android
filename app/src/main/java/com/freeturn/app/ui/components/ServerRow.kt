@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.ui.util.hapticClickable
+import com.freeturn.app.ui.theme.Spacing
 
 /**
  * Общая строка-сервер сегментированной группы: аватар, имя/подзаголовок, опциональный
@@ -82,7 +83,7 @@ fun ServerRow(
                     bottom = 12.dp
                 ),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
         ) {
             Box(
                 modifier = Modifier

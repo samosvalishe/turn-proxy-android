@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.freeturn.app.ui.theme.Spacing
 
 /** Пустое состояние списка: Cookie9Sided-плашка + текст, опционально заголовок
  *  и CTA. Один вид на всё приложение. */
@@ -37,7 +38,7 @@ fun EmptyState(
     onAction: (() -> Unit)? = null
 ) {
     Column(
-        modifier = modifier.padding(horizontal = 32.dp),
+        modifier = modifier.padding(horizontal = Spacing.xxxl),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {

@@ -34,6 +34,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.ui.theme.LocalReducedMotion
+import com.freeturn.app.ui.theme.Spacing
 
 /**
  * Главный экран без единого сервера: вместо кнопки запуска и листа серверов —
@@ -59,7 +60,7 @@ internal fun HomeEmptyState(
     }
 
     Column(
-        modifier = modifier.padding(horizontal = 32.dp),
+        modifier = modifier.padding(horizontal = Spacing.xxxl),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {

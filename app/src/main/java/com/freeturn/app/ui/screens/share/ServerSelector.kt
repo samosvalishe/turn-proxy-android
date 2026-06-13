@@ -23,13 +23,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.data.Server
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.ui.components.SettingsCard
 import com.freeturn.app.ui.components.SettingsRowIcon
 import com.freeturn.app.ui.util.hapticClickable
+import com.freeturn.app.ui.theme.Spacing
 
 /** Выбор сервера для шаринга: карточка-строка с выпадающим списком SSH-серверов. */
 @Composable
@@ -46,9 +46,9 @@ fun ServerSelector(
                 modifier = Modifier
                     .fillMaxWidth()
                     .hapticClickable(HapticUtil.Pattern.CLICK) { expanded = true }
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
             ) {
                 SettingsRowIcon(R.drawable.host_24px)
                 Column(modifier = Modifier.weight(1f)) {

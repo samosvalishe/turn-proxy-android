@@ -70,6 +70,7 @@ import com.freeturn.app.ui.components.SettingsSwitchRow
 import com.freeturn.app.ui.util.hapticClickable
 import com.freeturn.app.viewmodel.SettingsViewModel
 import com.freeturn.app.domain.UpdateState
+import com.freeturn.app.ui.theme.Spacing
 
 // Экраны «Приложение» и «О проекте» — бывшее содержимое инфо-шита главного экрана,
 // разложенное по разделам настроек на общих settings-блоках.
@@ -124,8 +125,8 @@ fun AppScreen(
                 modifier = Modifier
                     .widthIn(max = SettingsContentMaxWidth)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
             ) {
                 SectionLabel(stringResource(R.string.app_section_interface))
                 SettingsGroup {
@@ -227,12 +228,12 @@ private fun UpdateCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 SettingsRowIcon(R.drawable.cloud_download_24px)
@@ -293,9 +294,9 @@ private fun ResetRow(onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .hapticClickable(HapticUtil.Pattern.CLICK, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
     ) {
         SettingsRowIcon(
             R.drawable.delete_24px,
@@ -352,8 +353,8 @@ fun AboutScreen(onBack: () -> Unit) {
                 modifier = Modifier
                     .widthIn(max = SettingsContentMaxWidth)
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
             ) {
                 AboutHero(appVersion)
 
@@ -400,7 +401,7 @@ private fun AboutHero(appVersion: String) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 12.dp, bottom = 4.dp),
+            .padding(top = Spacing.md, bottom = Spacing.xs),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Surface(
@@ -431,7 +432,7 @@ private fun AboutHero(appVersion: String) {
                 "v$appVersion",
                 style = MaterialTheme.typography.labelMedium.copy(fontFamily = FontFamily.Monospace),
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs)
             )
         }
         Spacer(Modifier.height(16.dp))
@@ -440,7 +441,7 @@ private fun AboutHero(appVersion: String) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 8.dp)
+            modifier = Modifier.padding(horizontal = Spacing.sm)
         )
     }
 }

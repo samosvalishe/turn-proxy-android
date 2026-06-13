@@ -49,6 +49,7 @@ import com.freeturn.app.R
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.viewmodel.ServerHubStatus
+import com.freeturn.app.ui.theme.Spacing
 
 /**
  * Карточка статуса сервера в хабе. Один источник истины — [ServerHubStatus] (собран в VM).
@@ -100,8 +101,8 @@ internal fun ServerStatusCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(Spacing.xl),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
             ) {
                 when (s) {
                     is ServerHubStatus.Online -> OnlineContent(s)
@@ -152,13 +153,13 @@ private fun StatusHero(
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.lg),
         modifier = Modifier
             .fillMaxWidth()
             .semantics { liveRegion = LiveRegionMode.Polite }
     ) {
         StatusIndicator(color, pulsing)
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
             Text(
                 title,
                 style = MaterialTheme.typography.titleMedium,

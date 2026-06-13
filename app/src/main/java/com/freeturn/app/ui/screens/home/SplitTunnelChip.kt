@@ -17,6 +17,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
+import com.freeturn.app.ui.theme.Spacing
 
 /**
  * Ссылка-индикатор split-tunneling над свёрнутым листом серверов: текст состояния
@@ -33,9 +34,9 @@ internal fun SplitTunnelChip(
             .clip(MaterialTheme.shapes.large)
             .clickable(onClick = onClick)
             .heightIn(min = 48.dp)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
     ) {
         Text(
             text = if (splitActive) stringResource(R.string.split_tunnel_status_on)

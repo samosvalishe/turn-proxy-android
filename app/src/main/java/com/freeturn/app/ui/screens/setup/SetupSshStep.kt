@@ -16,12 +16,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.ui.components.InlineErrorCard
 import com.freeturn.app.ui.components.SshFormFields
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.viewmodel.SetupSshDraft
+import com.freeturn.app.ui.theme.Spacing
 
 /**
  * Шаг 1 мастера: SSH-доступ к серверу. Во время проверки форма заменяется
@@ -42,14 +42,14 @@ fun SetupSshStep(
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier.padding(Spacing.xxl),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(20.dp)
+                verticalArrangement = Arrangement.spacedBy(Spacing.xl)
             ) {
                 BusyProgressIndicator()
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                 ) {
                     Text(
                         stringResource(R.string.setup_checking_ssh),

@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.data.SshConfig
 import com.freeturn.app.ui.HapticUtil
+import com.freeturn.app.ui.theme.Spacing
 
 /**
  * Поля SSH-формы: адрес/порт + аутентификация (логин, способ входа, секрет).
@@ -200,7 +201,7 @@ fun InlineErrorCard(message: String) {
             // TalkBack озвучивает появившуюся ошибку без переноса фокуса.
             .semantics { liveRegion = LiveRegionMode.Polite }
     ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.padding(Spacing.lg), verticalAlignment = Alignment.CenterVertically) {
             Icon(painterResource(R.drawable.error_24px), null, tint = MaterialTheme.colorScheme.error)
             Spacer(Modifier.width(12.dp))
             Text(

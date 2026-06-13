@@ -47,6 +47,7 @@ import com.freeturn.app.data.ServersSnapshot
 import com.freeturn.app.ui.components.ServerRow
 import com.freeturn.app.ui.components.settingsItemShape
 import com.freeturn.app.ui.util.redact
+import com.freeturn.app.ui.theme.Spacing
 
 /**
  * Нижний лист серверов на главном: шапка активного сервера, бейдж провайдера и
@@ -74,7 +75,7 @@ internal fun ServersSheetContent(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 4.dp),
+                .padding(horizontal = Spacing.xxl, vertical = Spacing.xs),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Серверы есть всегда (без них HomeScreen sheet не показывает), но активный
@@ -126,14 +127,14 @@ internal fun ServersSheetContent(
         Text(
             stringResource(R.string.servers_sheet_title),
             style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier.padding(start = 24.dp, end = 16.dp, bottom = 8.dp)
+            modifier = Modifier.padding(start = Spacing.xxl, end = Spacing.lg, bottom = Spacing.sm)
         )
         LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+            contentPadding = PaddingValues(horizontal = Spacing.lg, vertical = Spacing.xs),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xxs)
         ) {
             itemsIndexed(snapshot.list, key = { _, p -> p.id }) { index, p ->
                 val isActive = snapshot.activeId == p.id
@@ -180,9 +181,9 @@ private fun ProviderChip(
         modifier = modifier
     ) {
         Row(
-            modifier = Modifier.padding(start = 6.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
+            modifier = Modifier.padding(start = Spacing.sm, end = Spacing.lg, top = Spacing.sm, bottom = Spacing.sm),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
             Box(
                 modifier = Modifier

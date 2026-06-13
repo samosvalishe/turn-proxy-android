@@ -52,6 +52,7 @@ import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.viewmodel.SetupInstallState
 import com.freeturn.app.viewmodel.SetupSummary
 import com.freeturn.app.viewmodel.SetupTaskKind
+import com.freeturn.app.ui.theme.Spacing
 
 /**
  * Шаг 3 мастера: чек-лист установки → итог. Ошибка показывает карточку с текстом
@@ -76,7 +77,7 @@ fun SetupInstallStep(
     if (install.error != null) {
         InlineErrorCard(install.error)
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
             modifier = Modifier.fillMaxWidth()
         ) {
             Button(
@@ -109,11 +110,11 @@ private fun TaskChecklistCard(install: SetupInstallState) {
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
+            modifier = Modifier.padding(Spacing.xxl),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xl)
         ) {
             if (!failed) BusyProgressIndicator()
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
                 install.tasks.forEachIndexed { index, task ->
                     TaskRow(
                         label = stringResource(task.labelRes()),
@@ -203,9 +204,9 @@ private fun SetupDoneCard(summary: SetupSummary) {
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(24.dp),
+            modifier = Modifier.padding(Spacing.xxl),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg)
         ) {
             // Бейдж в форме Sunny — та же форма, что у иконок строк настроек.
             // Появляется expressive-пружиной (момент успеха).
@@ -249,7 +250,7 @@ private fun SetupDoneCard(summary: SetupSummary) {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
             Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 SummaryRow(
@@ -292,7 +293,7 @@ private fun SetupDoneHint(text: String) {
             text,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(12.dp)
+            modifier = Modifier.padding(Spacing.md)
         )
     }
 }
@@ -302,7 +303,7 @@ private fun SummaryRow(label: String, value: String, mono: Boolean = false) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
     ) {
         Text(
             label,

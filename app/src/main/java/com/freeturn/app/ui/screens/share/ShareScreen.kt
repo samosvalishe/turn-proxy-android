@@ -57,6 +57,7 @@ import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.viewmodel.ShareViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.koin.androidx.compose.koinViewModel
+import com.freeturn.app.ui.theme.Spacing
 
 private const val TAB_CONNECTION = 0
 private const val TAB_USERS = 1
@@ -158,7 +159,7 @@ fun ShareScreen(
                 SingleChoiceSegmentedButtonRow(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.md)
                 ) {
                     SegmentedButton(
                         selected = tab == TAB_CONNECTION,
@@ -194,7 +195,7 @@ fun ShareScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp, vertical = 16.dp)
+                            .padding(horizontal = Spacing.lg, vertical = Spacing.lg)
                     ) {
                         when (current) {
                             TAB_CONNECTION -> ShareConnectionTab(

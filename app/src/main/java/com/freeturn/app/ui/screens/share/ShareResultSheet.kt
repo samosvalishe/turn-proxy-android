@@ -53,6 +53,7 @@ import com.freeturn.app.ui.components.QrCode
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.util.copyToClipboard
 import com.freeturn.app.viewmodel.ShareResult
+import com.freeturn.app.ui.theme.Spacing
 
 /**
  * Длиннее QR не рисуем (нечитаемые мелкие модули) — остаются share sheet и
@@ -80,11 +81,11 @@ fun ShareResultSheet(result: ShareResult, shareInfo: ShareInfo?, onDismiss: () -
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = Spacing.xxl)
                 .navigationBarsPadding()
-                .padding(bottom = 16.dp),
+                .padding(bottom = Spacing.lg),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(Spacing.lg)
         ) {
             Text(
                 stringResource(R.string.share_result_title, result.userName),
@@ -109,7 +110,7 @@ fun ShareResultSheet(result: ShareResult, shareInfo: ShareInfo?, onDismiss: () -
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = Spacing.sm),
                 contentAlignment = Alignment.Center
             ) {
                 if (result.link.length <= QR_MAX_CHARS) {
@@ -140,7 +141,7 @@ fun ShareResultSheet(result: ShareResult, shareInfo: ShareInfo?, onDismiss: () -
             }
 
             // Только иконки: copy/share узнаваемы без подписей, подпись — в a11y.
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
                 FilledTonalIconButton(
                     onClick = {
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
@@ -180,12 +181,12 @@ fun ShareResultSheet(result: ShareResult, shareInfo: ShareInfo?, onDismiss: () -
 /** Протокол выданного доступа + признак обфускации — пилюлями над QR. */
 @Composable
 private fun ProtocolPill(wg: Boolean, obfOn: Boolean) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
             Row(
-                modifier = Modifier.padding(start = 12.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
+                modifier = Modifier.padding(start = Spacing.md, end = Spacing.lg, top = Spacing.sm, bottom = Spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
                 Icon(
                     painterResource(if (wg) R.drawable.vpn_key_24px else R.drawable.public_24px),
@@ -203,9 +204,9 @@ private fun ProtocolPill(wg: Boolean, obfOn: Boolean) {
         if (obfOn) {
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
                 Row(
-                    modifier = Modifier.padding(start = 10.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
+                    modifier = Modifier.padding(start = Spacing.md, end = Spacing.lg, top = Spacing.sm, bottom = Spacing.sm),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
                 ) {
                     Icon(
                         painterResource(R.drawable.check_circle_24px),

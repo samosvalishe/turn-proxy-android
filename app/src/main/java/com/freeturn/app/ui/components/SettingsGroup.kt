@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.ui.HapticUtil
 import com.freeturn.app.ui.util.hapticClickable
+import com.freeturn.app.ui.theme.Spacing
 
 // Общие строительные блоки экранов настроек (Settings-флоу и «Режим подключения»):
 // заголовок секции, карточка-группа, строка-вход, inset-разделитель. Один источник —
@@ -58,7 +59,7 @@ fun SectionLabel(text: String) {
         color = MaterialTheme.colorScheme.primary,
         // heading() — TalkBack прыгает между секциями.
         modifier = Modifier
-            .padding(start = 4.dp)
+            .padding(start = Spacing.xs)
             .semantics { heading() }
     )
 }
@@ -111,7 +112,7 @@ fun SettingsFieldSlot(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
+            .padding(Spacing.lg),
         verticalArrangement = Arrangement.spacedBy(verticalSpacing),
         content = content
     )
@@ -120,7 +121,7 @@ fun SettingsFieldSlot(
 /** Заголовок + пояснение над контролом (сегменты/слайдер): пара с плотным зазором. */
 @Composable
 fun SettingsControlLabel(title: String, desc: String? = null) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
         Text(title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
         if (desc != null) {
             Text(desc, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -132,7 +133,7 @@ fun SettingsControlLabel(title: String, desc: String? = null) {
 @Composable
 fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
     Column(
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xxs),
         modifier = Modifier.fillMaxWidth(),
         content = content
     )
@@ -186,9 +187,9 @@ fun SettingsSwitchRow(
                     onCheckedChange(v)
                 }
             )
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
     ) {
         if (iconRes != null) SettingsRowIcon(iconRes, enabled = enabled)
         Column(modifier = Modifier.weight(1f)) {
@@ -253,9 +254,9 @@ fun SettingsEntryRow(
         modifier = Modifier
             .fillMaxWidth()
             .hapticClickable(HapticUtil.Pattern.CLICK, enabled = enabled, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = Spacing.lg, vertical = Spacing.lg),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
     ) {
         SettingsRowIcon(iconRes, enabled = enabled)
         Column(modifier = Modifier.weight(1f)) {
