@@ -3,7 +3,7 @@
     androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class
 )
 
-package com.freeturn.app.ui.screens
+package com.freeturn.app.ui.screens.captcha
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap

@@ -42,7 +42,7 @@ import androidx.navigation.compose.rememberNavController
 import com.freeturn.app.R
 import com.freeturn.app.domain.ProxyState
 import com.freeturn.app.ui.HapticUtil
-import com.freeturn.app.ui.screens.CaptchaWebViewDialog
+import com.freeturn.app.ui.screens.captcha.CaptchaWebViewDialog
 import com.freeturn.app.ui.screens.share.ImportSheet
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.viewmodel.ProxyViewModel

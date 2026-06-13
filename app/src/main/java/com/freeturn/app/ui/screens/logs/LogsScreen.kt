@@ -1,6 +1,6 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 
-package com.freeturn.app.ui.screens
+package com.freeturn.app.ui.screens.logs
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box

@@ -4,7 +4,7 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
-import com.freeturn.app.ui.screens.LogsScreen
+import com.freeturn.app.ui.screens.logs.LogsScreen
 import com.freeturn.app.ui.screens.home.HomeScreen
 import com.freeturn.app.viewmodel.ProxyViewModel
 import com.freeturn.app.viewmodel.SettingsViewModel
