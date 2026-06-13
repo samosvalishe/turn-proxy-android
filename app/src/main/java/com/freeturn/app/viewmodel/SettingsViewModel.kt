@@ -5,10 +5,10 @@ import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.freeturn.app.data.AppPreferences
-import com.freeturn.app.data.ClientConfig
-import com.freeturn.app.data.ObfProfile
-import com.freeturn.app.data.Server
-import com.freeturn.app.data.ServersSnapshot
+import com.freeturn.app.data.config.ClientConfig
+import com.freeturn.app.data.config.ObfProfile
+import com.freeturn.app.data.server.Server
+import com.freeturn.app.data.server.ServersSnapshot
 import com.freeturn.app.domain.update.AppUpdater
 import com.freeturn.app.domain.proxy.LocalProxyManager
 import com.freeturn.app.domain.proxy.ProxyOrchestrator

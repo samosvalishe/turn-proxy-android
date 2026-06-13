@@ -1,9 +1,9 @@
 package com.freeturn.app.domain.proxy
 
 import android.content.Context
-import com.freeturn.app.data.ClientConfig
-import com.freeturn.app.data.SplitTunnelMode
-import com.freeturn.app.data.TunnelTransport
+import com.freeturn.app.data.config.ClientConfig
+import com.freeturn.app.data.config.SplitTunnelMode
+import com.freeturn.app.data.config.TunnelTransport
 import com.freeturn.app.proxy.ProxyServiceState
 import com.wireguard.android.backend.GoBackend
 import com.wireguard.android.backend.Tunnel

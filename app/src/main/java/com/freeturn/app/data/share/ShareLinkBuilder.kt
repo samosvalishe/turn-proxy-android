@@ -1,7 +1,7 @@
 package com.freeturn.app.data.share
 
-import com.freeturn.app.data.ObfProfile
-import com.freeturn.app.data.Server
+import com.freeturn.app.data.config.ObfProfile
+import com.freeturn.app.data.server.Server
 
 /**
  * Собирает freeturn://-ссылку для пользователя.

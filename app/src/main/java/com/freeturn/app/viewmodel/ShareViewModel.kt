@@ -4,9 +4,9 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.freeturn.app.data.AppPreferences
-import com.freeturn.app.data.ClientConfig
-import com.freeturn.app.data.ClientId
-import com.freeturn.app.data.Server
+import com.freeturn.app.data.config.ClientConfig
+import com.freeturn.app.data.config.ClientId
+import com.freeturn.app.data.server.Server
 import com.freeturn.app.data.share.ShareInfo
 import com.freeturn.app.data.share.ShareLinkBuilder
 import com.freeturn.app.data.share.SharedClient

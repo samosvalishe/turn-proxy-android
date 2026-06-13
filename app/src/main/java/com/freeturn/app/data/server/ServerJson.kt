@@ -1,37 +1,15 @@
-package com.freeturn.app.data
+package com.freeturn.app.data.server
 
+import com.freeturn.app.data.config.ClientConfig
+import com.freeturn.app.data.config.DnsMode
+import com.freeturn.app.data.config.ObfProfile
+import com.freeturn.app.data.config.Provider
+import com.freeturn.app.data.config.SplitTunnelMode
+import com.freeturn.app.data.config.SshConfig
+import com.freeturn.app.data.config.TunnelTransport
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
-
-
-/**
- * Именованный сервер: SSH-доступ + клиентские параметры + серверные опции.
- * Список сериализуется в DataStore (SERVERS_JSON).
- */
-data class Server(
-    val id: String = UUID.randomUUID().toString(),
-    val name: String,
-    val ssh: SshConfig = SshConfig(),
-    val client: ClientConfig = ClientConfig(),
-    val proxyListen: String = "0.0.0.0:56000",
-    val proxyConnect: String = "127.0.0.1:40537",
-    val opts: ServerOpts = ServerOpts()
-) {
-    companion object {
-        /** Имя-заглушка для записей без имени (data-слой, ресурсы недоступны). */
-        const val FALLBACK_NAME = "Без названия"
-    }
-}
-
-data class ServersSnapshot(
-    val list: List<Server> = emptyList(),
-    val activeId: String? = null,
-    /** false = initial-значение stateIn до первой эмиссии DataStore. */
-    val loaded: Boolean = false
-) {
-    val active: Server? get() = list.firstOrNull { it.id == activeId }
-}
 
 // Имена JSON-ключей - контракт с сохранёнными данными: менять только с миграцией.
 internal object ServerJson {
@@ -120,7 +98,7 @@ internal object ServerJson {
                 serverAddress = cliO.optString("serverAddress"),
                 vkLink = cliO.optString("vkLink"),
                 provider = cliO.optString("provider", Provider.VK).let {
-                    if (it in Provider.ALL) it else Provider.VK
+                    if (it in Provider.VALUES) it else Provider.VK
                 },
                 // Фоллбэки = дефолты ClientConfig (для новых полей).
                 threads = cliO.optInt("threads", 12),
@@ -136,14 +114,14 @@ internal object ServerJson {
                 debugMode = cliO.optBoolean("debugMode", false),
                 useCarrierDns = cliO.optBoolean("useCarrierDns", true),
                 dnsMode = cliO.optString("dnsMode", DnsMode.AUTO).let {
-                    if (it in DnsMode.ALL) it else DnsMode.AUTO
+                    if (it in DnsMode.VALUES) it else DnsMode.AUTO
                 },
                 customDns = cliO.optString("customDns"),
                 syncServerSwitches = cliO.optBoolean("syncServerSwitches", true),
                 magicSwitch = cliO.optBoolean("magicSwitch", false),
                 magicTurn = cliO.optString("magicTurn"),
                 tunnelTransport = cliO.optString("tunnelTransport", TunnelTransport.NONE).let {
-                    if (it in TunnelTransport.PERSISTED) it else TunnelTransport.NONE
+                    if (it in TunnelTransport.VALUES) it else TunnelTransport.NONE
                 },
                 wireGuardConfig = cliO.optString("wireGuardConfig"),
                 wireGuardTunnelName = cliO.optString("wireGuardTunnelName").ifBlank { TunnelTransport.DEFAULT_TUNNEL_NAME },
@@ -158,7 +136,7 @@ internal object ServerJson {
             proxyConnect = o.optString("proxyConnect").ifBlank { "127.0.0.1:40537" },
             opts = ServerOpts(
                 obfProfile = optsO.optString("obfProfile", ObfProfile.NONE).let {
-                    if (it in ObfProfile.ALL) it else ObfProfile.NONE
+                    if (it in ObfProfile.VALUES) it else ObfProfile.NONE
                 },
                 obfKey = optsO.optString("obfKey", "")
             )

@@ -2,7 +2,7 @@ package com.freeturn.app.data.share
 
 /**
  * Фактическое состояние сервера для построения share-ссылки (из `share-info`).
- * Используется вместо локального [com.freeturn.app.data.ServerOpts] для точности.
+ * Используется вместо локального [com.freeturn.app.data.server.ServerOpts] для точности.
  */
 data class ShareInfo(
     /** Режим бэкенда: "udp" | "tcp". Пусто = сервер не запускался из приложения. */

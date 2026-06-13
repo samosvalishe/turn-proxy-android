@@ -15,7 +15,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import com.freeturn.app.R
 import com.freeturn.app.data.DnsList
-import com.freeturn.app.data.DnsMode
+import com.freeturn.app.data.config.DnsMode
 import com.freeturn.app.ui.components.SectionLabel
 import com.freeturn.app.ui.components.SettingsCard
 import com.freeturn.app.ui.components.SettingsControlLabel

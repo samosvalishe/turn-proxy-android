@@ -24,7 +24,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import com.freeturn.app.R
-import com.freeturn.app.data.Server
+import com.freeturn.app.data.server.Server
 import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.ui.components.SettingsCard
 import com.freeturn.app.ui.components.SettingsRowIcon

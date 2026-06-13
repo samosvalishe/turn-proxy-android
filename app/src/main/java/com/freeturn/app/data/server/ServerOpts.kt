@@ -1,4 +1,6 @@
-package com.freeturn.app.data
+package com.freeturn.app.data.server
+
+import com.freeturn.app.data.config.ObfProfile
 
 /** Снимок серверных obf-опций. obfKey хранится в шифрованном хранилище AppPreferences. */
 data class ServerOpts(

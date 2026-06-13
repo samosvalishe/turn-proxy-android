@@ -1,8 +1,8 @@
 package com.freeturn.app.data.share
 
-import com.freeturn.app.data.ClientConfig
-import com.freeturn.app.data.Server
-import com.freeturn.app.data.ServerOpts
+import com.freeturn.app.data.config.ClientConfig
+import com.freeturn.app.data.server.Server
+import com.freeturn.app.data.server.ServerOpts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test

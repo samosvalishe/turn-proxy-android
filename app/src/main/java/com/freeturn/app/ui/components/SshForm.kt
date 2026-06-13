@@ -27,7 +27,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
-import com.freeturn.app.data.SshConfig
+import com.freeturn.app.data.config.SshConfig
 import com.freeturn.app.ui.util.HapticUtil
 
 /**

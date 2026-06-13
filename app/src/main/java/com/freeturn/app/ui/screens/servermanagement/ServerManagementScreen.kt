@@ -54,7 +54,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
-import com.freeturn.app.data.ObfProfile
+import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.domain.ServerState
 import com.freeturn.app.domain.SshConnectionState
 import com.freeturn.app.ui.util.HapticUtil

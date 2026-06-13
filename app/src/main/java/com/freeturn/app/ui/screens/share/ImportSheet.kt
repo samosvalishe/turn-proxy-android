@@ -32,7 +32,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
-import com.freeturn.app.data.ObfProfile
+import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.data.share.FreeturnLink
 import com.freeturn.app.ui.components.SettingsCard
 import com.freeturn.app.ui.components.SettingsFieldSlot

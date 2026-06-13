@@ -50,7 +50,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
-import com.freeturn.app.data.SshConfig
+import com.freeturn.app.data.config.SshConfig
 import com.freeturn.app.domain.SshConnectionState
 import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.ui.components.InlineErrorCard

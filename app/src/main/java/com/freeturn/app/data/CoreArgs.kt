@@ -1,10 +1,17 @@
 package com.freeturn.app.data
 
+import com.freeturn.app.data.config.ClientConfig
+import com.freeturn.app.data.config.DnsMode
+import com.freeturn.app.data.config.ObfProfile
+import com.freeturn.app.data.config.Provider
+import com.freeturn.app.data.server.ServerOpts
+
 /**
  * Единый источник истины для argv клиентского ядра.
  * Возвращает аргументы без имени бинарника. [carrierDns] и [ownClientId] резолвятся движком.
  */
-object CoreArgs {
+object
+CoreArgs {
 
     fun client(
         cfg: ClientConfig,

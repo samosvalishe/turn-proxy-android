@@ -27,7 +27,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
-import com.freeturn.app.data.Server
+import com.freeturn.app.data.server.Server
 import com.freeturn.app.ui.components.EmptyServersState
 import com.freeturn.app.ui.components.ServerRow
 import com.freeturn.app.ui.components.SettingsBackButton

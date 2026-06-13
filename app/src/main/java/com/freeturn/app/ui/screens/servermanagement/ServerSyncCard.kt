@@ -17,7 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.freeturn.app.R
-import com.freeturn.app.data.ObfProfile
+import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.ui.components.SectionLabel
 import com.freeturn.app.ui.components.SettingsCard
 import com.freeturn.app.ui.components.SettingsControlLabel
@@ -66,11 +66,11 @@ internal fun ServerSyncCard(
         SettingsFieldSlot {
             SettingsControlLabel(stringResource(R.string.obf_profile_title))
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                ObfProfile.ALL.forEachIndexed { idx, value ->
+                ObfProfile.VALUES.forEachIndexed { idx, value ->
                     SegmentedButton(
                         selected = obfProfile == value,
                         onClick = { onObfProfile(value) },
-                        shape = SegmentedButtonDefaults.itemShape(index = idx, count = ObfProfile.ALL.size)
+                        shape = SegmentedButtonDefaults.itemShape(index = idx, count = ObfProfile.VALUES.size)
                     ) { Text(obfProfileLabel(value)) }
                 }
             }

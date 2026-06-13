@@ -1,7 +1,7 @@
 package com.freeturn.app.domain.share
 
 import android.content.Context
-import com.freeturn.app.data.SshConfig
+import com.freeturn.app.data.config.SshConfig
 import com.freeturn.app.data.share.ShareInfo
 import com.freeturn.app.data.share.SharedClient
 import com.freeturn.app.data.share.SharedClientParser

@@ -4,9 +4,9 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.freeturn.app.data.AppPreferences
-import com.freeturn.app.data.ObfProfile
-import com.freeturn.app.data.ServerOpts
-import com.freeturn.app.data.SshConfig
+import com.freeturn.app.data.config.ObfProfile
+import com.freeturn.app.data.server.ServerOpts
+import com.freeturn.app.data.config.SshConfig
 import com.freeturn.app.domain.proxy.ProxyOrchestrator
 import com.freeturn.app.domain.ServerState
 import com.freeturn.app.domain.SshConnectionState

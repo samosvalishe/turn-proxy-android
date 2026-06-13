@@ -1,5 +1,3 @@
-﻿
-
 package com.freeturn.app.data
 
 import android.content.Context
@@ -7,13 +5,19 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
+import com.freeturn.app.data.config.ClientConfig
+import com.freeturn.app.data.config.ClientId
+import com.freeturn.app.data.config.SshConfig
+import com.freeturn.app.data.server.Server
+import com.freeturn.app.data.server.ServerJson
+import com.freeturn.app.data.server.ServerOpts
+import com.freeturn.app.data.server.ServersSnapshot
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.io.IOException
-import java.security.SecureRandom
 
 // Битый файл переживаем с дефолтами: чтение/запись на пути старта туннеля
 // (ownClientId, оркестратор) не должны ронять процесс.
@@ -21,138 +25,6 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(
     name = "app_prefs",
     corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() }
 )
-
-data class SshConfig(
-    val ip: String = "",
-    val port: Int = 22,
-    val username: String = "root",
-    val password: String = "",
-    val authType: String = AUTH_PASSWORD,
-    val sshKey: String = "",
-    val hostFingerprint: String = ""
-) {
-    companion object {
-        // Значения authType - контракт хранения (ServerJson).
-        const val AUTH_PASSWORD = "PASSWORD"
-        const val AUTH_SSH_KEY = "SSH_KEY"
-    }
-}
-
-object DnsMode {
-    const val AUTO = "auto"
-    const val PLAIN = "plain"
-    const val DOH = "doh"
-    val ALL = listOf(AUTO, PLAIN, DOH)
-}
-
-/** Источник TURN-creds (флаг -provider ядра). Client-only. */
-object Provider {
-    const val VK = "vk"
-    val ALL = listOf(VK)
-}
-
-/** Wire-профиль обфускации payload (флаг -obf-profile ядра). Должен совпадать с сервером. */
-object ObfProfile {
-    const val NONE = "none"
-    const val RTPOPUS = "rtpopus"
-    val ALL = listOf(NONE, RTPOPUS)
-
-    private val KEY_REGEX = Regex("^[0-9a-fA-F]{64}$")
-
-    /** Ключ -obf-key, который примет ядро (DecodeKey). Единая проверка для argv, UI и regen. */
-    fun isValidKey(key: String): Boolean = key.matches(KEY_REGEX)
-
-    /** Новый случайный obf-ключ (32 байта -> 64-hex). Ядру важен только формат. */
-    fun generateKey(): String =
-        ByteArray(32).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
-}
-
-/** Client ID (флаг -client-id ядра): авторизация по allowlist clients.json на сервере. */
-object ClientId {
-    private val ID_REGEX = Regex("^[0-9a-f]{32}$")
-
-    /** Формат, который генерирует и валидирует приложение (16 байт -> 32-hex, как автоген ядра). */
-    fun isValid(id: String): Boolean = id.matches(ID_REGEX)
-
-    fun generate(): String =
-        ByteArray(16).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
-}
-
-/** Транспорт VPN-туннеля (пока только WireGuard) поверх локального прокси. */
-object TunnelTransport {
-    const val NONE = "none"
-    const val WIREGUARD = "wireguard"
-    const val DEFAULT_TUNNEL_NAME = "freeturn-wg"
-    val PERSISTED = listOf(NONE, WIREGUARD)
-}
-
-/** Режим split-tunneling для WireGuard-интерфейса. */
-object SplitTunnelMode {
-    /** Весь трафик в туннель (только сам прокси исключён). */
-    const val ALL = "all"
-    /** Только перечисленные приложения идут в туннель (IncludedApplications). */
-    const val INCLUDE = "include"
-    /** Перечисленные приложения исключены из туннеля (ExcludedApplications). */
-    const val EXCLUDE = "exclude"
-    val VALUES = listOf(ALL, INCLUDE, EXCLUDE)
-}
-
-data class ClientConfig(
-    val serverAddress: String = "",
-    val vkLink: String = "",
-    /** Источник TURN-creds (-provider). Пока только "vk". */
-    val provider: String = Provider.VK,
-    val threads: Int = 12,
-    /** Соответствует флагу `-streams-per-cred` ядра. Дефолт ядра = 10, наш = 6. */
-    val streamsPerCred: Int = DEFAULT_STREAMS_PER_CRED,
-    /** TURN-транспорт UDP (-transport udp). false = TCP/TLS (дефолт ядра и наш). */
-    val useUdp: Boolean = false,
-    val manualCaptcha: Boolean = false,
-    val localPort: String = DEFAULT_LOCAL_PORT,
-    val isRawMode: Boolean = false,
-    val rawCommand: String = "",
-    /** Режим туннеля TCP-форвард (-mode tcp, Xray/sing-box). false = UDP-релей (WireGuard). */
-    val tcpForward: Boolean = false,
-    /** Bonding TCP по smux-сессиям (-bond). Только при tcpForward. Client-only в новом ядре. */
-    val bond: Boolean = false,
-
-    // Если true - добавляется флаг -debug для расширенного вывода в логах.
-    val debugMode: Boolean = false,
-    // Если true - в argv передаётся -dns-servers с DNS активной сети (оператор связи).
-    val useCarrierDns: Boolean = true,
-    // "auto" | "plain" | "doh" - соответствует флагу -dns-mode ядра.
-    val dnsMode: String = DnsMode.AUTO,
-    /** Ручной список DNS (-dns-servers), приоритет над [useCarrierDns]. */
-    val customDns: String = "",
-    /** true - изменения tcpForward/obfEnabled перезапускают удаленный сервер. */
-    val syncServerSwitches: Boolean = true,
-    val magicSwitch: Boolean = false,
-    /** Адрес для флага -turn ядра, если magicSwitch включён. Пусто = не передавать. */
-    val magicTurn: String = "",
-    /** Транспорт туннеля: NONE (proxy) либо WIREGUARD (VPN). По умолчанию - без туннеля. */
-    val tunnelTransport: String = TunnelTransport.NONE,
-    /** Конфиг WireGuard (.conf). Пусто = WG-туннель не поднимается. */
-    val wireGuardConfig: String = "",
-    /** Имя WG-туннеля для GoBackend. */
-    val wireGuardTunnelName: String = TunnelTransport.DEFAULT_TUNNEL_NAME,
-    /** Режим split-tunneling: all | include | exclude. */
-    val splitTunnelMode: String = SplitTunnelMode.ALL,
-    /** Список package-имён для include/exclude (разделители: запятая/пробел/перенос строки). */
-    val splitTunnelApps: String = "",
-    /** Сбор логов ядра в UI. false = ProxyServiceState.addLog глотает строки. */
-    val logsEnabled: Boolean = true,
-    /** -client-id для сервера (cid из share-ссылки). Пусто = общий ID устройства. */
-    val clientId: String = ""
-) {
-    /** WG реально активен только если выбран WG-транспорт и задан непустой конфиг. */
-    val wireGuardActive: Boolean
-        get() = tunnelTransport == TunnelTransport.WIREGUARD && wireGuardConfig.isNotBlank()
-
-    companion object {
-        const val DEFAULT_LOCAL_PORT = "127.0.0.1:9000"
-        const val DEFAULT_STREAMS_PER_CRED = 6
-    }
-}
 
 class AppPreferences(context: Context) {
     private val context = context.applicationContext

@@ -3,7 +3,7 @@
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import com.freeturn.app.data.ClientConfig
+import com.freeturn.app.data.config.ClientConfig
 import com.freeturn.app.domain.ConnectionStats
 import com.freeturn.app.domain.ProxyState
 import com.freeturn.app.domain.StartupResult

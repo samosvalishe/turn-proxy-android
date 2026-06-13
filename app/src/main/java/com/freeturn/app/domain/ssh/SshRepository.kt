@@ -1,7 +1,7 @@
 package com.freeturn.app.domain.ssh
 
 import android.content.Context
-import com.freeturn.app.data.SshConfig
+import com.freeturn.app.data.config.SshConfig
 import com.freeturn.app.domain.ServerState
 import com.freeturn.app.domain.SshConnectionState
 import com.freeturn.app.domain.server.CmdResult

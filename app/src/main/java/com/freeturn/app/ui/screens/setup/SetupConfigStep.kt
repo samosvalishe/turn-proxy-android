@@ -33,7 +33,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
-import com.freeturn.app.data.ObfProfile
+import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.ui.components.SectionLabel
 import com.freeturn.app.ui.components.SettingsCard
@@ -261,12 +261,12 @@ fun SetupConfigStep(
         }
     }
 
-    // --- Обфускация: сегмент по всем профилям (расширяется вместе с ObfProfile.ALL) ---
+    // --- Обфускация: сегмент по всем профилям (расширяется вместе с ObfProfile.VALUES) ---
     SectionLabel(stringResource(R.string.obf_profile_title))
     SettingsCard {
         SettingsFieldSlot {
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                ObfProfile.ALL.forEachIndexed { idx, value ->
+                ObfProfile.VALUES.forEachIndexed { idx, value ->
                     SegmentedButton(
                         selected = draft.obfProfile == value,
                         onClick = {
@@ -275,7 +275,7 @@ fun SetupConfigStep(
                                 onDraftChange(draft.copy(obfProfile = value))
                             }
                         },
-                        shape = SegmentedButtonDefaults.itemShape(index = idx, count = ObfProfile.ALL.size)
+                        shape = SegmentedButtonDefaults.itemShape(index = idx, count = ObfProfile.VALUES.size)
                     ) { Text(obfProfileLabel(value)) }
                 }
             }
