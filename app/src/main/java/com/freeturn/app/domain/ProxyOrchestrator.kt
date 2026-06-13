@@ -38,17 +38,4 @@ class ProxyOrchestrator(
         proxyManager.startProxy(prefs.clientConfigFlow.first())
     }
 
-    suspend fun startServerFromPrefs() {
-        val l = prefs.proxyListenFlow.first()
-        val c = prefs.proxyConnectFlow.first()
-        val tcpMode = prefs.clientConfigFlow.first().tcpForward
-        val opts = prefs.serverOptsFlow.first()
-        sshRepository.startServer(
-            listen = l, connect = c,
-            tcpMode = tcpMode,
-            obfProfile = if (opts.obfEnabled) opts.obfProfile else "none",
-            obfKey = if (opts.obfEnabled) opts.obfKey else "",
-            clientId = prefs.ownClientId()
-        )
-    }
 }

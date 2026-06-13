@@ -194,7 +194,6 @@
     <string name="local_listen_address">Локальный адрес прослушивания</string>
     <string name="local_listen_placeholder">127.0.0.1:9000</string>
     <string name="local_listen_support">Адрес, на котором клиент принимает трафик от WireGuard/XRay</string>
-    <string name="parameters_title">Параметры</string>
     <string name="client_section_performance">Производительность</string>
     <string name="client_section_dns">DNS</string>
     <string name="client_section_advanced">Дополнительно</string>
@@ -376,8 +375,6 @@
     <string name="nerd_launch_params">Параметры запуска</string>
     <string name="nerd_launch_server">Сервер</string>
     <string name="nerd_launch_client">Клиент</string>
-    <string name="common_yes">Да</string>
-    <string name="common_no">Нет</string>
     <string name="open_logs">Открыть логи</string>
 
     <!-- Настройки (новый раздел) -->

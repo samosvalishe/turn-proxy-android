@@ -89,7 +89,6 @@ internal fun ConnectionHero(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         HeroToggleButton(
-            state = state,
             kind = kind,
             reducedMotion = reducedMotion,
             onClick = onToggle
@@ -121,7 +120,6 @@ private fun ProxyState.heroKind(): HeroKind = when (this) {
 
 @Composable
 private fun HeroToggleButton(
-    state: ProxyState,
     kind: HeroKind,
     reducedMotion: Boolean,
     onClick: () -> Unit
