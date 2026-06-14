@@ -25,7 +25,7 @@ class AppUpdater(private val context: Context) {
     private val _state = MutableStateFlow<UpdateState>(UpdateState.Idle)
     val state: StateFlow<UpdateState> = _state.asStateFlow()
 
-    private var latestApkUrl: String? = null
+    @Volatile private var latestApkUrl: String? = null
 
     private val apkFile: File
         get() = File(context.cacheDir, "update.apk")
