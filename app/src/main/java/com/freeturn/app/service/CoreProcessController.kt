@@ -57,6 +57,8 @@ class CoreProcessController(
     private val userStopped = AtomicBoolean(false)
     private val sessionKillScheduled = AtomicBoolean(false)
     private val restartCount = AtomicInteger(0)
+    // Single-flight: двойной старт (tile+UI/watchdog) затёр бы первый процесс -> зомби.
+    private val startInFlight = AtomicBoolean(false)
 
     val isRunning: Boolean get() = process.get() != null
     val isUserStopped: Boolean get() = userStopped.get()
@@ -93,6 +95,16 @@ class CoreProcessController(
     }
 
     private suspend fun startBinaryProcess() {
+        if (userStopped.get()) return
+        if (!startInFlight.compareAndSet(false, true)) return
+        try {
+            runProcessSession()
+        } finally {
+            startInFlight.set(false)
+        }
+    }
+
+    private suspend fun runProcessSession() {
         if (userStopped.get()) return
 
         val cfg = prefs.clientConfigFlow.first()
@@ -151,7 +163,7 @@ class CoreProcessController(
         // Сброс на старте сессии (в том числе на watchdog-рестарте).
         publishStats()
         try {
-            ProxyServiceState.addLog("Команда: ${cmdArgs.joinToString(" ")}")
+            ProxyServiceState.addLog("Команда: ${CoreArgs.redactForLog(cmdArgs)}")
 
             val proc = withContext(Dispatchers.IO) {
                 val pb = ProcessBuilder(cmdArgs).redirectErrorStream(true)
@@ -163,6 +175,10 @@ class CoreProcessController(
                 pb.start()
             }
             process.set(proc)
+            // Stop в окне старта: destroyProcessAndTunnel видел ещё null - убиваем сами.
+            if (userStopped.get()) {
+                proc.destroyCompat()
+            }
 
             BufferedReader(InputStreamReader(proc.inputStream)).use { reader ->
                 var line: String?
