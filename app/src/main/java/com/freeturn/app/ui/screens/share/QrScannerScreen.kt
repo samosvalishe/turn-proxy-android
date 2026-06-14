@@ -56,7 +56,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.freeturn.app.R
 import com.freeturn.app.data.share.FreeturnLink
 import com.freeturn.app.domain.share.LinkImportBus
-import com.freeturn.app.ui.util.HapticUtil
+import com.freeturn.app.data.HapticUtil
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode

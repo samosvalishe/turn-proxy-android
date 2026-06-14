@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.data.config.ObfProfile
-import com.freeturn.app.ui.util.HapticUtil
+import com.freeturn.app.data.HapticUtil
 import com.freeturn.app.ui.components.SectionLabel
 import com.freeturn.app.ui.components.SettingsCard
 import com.freeturn.app.ui.components.SettingsEntryRow

@@ -19,7 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.freeturn.app.R
 import com.freeturn.app.data.config.SplitTunnelMode
-import com.freeturn.app.ui.util.HapticUtil
+import com.freeturn.app.data.HapticUtil
 
 /** Выбор режима split-tunnel: include / exclude. */
 @Composable

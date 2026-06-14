@@ -44,7 +44,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
 import com.freeturn.app.data.config.SplitTunnelMode
 import com.freeturn.app.ui.components.SettingsContentMaxWidth
-import com.freeturn.app.ui.util.HapticUtil
+import com.freeturn.app.data.HapticUtil
 import com.freeturn.app.ui.screens.splittunnel.SplitTunnelModal
 import com.freeturn.app.domain.ProxyState
 import com.freeturn.app.viewmodel.proxy.ProxyViewModel
@@ -216,10 +216,11 @@ fun HomeScreen(
 
     if (showSplitSheet.value) {
         SplitTunnelModal(
-            settingsViewModel = settingsViewModel,
             mode = clientConfig.splitTunnelMode,
             apps = clientConfig.splitTunnelApps,
             locked = proxyState !is ProxyState.Idle && proxyState !is ProxyState.Error,
+            onModeChange = settingsViewModel::setSplitTunnelMode,
+            onAppsChange = settingsViewModel::setSplitTunnelApps,
             onDismiss = { showSplitSheet.value = false },
             containerColor = sheetColor
         )

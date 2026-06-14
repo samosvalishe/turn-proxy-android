@@ -27,7 +27,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.ui.theme.Spacing
-import com.freeturn.app.ui.util.HapticUtil
+import com.freeturn.app.data.HapticUtil
 import com.freeturn.app.ui.util.hapticClickable
 
 /**

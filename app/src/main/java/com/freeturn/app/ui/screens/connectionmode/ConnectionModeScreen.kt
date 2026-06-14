@@ -51,7 +51,7 @@ import com.freeturn.app.R
 import com.freeturn.app.data.config.ClientConfig
 import com.freeturn.app.data.config.TunnelTransport
 import com.freeturn.app.domain.ProxyState
-import com.freeturn.app.ui.util.HapticUtil
+import com.freeturn.app.data.HapticUtil
 import com.freeturn.app.ui.components.SectionLabel
 import com.freeturn.app.ui.components.SettingsCard
 import com.freeturn.app.ui.components.SettingsContentMaxWidth
@@ -241,10 +241,11 @@ fun ConnectionModeScreen(
     // Split-tunnel (только для активного сервера).
     if (showSplitSheet && isActive) {
         SplitTunnelModal(
-            settingsViewModel = settingsViewModel,
             mode = saved.splitTunnelMode,
             apps = saved.splitTunnelApps,
             locked = proxyState !is ProxyState.Idle && proxyState !is ProxyState.Error,
+            onModeChange = settingsViewModel::setSplitTunnelMode,
+            onAppsChange = settingsViewModel::setSplitTunnelApps,
             onDismiss = { showSplitSheet = false },
             // Тот же фон листа, что на главном экране (HomeScreen.sheetColor).
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow

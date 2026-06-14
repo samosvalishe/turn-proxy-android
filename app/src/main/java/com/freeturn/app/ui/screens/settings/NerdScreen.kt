@@ -42,7 +42,7 @@ import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.data.server.Server
 import com.freeturn.app.domain.server.ServerCommand
 import com.freeturn.app.domain.server.ServerOptions
-import com.freeturn.app.ui.util.HapticUtil
+import com.freeturn.app.data.HapticUtil
 import com.freeturn.app.ui.components.SettingsBackButton
 import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.ui.components.SettingsGroup
@@ -69,9 +69,12 @@ fun NerdScreen(
     serverViewModel: ServerViewModel,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
     val snapshot by settingsViewModel.serversSnapshot.collectAsStateWithLifecycle()
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
     val coreStatus by serverViewModel.hubState.collectAsStateWithLifecycle()
+    val sshLog by serverViewModel.sshLog.collectAsStateWithLifecycle()
+    val logsLoading by serverViewModel.logsLoading.collectAsStateWithLifecycle()
     val server = snapshot.list.firstOrNull { it.id == serverId }
     val isActive = snapshot.activeId == serverId
 
@@ -116,8 +119,22 @@ fun NerdScreen(
                         server = server,
                         online = online,
                         privacyMode = privacyMode,
-                        settingsViewModel = settingsViewModel,
-                        serverViewModel = serverViewModel
+                        sshLog = sshLog,
+                        logsLoading = logsLoading,
+                        onDebugModeChange = { v ->
+                            settingsViewModel.updateServerClient(serverId) { it.copy(debugMode = v) }
+                        },
+                        onLogsEnabledChange = { v ->
+                            settingsViewModel.updateServerClient(serverId) { it.copy(logsEnabled = v) }
+                        },
+                        onFetchJournal = {
+                            HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                            serverViewModel.fetchServerLogs()
+                        },
+                        onClearLog = {
+                            HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                            serverViewModel.clearSshLog()
+                        }
                     )
                 }
             }
@@ -130,14 +147,14 @@ private fun NerdContent(
     server: Server,
     online: ServerHubState.Online?,
     privacyMode: Boolean,
-    settingsViewModel: SettingsViewModel,
-    serverViewModel: ServerViewModel
+    sshLog: List<String>,
+    logsLoading: Boolean,
+    onDebugModeChange: (Boolean) -> Unit,
+    onLogsEnabledChange: (Boolean) -> Unit,
+    onFetchJournal: () -> Unit,
+    onClearLog: () -> Unit
 ) {
-    val context = LocalContext.current
-    val serverId = server.id
     val client = server.client
-    val sshLog by serverViewModel.sshLog.collectAsStateWithLifecycle()
-    val logsLoading by serverViewModel.logsLoading.collectAsStateWithLifecycle()
 
     // Per-server отладочные флаги. updateServerClient разводит active/inactive и
     // применяет logsEnabled живьём - отдельные VM-сеттеры не нужны.
@@ -147,9 +164,7 @@ private fun NerdContent(
                 title = stringResource(R.string.debug_mode),
                 subtitle = stringResource(R.string.debug_mode_desc),
                 checked = client.debugMode,
-                onCheckedChange = { v ->
-                    settingsViewModel.updateServerClient(serverId) { it.copy(debugMode = v) }
-                }
+                onCheckedChange = onDebugModeChange
             )
         }
         SettingsGroupItem(1, 2) {
@@ -157,9 +172,7 @@ private fun NerdContent(
                 title = stringResource(R.string.logs_enabled),
                 subtitle = stringResource(R.string.logs_enabled_desc),
                 checked = client.logsEnabled,
-                onCheckedChange = { v ->
-                    settingsViewModel.updateServerClient(serverId) { it.copy(logsEnabled = v) }
-                }
+                onCheckedChange = onLogsEnabledChange
             )
         }
     }
@@ -178,14 +191,8 @@ private fun NerdContent(
             lines = sshLog,
             canFetchJournal = online != null,
             logsLoading = logsLoading,
-            onFetchJournal = {
-                HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                serverViewModel.fetchServerLogs()
-            },
-            onClear = {
-                HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                serverViewModel.clearSshLog()
-            }
+            onFetchJournal = onFetchJournal,
+            onClear = onClearLog
         )
     }
 }

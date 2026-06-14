@@ -57,7 +57,7 @@ import com.freeturn.app.R
 import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.domain.ServerState
 import com.freeturn.app.domain.SshConnectionState
-import com.freeturn.app.ui.util.HapticUtil
+import com.freeturn.app.data.HapticUtil
 import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.ui.theme.Spacing
 import com.freeturn.app.ui.util.copyToClipboard

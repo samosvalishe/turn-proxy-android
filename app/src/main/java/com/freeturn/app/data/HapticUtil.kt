@@ -1,4 +1,4 @@
-package com.freeturn.app.ui.util
+package com.freeturn.app.data
 
 import android.content.Context
 import android.os.Build

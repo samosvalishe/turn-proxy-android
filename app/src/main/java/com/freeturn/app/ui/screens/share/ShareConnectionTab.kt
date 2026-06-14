@@ -26,7 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
-import com.freeturn.app.ui.util.HapticUtil
+import com.freeturn.app.data.HapticUtil
 import com.freeturn.app.ui.components.SectionLabel
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.components.SettingsCard

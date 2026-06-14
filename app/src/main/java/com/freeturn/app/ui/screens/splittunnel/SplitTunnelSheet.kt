@@ -38,12 +38,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.data.config.SplitTunnelMode
-import com.freeturn.app.ui.util.HapticUtil
+import com.freeturn.app.data.HapticUtil
 import com.freeturn.app.data.AppChoice
 import com.freeturn.app.data.installedInternetApps
 import com.freeturn.app.data.toPackageSet
 import com.freeturn.app.ui.theme.Spacing
-import com.freeturn.app.viewmodel.settings.SettingsViewModel
 
 /**
  * Общий модальный лист split-tunneling. Один источник для главного экрана и экрана
@@ -53,10 +52,11 @@ import com.freeturn.app.viewmodel.settings.SettingsViewModel
  */
 @Composable
 fun SplitTunnelModal(
-    settingsViewModel: SettingsViewModel,
     mode: String,
     apps: String,
     locked: Boolean,
+    onModeChange: (String) -> Unit,
+    onAppsChange: (String) -> Unit,
     onDismiss: () -> Unit,
     containerColor: Color = BottomSheetDefaults.ContainerColor
 ) {
@@ -71,10 +71,11 @@ fun SplitTunnelModal(
         contentWindowInsets = { WindowInsets(0, 0, 0, 0) }
     ) {
         SplitTunnelSheetContent(
-            settingsViewModel = settingsViewModel,
             mode = mode,
             apps = apps,
-            locked = locked
+            locked = locked,
+            onModeChange = onModeChange,
+            onAppsChange = onAppsChange
         )
     }
 }
@@ -89,10 +90,11 @@ fun SplitTunnelModal(
  */
 @Composable
 fun SplitTunnelSheetContent(
-    settingsViewModel: SettingsViewModel,
     mode: String,
     apps: String,
-    locked: Boolean
+    locked: Boolean,
+    onModeChange: (String) -> Unit,
+    onAppsChange: (String) -> Unit
 ) {
     val context = LocalContext.current
     val enabled = mode != SplitTunnelMode.ALL
@@ -134,9 +136,7 @@ fun SplitTunnelSheetContent(
                 enabled = !locked,
                 onCheckedChange = { on ->
                     HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
-                    settingsViewModel.setSplitTunnelMode(
-                        if (on) modeChoice else SplitTunnelMode.ALL
-                    )
+                    onModeChange(if (on) modeChoice else SplitTunnelMode.ALL)
                 }
             )
         }
@@ -158,7 +158,7 @@ fun SplitTunnelSheetContent(
                     .padding(horizontal = HorizontalPadding),
                 onSelect = { value ->
                     modeChoice = value
-                    settingsViewModel.setSplitTunnelMode(value)
+                    onModeChange(value)
                 }
             )
 
@@ -187,7 +187,7 @@ fun SplitTunnelSheetContent(
                 onToggle = { pkg ->
                     HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
                     val next = if (pkg in selected) selected - pkg else selected + pkg
-                    settingsViewModel.setSplitTunnelApps(next.sorted().joinToString("\n"))
+                    onAppsChange(next.sorted().joinToString("\n"))
                 }
             )
         }
