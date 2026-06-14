@@ -10,12 +10,6 @@
 ![Material 3](https://img.shields.io/badge/Material-3-757575?logo=materialdesign&logoColor=white)
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue)
 [![Telegram](https://img.shields.io/badge/Telegram-канал-26A5E4?logo=telegram&logoColor=white)](https://t.me/+5BdkU4q_CGQyNTdi)
-
-<p float="left">
-  <img src="docs/screenshots/1.jpg" width="230" />
-  <img src="docs/screenshots/2.jpg" width="230" />
-</p>
-
 </div>
 
 > **Disclaimer.** Проект предназначен **исключительно для образовательных и исследовательских целей.**
