@@ -68,7 +68,7 @@
         </activity>
 
         <service
-            android:name=".proxy.ProxyService"
+            android:name=".service.ProxyService"
             android:exported="false"
             android:foregroundServiceType="specialUse"
             tools:targetApi="29">
@@ -97,11 +97,11 @@
         </provider>
 
         <receiver
-            android:name=".proxy.ProxyReceiver"
+            android:name=".service.ProxyReceiver"
             android:exported="false" />
 
         <service
-            android:name=".proxy.ProxyTileService"
+            android:name=".service.ProxyTileService"
             android:exported="true"
             android:icon="@drawable/ic_qs_tile_nearby"
             android:label="@string/tile_service_label"

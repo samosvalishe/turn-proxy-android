@@ -1,4 +1,5 @@
-package com.freeturn.app.proxy
+package com.freeturn.app.service
+import com.freeturn.app.domain.proxy.ProxyServiceState
 
 import android.app.Notification
 import android.app.NotificationChannel

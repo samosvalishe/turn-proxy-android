@@ -1,4 +1,4 @@
-﻿package com.freeturn.app.proxy
+﻿package com.freeturn.app.service
 
 import android.content.Context
 import android.os.Handler
@@ -13,6 +13,8 @@ import com.freeturn.app.domain.proxy.CoreConnectionTracker
 import com.freeturn.app.domain.proxy.CoreLogEvent
 import com.freeturn.app.domain.proxy.CoreLogParser
 import com.freeturn.app.domain.StartupResult
+import com.freeturn.app.domain.proxy.MAX_PROXY_RESTARTS
+import com.freeturn.app.domain.proxy.ProxyServiceState
 import com.freeturn.app.domain.proxy.WireGuardTunnelManager
 import java.io.BufferedReader
 import java.io.File
@@ -44,7 +46,6 @@ class CoreProcessController(
     private val onStopRequested: () -> Unit,
 ) {
     companion object {
-        const val MAX_RESTARTS = 8
         // Даём TURN-туннелю "устаканиться" перед поднятием WireGuard поверх него.
         private const val WIREGUARD_START_DELAY_MS = 2_000L
     }
@@ -331,8 +332,8 @@ class CoreProcessController(
 
     private fun scheduleWatchdogRestart() {
         val count = restartCount.incrementAndGet()
-        if (count > MAX_RESTARTS) {
-            ProxyServiceState.addLog("Watchdog: превышен лимит попыток ($MAX_RESTARTS), остановка")
+        if (count > MAX_PROXY_RESTARTS) {
+            ProxyServiceState.addLog("Watchdog: превышен лимит попыток ($MAX_PROXY_RESTARTS), остановка")
             ProxyServiceState.setRunning(false)
             ProxyServiceState.emitFailed()
             onStopRequested()
@@ -341,8 +342,8 @@ class CoreProcessController(
         val baseDelay = minOf(1_000L * count, 30_000L)
         val jitter = Random.nextLong(0, 500)
         val delayMs = baseDelay + jitter
-        ProxyServiceState.addLog("Watchdog: перезапуск через ${delayMs} мс (попытка $count/$MAX_RESTARTS)")
-        notifier.setStatus(context.getString(R.string.notif_proxy_reconnecting, count, MAX_RESTARTS))
+        ProxyServiceState.addLog("Watchdog: перезапуск через ${delayMs} мс (попытка $count/$MAX_PROXY_RESTARTS)")
+        notifier.setStatus(context.getString(R.string.notif_proxy_reconnecting, count, MAX_PROXY_RESTARTS))
         handler.postDelayed({
             if (!userStopped.get()) scope.launch { startBinaryProcess() }
         }, delayMs)

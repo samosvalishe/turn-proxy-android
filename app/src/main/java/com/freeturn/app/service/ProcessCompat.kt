@@ -1,4 +1,4 @@
-package com.freeturn.app.proxy
+package com.freeturn.app.service
 
 import android.os.Build
 import java.util.concurrent.TimeUnit

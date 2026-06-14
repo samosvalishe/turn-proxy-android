@@ -1,15 +1,9 @@
 ﻿package com.freeturn.app.domain.proxy
 
-import android.content.Context
-import android.content.Intent
-import android.os.Build
 import com.freeturn.app.data.config.ClientConfig
 import com.freeturn.app.domain.ConnectionStats
 import com.freeturn.app.domain.ProxyState
 import com.freeturn.app.domain.StartupResult
-import com.freeturn.app.proxy.CoreProcessController
-import com.freeturn.app.proxy.ProxyService
-import com.freeturn.app.proxy.ProxyServiceState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,7 +19,7 @@ import kotlinx.coroutines.launch
 /**
  * Управляет жизненным циклом прокси-сервиса (Koin `single`, Application scope).
  */
-class LocalProxyManager(private val context: Context) {
+class LocalProxyManager(private val launcher: ProxyServiceLauncher) {
 
     private val _proxyState = MutableStateFlow<ProxyState>(ProxyState.Idle)
     val proxyState: StateFlow<ProxyState> = _proxyState.asStateFlow()
@@ -43,7 +37,7 @@ class LocalProxyManager(private val context: Context) {
 
     private suspend fun observeProxyLifecycle() {
         ProxyServiceState.proxyFailed.collect {
-            setErrorWithAutoReset("Прокси упал ${CoreProcessController.MAX_RESTARTS} раз - проверьте настройки")
+            setErrorWithAutoReset("Прокси упал $MAX_PROXY_RESTARTS раз - проверьте настройки")
         }
     }
 
@@ -133,12 +127,7 @@ class LocalProxyManager(private val context: Context) {
         ProxyServiceState.setStartupResult(null)
         ProxyServiceState.setConnectionStats(ConnectionStats.IDLE)
         ProxyServiceState.clearConnectedSince()
-        val intent = Intent(context, ProxyService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent)
-        } else {
-            context.startService(intent)
-        }
+        launcher.start()
 
         // Ждём StartupResult или остановки сервиса.
         // Верхняя граница в 5 минут - страховка от зависания.
@@ -176,7 +165,7 @@ class LocalProxyManager(private val context: Context) {
     }
 
     fun stopProxy() {
-        context.stopService(Intent(context, ProxyService::class.java))
+        launcher.stop()
         _proxyState.value = ProxyState.Idle
     }
 

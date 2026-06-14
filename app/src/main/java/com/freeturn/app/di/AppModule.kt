@@ -5,23 +5,26 @@ import com.freeturn.app.domain.update.AppUpdater
 import com.freeturn.app.domain.share.LinkImportBus
 import com.freeturn.app.domain.proxy.LocalProxyManager
 import com.freeturn.app.domain.proxy.ProxyOrchestrator
+import com.freeturn.app.domain.proxy.ProxyServiceLauncher
+import com.freeturn.app.service.AndroidProxyServiceLauncher
 import com.freeturn.app.domain.ssh.SSHManager
 import com.freeturn.app.domain.server.ServerSetupRepository
 import com.freeturn.app.domain.share.ShareRepository
 import com.freeturn.app.domain.ssh.SshRepository
-import com.freeturn.app.viewmodel.ImportViewModel
-import com.freeturn.app.viewmodel.ProxyViewModel
-import com.freeturn.app.viewmodel.ServerSetupViewModel
-import com.freeturn.app.viewmodel.ServerViewModel
-import com.freeturn.app.viewmodel.SettingsViewModel
-import com.freeturn.app.viewmodel.ShareViewModel
+import com.freeturn.app.viewmodel.share.ImportViewModel
+import com.freeturn.app.viewmodel.proxy.ProxyViewModel
+import com.freeturn.app.viewmodel.server.ServerSetupViewModel
+import com.freeturn.app.viewmodel.server.ServerViewModel
+import com.freeturn.app.viewmodel.settings.SettingsViewModel
+import com.freeturn.app.viewmodel.share.ShareViewModel
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 
 val appModule = module {
     single { AppPreferences(androidContext()) }
-    single { LocalProxyManager(androidContext()) }
+    single<ProxyServiceLauncher> { AndroidProxyServiceLauncher(androidContext()) }
+    single { LocalProxyManager(get()) }
     // factory: каждому потребителю свой SSHManager - lastSeenFingerprint (TOFU) не должен
     // делиться между живой сессией и мастером/шарингом.
     factory { SSHManager() }

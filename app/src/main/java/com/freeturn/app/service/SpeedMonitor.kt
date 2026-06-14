@@ -1,4 +1,4 @@
-package com.freeturn.app.proxy
+package com.freeturn.app.service
 
 import android.net.TrafficStats
 import android.os.Process

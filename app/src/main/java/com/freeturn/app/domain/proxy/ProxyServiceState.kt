@@ -1,4 +1,4 @@
-package com.freeturn.app.proxy
+package com.freeturn.app.domain.proxy
 
 import com.freeturn.app.domain.CaptchaSession
 import com.freeturn.app.domain.ConnectionStats

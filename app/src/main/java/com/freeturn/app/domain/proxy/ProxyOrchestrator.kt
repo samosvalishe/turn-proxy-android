@@ -3,7 +3,6 @@ package com.freeturn.app.domain.proxy
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.domain.ServerState
 import com.freeturn.app.domain.ssh.SshRepository
-import com.freeturn.app.proxy.ProxyServiceState
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 

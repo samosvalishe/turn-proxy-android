@@ -1,4 +1,4 @@
-package com.freeturn.app.proxy
+package com.freeturn.app.service
 
 /** Action-строки управления [ProxyService] через [ProxyReceiver] (тайл/нотификация). */
 object ProxyActions {
