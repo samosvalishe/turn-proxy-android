@@ -44,14 +44,14 @@
     <string name="share_peer_actions">Действия</string>
     <string name="share_peer_reshare">Показать ссылку</string>
     <string name="share_peer_revoke">Отозвать доступ</string>
-    <string name="share_result_title">Доступ для «%1$s»</string>
+    <string name="share_result_title">Доступ для \"%1$s\"</string>
     <string name="share_result_desc">Передавайте ссылку или QR-код только доверенным лицам. При изменении ключа обфускации потребуется выпустить новую ссылку.</string>
     <string name="share_result_copy">Копировать</string>
     <string name="share_result_share">Поделиться</string>
     <string name="share_revoke_title">Отозвать доступ?</string>
-    <string name="share_revoke_desc">Пользователь «%1$s» будет удалён с сервера, его подключение перестанет работать. Действие необратимо.</string>
+    <string name="share_revoke_desc">Пользователь \"%1$s\" будет удалён с сервера, его подключение перестанет работать. Действие необратимо.</string>
     <string name="share_revoke_confirm">Отозвать</string>
-    <string name="share_no_address">У сервера не указан адрес — добавьте его в настройках сервера</string>
+    <string name="share_no_address">У сервера не указан адрес - добавьте его в настройках сервера</string>
     <string name="error_ssh_generic">Ошибка SSH</string>
 
     <!-- Импорт по ссылке (ImportSheet) -->
@@ -83,17 +83,17 @@
     <string name="add_server_title">Соединение</string>
     <string name="add_paste_hint">Вставьте ссылку</string>
     <string name="add_paste_button">Вставить</string>
-    <string name="add_paste_not_link">Буфер обмена не содержит ссылку формата freeturn://</string>
+    <string name="add_paste_not_link">В буфере обмена нет ссылки freeturn://</string>
     <string name="add_methods_section">Другие способы подключения</string>
     <string name="add_self_hosted_title">Свой сервер</string>
     <string name="add_self_hosted_desc">Самостоятельная настройка подключения к серверу</string>
     <string name="add_manual_title">Ручная настройка</string>
-    <string name="add_manual_desc">Добавление сервера с ручным вводом параметров</string>
+    <string name="add_manual_desc">Ввести параметры вручную</string>
     <string name="add_manual_create">Создать</string>
     <string name="add_from_file_title">Файл с настройками</string>
-    <string name="add_from_file_desc">Импорт конфигурации из файла</string>
+    <string name="add_from_file_desc">Загрузить конфигурацию из файла</string>
     <string name="add_from_qr_title">QR-код</string>
-    <string name="add_from_qr_desc">Сканирование кода с другого устройства</string>
+    <string name="add_from_qr_desc">Отсканировать код с экрана</string>
     <string name="add_soon_badge">Скоро</string>
     <string name="add_default_server_name">Новый сервер</string>
 
@@ -106,7 +106,7 @@
     <string name="setup_install_btn">Установить</string>
     <string name="setup_go_home">На главную</string>
     <string name="setup_checking_ssh">Проверка подключения…</string>
-    <string name="setup_checking_ssh_desc">Подключаемся по SSH и проверяем окружение сервера</string>
+    <string name="setup_checking_ssh_desc">Проверка окружения сервера</string>
     <string name="setup_mode_section">Режим работы</string>
     <string name="setup_mode_vpn_desc">Поднимем WireGuard на сервере - весь трафик устройства пойдёт через туннель.</string>
     <string name="setup_mode_proxy_desc">Прокси перенаправляет трафик на ваш бэкенд на сервере: Xray или WireGuard.</string>
@@ -117,7 +117,7 @@
     <string name="setup_wg_port_label">Порт WireGuard</string>
     <string name="setup_wg_source_auto">Автоматически</string>
     <string name="setup_wg_source_custom">Свой конфиг</string>
-    <string name="setup_wg_custom_desc">WireGuard на сервере не настраиваем ставьте клиентский .conf вашего туннеля и укажите его порт на сервере.</string>
+    <string name="setup_wg_custom_desc">WireGuard на сервере не настраивается - укажите порт и вставьте свой клиентский .conf.</string>
     <string name="setup_wg_conf_label">Клиентский конфиг (.conf)</string>
     <string name="setup_wg_conf_placeholder">[Interface]\n…</string>
     <string name="setup_port_roll">Сгенерировать порт</string>
@@ -138,20 +138,20 @@
     <string name="setup_done_hero">Сервер настроен и запущен</string>
     <string name="setup_done_active_hint">Сервер добавлен и сделан активным - запускайте с главного экрана.</string>
     <string name="setup_done_wg_imported">WireGuard-конфиг получен с сервера и подключён.</string>
-    <string name="setup_done_wg_manual">Используется существующий WireGuard - импортируйте свой клиентский .conf в «Режиме подключения».</string>
+    <string name="setup_done_wg_manual">Используется существующий WireGuard - импортируйте свой клиентский .conf в \"Режиме подключения\".</string>
     <string name="setup_summary_address">Адрес</string>
     <string name="setup_summary_mode">Режим</string>
     <string name="setup_summary_obf">Обфускация</string>
     <string name="setup_obf_off">Выключена</string>
     <string name="setup_abort_title">Прервать установку?</string>
-    <string name="setup_abort_text">Установка остановится, вы вернётесь к настройкам. Повторный запуск безопасен - выполненные шаги не сломаются.</string>
+    <string name="setup_abort_text">Установка прервётся. Выполненные шаги сохранятся, повторный запуск безопасен.</string>
     <string name="setup_abort_confirm">Прервать</string>
     <string name="setup_abort_stay">Остаться</string>
     <string name="setup_field_required">Обязательное поле</string>
     <string name="setup_port_invalid">Порт от 1 до 65535</string>
     <string name="setup_ports_clash">Совпадает с портом бэкенда</string>
     <string name="setup_duplicate_host">Сервер с этим адресом уже есть в списке - добавится ещё одна запись.</string>
-    <string name="setup_name_hint">Пусто - назовём «Новый сервер». Переименовать можно в настройках.</string>
+    <string name="setup_name_hint">Если не заполнять, назовем \"Новый сервер\".</string>
     <string name="setup_summary_name">Название</string>
     <string name="setup_task_state_done">Выполнено</string>
     <string name="setup_task_state_active">Выполняется</string>
@@ -182,7 +182,7 @@
     <string name="server_address_support">IP и порт turn-proxy на вашем VPS</string>
     <string name="call_link_label">Ссылка на звонок</string>
     <string name="call_link_placeholder">https://site.ru/call/…</string>
-    <string name="call_link_support">Звонки → Создать → Скопировать ссылку (не нажимайте «Завершить»)</string>
+    <string name="call_link_support">Звонки → Создать → Скопировать ссылку (не нажимайте \"Завершить\")</string>
     <string name="local_listen_address">Локальный адрес прослушивания</string>
     <string name="local_listen_placeholder">127.0.0.1:9000</string>
     <string name="local_listen_support">Адрес, на котором клиент принимает трафик от WireGuard/XRay</string>
@@ -205,7 +205,7 @@
     <string name="obf_key_invalid_hint">Неверный формат - нужны 64 hex-символа</string>
     <string name="server_sync_section">Синхронные настройки сервера</string>
     <string name="sync_server_switches">Синхронизировать с сервером</string>
-    <string name="sync_off_banner">Sync с сервером выключен. Следите за совпадением вручную.</string>
+    <string name="sync_off_banner">Синхронизация с сервером отключена. Проверяйте настройки вручную.</string>
     <string name="transport_protocol">Транспорт</string>
     <string name="transport_protocol_desc">UDP снижает задержки, TCP - стабильнее</string>
     <string name="manual_captcha">Ручной ввод капчи</string>
@@ -219,8 +219,8 @@
     <string name="dns_mode_udp">UDP/53</string>
     <string name="dns_mode_doh">DoH</string>
     <string name="dns_custom_label">DNS-серверы (вручную)</string>
-    <string name="dns_custom_hint">Через запятую/пробел. Приоритет над DNS оператора. Пусто — не задавать.</string>
-    <string name="dns_custom_invalid">Часть значений не похожа на DNS-адреса — они будут пропущены</string>
+    <string name="dns_custom_hint">Через запятую/пробел. Приоритет над DNS оператора. Пусто - не задавать.</string>
+    <string name="dns_custom_invalid">Некорректные DNS-адреса будут пропущены.</string>
 
     <string name="obf_select_profile_hint">Выберите профиль rtpopus, чтобы задать ключ обфускации.</string>
 
@@ -237,8 +237,8 @@
     <string name="listen_port_desc">Порт, на котором сервер принимает подключения от клиентов</string>
     <string name="listen_ip">IP прослушивания</string>
     <string name="listen_ip_placeholder">0.0.0.0</string>
-    <string name="listen_ip_desc">IP-адрес, к которому биндится сервер. 0.0.0.0 - все интерфейсы. Укажите конкретный WAN IP, если на хосте несколько адресов.</string>
-    <string name="turn_client_address">Адрес TURN‑клиента</string>
+    <string name="listen_ip_desc">IP-адрес, который прослушивает сервер. 0.0.0.0 - все интерфейсы. Укажите конкретный WAN IP, если на хосте несколько адресов.</string>
+    <string name="turn_client_address">Адрес TURN-клиента</string>
     <string name="turn_client_placeholder">127.0.0.1:40537</string>
     <string name="turn_client_desc">Локальный WireGuard/Xray-клиент на стороне сервера</string>
     <string name="server_install">Установить</string>
@@ -320,7 +320,7 @@
     <!-- Telegram -->
     <string name="tg_channel">Telegram-канал</string>
     <string name="tg_subscribe_title">Следите за обновлениями</string>
-    <string name="tg_subscribe_desc">Подпишитесь на Telegram-канал, чтобы узнавать о новых версиях и изменениях первыми.</string>
+    <string name="tg_subscribe_desc">Подпишитесь на Telegram-канал, чтобы первыми узнавать о новых версиях.</string>
     <string name="tg_subscribe_btn">Подписаться</string>
     <string name="tg_not_now">Не сейчас</string>
 
@@ -345,7 +345,7 @@
     <string name="split_tunnel_search">Поиск приложений</string>
     <string name="split_tunnel_empty">Приложения не найдены</string>
     <string name="split_tunnel_off_hint">Включите, чтобы выбрать приложения</string>
-    <string name="split_tunnel_locked">Остановите VPN, чтобы изменить раздельное туннелирование</string>
+    <string name="split_tunnel_locked">Остановите подключение, чтобы изменить раздельное туннелирование</string>
     <string name="split_tunnel_status_off">Раздельное туннелирование выключено</string>
     <string name="split_tunnel_status_on">Раздельное туннелирование включено</string>
 
@@ -382,7 +382,7 @@
     <string name="settings_empty_servers">Нет добавленных серверов</string>
     <string name="provider_vk_calls">VK Звонки</string>
     <string name="server_delete_confirm_title">Удалить сервер?</string>
-    <string name="server_delete_confirm_desc">Сервер «%1$s» и все его настройки будут удалены из приложения.</string>
+    <string name="server_delete_confirm_desc">Сервер \"%1$s\" и все его настройки будут удалены из приложения.</string>
     <string name="provider_connection_settings">Настройки подключения</string>
     <string name="provider_connection_settings_desc">Параметры клиента: адрес, потоки, DNS</string>
     <string name="provider_server_settings">Настройки сервера</string>
@@ -412,7 +412,7 @@
     <string name="save">Сохранить</string>
     <string name="connection_mode_title">Режим подключения</string>
     <string name="provider_connection_mode_desc">Proxy или VPN (WireGuard), импорт конфига</string>
-    <string name="mode_proxy">Proxy</string>
+    <string name="mode_proxy">Прокси</string>
     <string name="mode_vpn">VPN</string>
     <string name="mode_proxy_desc">Трафик идёт через локальный прокси, без туннеля.</string>
     <string name="mode_vpn_desc">Весь трафик устройства туннелируется через WireGuard.</string>
@@ -433,9 +433,9 @@
     <string name="app_section_backup">Резервная копия</string>
     <string name="backup_export_title">Экспорт настроек</string>
     <string name="backup_export_desc">Профили и настройки в зашифрованный файл</string>
-    <string name="backup_export_action">Экспорт</string>
+    <string name="backup_export_action">Экспортировать</string>
     <string name="backup_import_title">Импорт настроек</string>
-    <string name="backup_import_action">Импорт</string>
+    <string name="backup_import_action">Импортировать</string>
     <string name="backup_password_label">Пароль</string>
     <string name="backup_password_confirm_label">Повторите пароль</string>
     <string name="backup_password_hint">Понадобится при импорте на другом устройстве. Восстановить нельзя.</string>
@@ -446,7 +446,7 @@
     <string name="backup_import_ok">Импортировано серверов: %1$d</string>
     <string name="backup_import_fail">Не удалось импортировать файл</string>
     <string name="backup_import_bad_password">Неверный пароль</string>
-    <string name="backup_import_bad_file">Файл не похож на бэкап FreeTurn</string>
+    <string name="backup_import_bad_file">Неверный формат файла резервной копии</string>
 
     <!-- О проекте -->
     <string name="settings_about">О проекте</string>
