@@ -16,13 +16,6 @@
 -dontwarn org.bouncycastle.**
 -dontwarn javax.naming.**
 
-# ── Kotlin Coroutines ─────────────────────────────────────────────────────────
--keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
--keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
--keepclassmembernames class kotlinx.coroutines.** {
-    volatile <fields>;
-}
-
 # ── Compile-only аннотации (errorprone/javax) не включены в runtime ───────────
 -dontwarn com.google.errorprone.annotations.CanIgnoreReturnValue
 -dontwarn com.google.errorprone.annotations.CheckReturnValue
