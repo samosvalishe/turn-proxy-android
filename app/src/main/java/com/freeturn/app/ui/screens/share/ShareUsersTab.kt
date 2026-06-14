@@ -27,8 +27,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -68,6 +70,13 @@ fun ShareUsersTab(
     onReshareClient: (SharedClient) -> Unit,
     onRevokeClient: (SharedClient) -> Unit
 ) {
+    // Тикает, чтобы online-статус пира гас сам по времени, а не только при перезагрузке.
+    val nowSec by produceState(System.currentTimeMillis() / 1000) {
+        while (true) {
+            value = System.currentTimeMillis() / 1000
+            delay(30_000)
+        }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
         ServerSelector(
             servers = state.sshServers,
@@ -129,7 +138,7 @@ fun ShareUsersTab(
                             },
                             subtitle = peerSubtitle(peer),
                             online = peer.lastHandshakeEpoch?.let {
-                                System.currentTimeMillis() / 1000 - it < ONLINE_WINDOW_SEC
+                                nowSec - it < ONLINE_WINDOW_SEC
                             } ?: false,
                             resharing = state.resharePubkey == peer.pubkey,
                             canReshare = peer.hasStoredConf,
