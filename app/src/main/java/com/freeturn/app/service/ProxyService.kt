@@ -11,7 +11,6 @@ import androidx.core.app.ServiceCompat
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.domain.ConnectionStats
 import com.freeturn.app.domain.StartupResult
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -96,7 +95,8 @@ class ProxyService : Service() {
         // Освобождаем wakelock во избежание утечек при повторном onStartCommand.
         if (wakeLock?.isHeld == true) wakeLock?.release()
         wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "VkTurn::BgLock")
-        wakeLock?.acquire(TimeUnit.HOURS.toMillis(24))
+        // Без таймаута: сессия может длиться дольше суток; release гарантирован в onDestroy.
+        wakeLock?.acquire()
     }
 
     override fun onDestroy() {
