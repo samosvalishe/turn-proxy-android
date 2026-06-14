@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
+import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.ui.util.copyToClipboard
@@ -113,7 +114,7 @@ fun LogsScreen(proxyViewModel: ProxyViewModel) {
                 LazyColumn(
                     state = listState,
                     modifier = Modifier
-                        .widthIn(max = 840.dp)
+                        .widthIn(max = SettingsContentMaxWidth)
                         .fillMaxSize()
                 ) {
                     itemsIndexed(logs, key = { index, _ -> index }) { _, line ->

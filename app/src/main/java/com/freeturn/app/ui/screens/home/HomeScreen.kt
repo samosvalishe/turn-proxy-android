@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
 import com.freeturn.app.data.config.SplitTunnelMode
+import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.ui.screens.splittunnel.SplitTunnelModal
 import com.freeturn.app.domain.ProxyState
@@ -170,7 +171,7 @@ fun HomeScreen(
                 Column(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .widthIn(max = 840.dp)
+                        .widthIn(max = SettingsContentMaxWidth)
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally,
