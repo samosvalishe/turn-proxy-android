@@ -406,6 +406,7 @@
     <string name="server_has_ssh">SSH</string>
     <string name="menu_delete_server">Удалить сервер</string>
     <string name="menu_rename_server">Переименовать</string>
+    <string name="menu_clone_server">Клонировать</string>
     <string name="rename_server_title">Переименовать сервер</string>
     <string name="server_name_label">Имя сервера</string>
     <string name="save">Сохранить</string>

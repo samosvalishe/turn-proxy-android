@@ -75,7 +75,8 @@ fun ServerDetailScreen(
     onOpenConnection: (String) -> Unit,
     onOpenConnectionMode: (String) -> Unit,
     onOpenServerSettings: (String) -> Unit,
-    onOpenNerdInfo: (String) -> Unit
+    onOpenNerdInfo: (String) -> Unit,
+    onCloned: (String) -> Unit
 ) {
     val context = LocalContext.current
     val snapshot by settingsViewModel.serversSnapshot.collectAsStateWithLifecycle()
@@ -201,6 +202,20 @@ fun ServerDetailScreen(
                                 leadingIcon = {
                                     Icon(
                                         painterResource(R.drawable.edit_24px),
+                                        contentDescription = null
+                                    )
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.menu_clone_server)) },
+                                onClick = {
+                                    showMenu = false
+                                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                                    settingsViewModel.cloneServer(serverId, onCloned)
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        painterResource(R.drawable.content_copy_24px),
                                         contentDescription = null
                                     )
                                 }

@@ -169,6 +169,11 @@ class SettingsViewModel(
         viewModelScope.launch { prefs.renameServer(id, name) }
     }
 
+    /** Клонирует сервер; [onCloned] получает id копии для перехода в её хаб. */
+    fun cloneServer(id: String, onCloned: (String) -> Unit) {
+        viewModelScope.launch { prefs.cloneServer(id)?.let(onCloned) }
+    }
+
     fun applyServer(id: String) {
         viewModelScope.launch {
             val target = prefs.serversSnapshot.first().list.firstOrNull { it.id == id }

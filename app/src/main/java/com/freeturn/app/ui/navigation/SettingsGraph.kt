@@ -73,7 +73,8 @@ internal fun NavGraphBuilder.settingsGraph(
                 onOpenConnection = { navController.navigate(ClientSetup(id)) },
                 onOpenConnectionMode = { navController.navigate(ConnectionMode(id)) },
                 onOpenServerSettings = { navController.navigate(ServerManagement(id)) },
-                onOpenNerdInfo = { navController.navigate(NerdInfo(id)) }
+                onOpenNerdInfo = { navController.navigate(NerdInfo(id)) },
+                onCloned = { newId -> navController.navigate(ServerDetail(newId)) }
             )
         }
 

@@ -129,6 +129,22 @@ class AppPreferences(context: Context) {
         return server.id
     }
 
+    /** Клонирует сервер по id: копия с новым id и уникальным именем. Возвращает id копии. */
+    suspend fun cloneServer(id: String): String? {
+        var newId: String? = null
+        context.dataStore.edit { prefs ->
+            val list = ServerJson.decodeList(prefs[SERVERS_JSON])
+            val source = list.firstOrNull { it.id == id } ?: return@edit
+            val copy = source.copy(
+                id = UUID.randomUUID().toString(),
+                name = uniqueServerName(source.name, list)
+            )
+            prefs[SERVERS_JSON] = ServerJson.encodeList(list + copy)
+            newId = copy.id
+        }
+        return newId
+    }
+
     /** Переименовывает сервер. Пустое имя оставляет текущее; занятое получает " (2)". */
     suspend fun renameServer(id: String, name: String) {
         context.dataStore.edit { prefs ->
