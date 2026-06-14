@@ -10,6 +10,8 @@ import com.wireguard.config.Config
 import java.io.ByteArrayInputStream
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicReference
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Поднимает WireGuard-туннель поверх локального прокси.
@@ -20,6 +22,8 @@ class WireGuardTunnelManager(context: Context) {
     private val appContext = context.applicationContext
     private val backend by lazy { GoBackend(appContext) }
     private val tunnelRef = AtomicReference<NamedTunnel?>(null)
+    // Без сериализации stop во время старта оставлял туннель поднятым (no-op до tunnelRef.set).
+    private val mutex = Mutex()
 
     /** Поднять туннель после того как прокси-ядро установило соединение. No-op без WG-конфига. */
     suspend fun startAfterProxyReady(cfg: ClientConfig) {
@@ -43,14 +47,24 @@ class WireGuardTunnelManager(context: Context) {
             ByteArrayInputStream(preparedConfig.toByteArray(StandardCharsets.UTF_8))
         )
 
-        stop()
-        val tunnel = NamedTunnel(name)
-        backend.setState(tunnel, Tunnel.State.UP, config)
-        tunnelRef.set(tunnel)
-        ProxyServiceState.addLog("WireGuard: туннель $name поднят через $endpoint")
+        mutex.withLock {
+            stopLocked()
+            val tunnel = NamedTunnel(name)
+            // Ссылка ДО setState: при провале откат/stop опустит частично поднятый туннель.
+            tunnelRef.set(tunnel)
+            try {
+                backend.setState(tunnel, Tunnel.State.UP, config)
+            } catch (e: Exception) {
+                stopLocked()
+                throw e
+            }
+            ProxyServiceState.addLog("WireGuard: туннель $name поднят через $endpoint")
+        }
     }
 
-    fun stop() {
+    suspend fun stop() = mutex.withLock { stopLocked() }
+
+    private fun stopLocked() {
         val tunnel = tunnelRef.getAndSet(null) ?: return
         try {
             backend.setState(tunnel, Tunnel.State.DOWN, null)
