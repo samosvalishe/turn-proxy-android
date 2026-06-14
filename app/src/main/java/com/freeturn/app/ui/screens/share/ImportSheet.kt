@@ -7,35 +7,45 @@ package com.freeturn.app.ui.screens.share
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
 import com.freeturn.app.data.config.ObfProfile
-import com.freeturn.app.data.share.FreeturnLink
-import com.freeturn.app.ui.components.SettingsCard
-import com.freeturn.app.ui.components.SettingsFieldSlot
+import com.freeturn.app.ui.components.EmptyState
+import com.freeturn.app.ui.components.InlineErrorCard
+import com.freeturn.app.ui.components.ProtocolPills
+import com.freeturn.app.ui.util.redact
 import com.freeturn.app.viewmodel.share.ImportViewModel
 import org.koin.androidx.compose.koinViewModel
 import com.freeturn.app.ui.theme.Spacing
@@ -50,6 +60,7 @@ fun ImportSheet(
     viewModel: ImportViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val privacyMode by viewModel.privacyMode.collectAsStateWithLifecycle()
 
     if (state.parseError) {
         AlertDialog(
@@ -68,27 +79,56 @@ fun ImportSheet(
     val link = state.link ?: return
     val fallbackName = stringResource(R.string.import_default_name)
 
-    ModalBottomSheet(onDismissRequest = viewModel::dismiss) {
+    val sheetState = rememberBottomSheetState(
+        initialValue = SheetValue.Hidden,
+        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded)
+    )
+
+    ModalBottomSheet(
+        onDismissRequest = viewModel::dismiss,
+        sheetState = sheetState,
+        contentWindowInsets = { WindowInsets(0, 0, 0, 0) }
+    ) {
+        if (state.saved) {
+            EmptyState(
+                iconRes = R.drawable.check_circle_24px,
+                title = stringResource(R.string.import_success_title),
+                desc = stringResource(R.string.import_success_desc),
+                actionLabel = stringResource(R.string.import_success_go_home),
+                onAction = {
+                    viewModel.dismiss()
+                    onImported()
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .navigationBarsPadding()
+                    .padding(bottom = Spacing.lg)
+            )
+            return@ModalBottomSheet
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = Spacing.xxl)
                 .navigationBarsPadding()
                 .padding(bottom = Spacing.lg),
+            horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Spacing.lg)
         ) {
-            if (state.saved) {
-                ImportSuccess(onDone = {
-                    viewModel.dismiss()
-                    onImported()
-                })
-                return@Column
-            }
-
             Text(
                 stringResource(R.string.import_title),
-                style = MaterialTheme.typography.titleLarge
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center
             )
+
+            ProtocolPills(
+                wg = link.wgConf.isNotBlank(),
+                obfOn = link.obfProfile.isNotEmpty() && link.obfProfile != ObfProfile.NONE
+            )
+
+            AddressChip(link.peer.redact(privacyMode))
 
             OutlinedTextField(
                 value = state.serverName,
@@ -109,8 +149,6 @@ fun ImportSheet(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            ImportSummary(link)
-
             if (state.duplicateConf) {
                 ImportWarning(stringResource(R.string.import_duplicate_conf))
             } else if (state.duplicateAddress) {
@@ -118,11 +156,7 @@ fun ImportSheet(
             }
 
             if (state.saveError) {
-                Text(
-                    stringResource(R.string.import_save_error),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error
-                )
+                InlineErrorCard(stringResource(R.string.import_save_error))
             }
 
             Button(
@@ -131,7 +165,7 @@ fun ImportSheet(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (state.saving) {
-                    CircularWavyProgressIndicator(modifier = Modifier.size(20.dp))
+                    LoadingIndicator(modifier = Modifier.size(24.dp))
                 } else {
                     Text(stringResource(R.string.import_confirm))
                 }
@@ -140,83 +174,54 @@ fun ImportSheet(
     }
 }
 
-/** Сводка конфига из ссылки: адрес, режим, обфускация. */
+/** Адрес сервера из ссылки - пилюля с иконкой хоста и моно-текстом (в стиле ProtocolPills). */
 @Composable
-private fun ImportSummary(link: FreeturnLink) {
-    SettingsCard {
-        SettingsFieldSlot(verticalSpacing = 8.dp) {
-            SummaryRow(
-                label = stringResource(R.string.import_summary_address),
-                value = link.peer
+private fun AddressChip(peer: String) {
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+        ) {
+            Icon(
+                painterResource(R.drawable.host_24px),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
             )
-            SummaryRow(
-                label = stringResource(R.string.import_summary_mode),
-                value = stringResource(
-                    if (link.wgConf.isNotBlank()) R.string.import_summary_mode_vpn
-                    else R.string.import_summary_mode_proxy
-                )
-            )
-            SummaryRow(
-                label = stringResource(R.string.import_summary_obf),
-                value = stringResource(
-                    if (link.obfProfile.isNotEmpty() && link.obfProfile != ObfProfile.NONE)
-                        R.string.import_summary_obf_on
-                    else R.string.import_summary_obf_off
-                )
+            Text(
+                peer,
+                style = MaterialTheme.typography.bodyLarge,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
     }
 }
 
-@Composable
-private fun SummaryRow(label: String, value: String) {
-    Column {
-        Text(
-            label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(value, style = MaterialTheme.typography.bodyLarge)
-    }
-}
-
+/** Тональный баннер-предупреждение (tertiaryContainer) - дубликат конфига/адреса. */
 @Composable
 private fun ImportWarning(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.tertiary
-    )
-}
-
-@Composable
-private fun ImportSuccess(onDone: () -> Unit) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Icon(
-            painterResource(R.drawable.check_circle_24px),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(48.dp)
-        )
-        Spacer(Modifier.height(12.dp))
-        Text(
-            stringResource(R.string.import_success_title),
-            style = MaterialTheme.typography.titleLarge,
-            textAlign = TextAlign.Center
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            stringResource(R.string.import_success_desc),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-        Spacer(Modifier.height(20.dp))
-        Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) {
-            Text(stringResource(R.string.import_success_go_home))
+        Row(modifier = Modifier.padding(Spacing.lg), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                painterResource(R.drawable.info_24px),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+            Spacer(Modifier.width(Spacing.md))
+            Text(
+                text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onTertiaryContainer
+            )
         }
     }
 }

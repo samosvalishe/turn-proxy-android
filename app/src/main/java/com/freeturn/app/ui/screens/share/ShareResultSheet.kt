@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
@@ -28,7 +27,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetValue
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
@@ -49,6 +47,7 @@ import com.freeturn.app.R
 import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.data.share.ShareInfo
 import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.ui.components.ProtocolPills
 import com.freeturn.app.ui.components.QrCode
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.util.copyToClipboard
@@ -97,7 +96,7 @@ fun ShareResultSheet(result: ShareResult, shareInfo: ShareInfo?, onDismiss: () -
             val obfOn = shareInfo?.let {
                 it.obfProfile.isNotEmpty() && it.obfProfile != ObfProfile.NONE
             } ?: false
-            ProtocolPill(wg = result.isWg, obfOn = obfOn)
+            ProtocolPills(wg = result.isWg, obfOn = obfOn)
 
             Text(
                 stringResource(R.string.share_result_desc),
@@ -177,49 +176,3 @@ fun ShareResultSheet(result: ShareResult, shareInfo: ShareInfo?, onDismiss: () -
     }
 }
 
-/** Протокол выданного доступа + признак обфускации - пилюлями над QR. */
-@Composable
-private fun ProtocolPill(wg: Boolean, obfOn: Boolean) {
-    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
-            Row(
-                modifier = Modifier.padding(start = Spacing.md, end = Spacing.lg, top = Spacing.sm, bottom = Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
-            ) {
-                Icon(
-                    painterResource(if (wg) R.drawable.vpn_key_24px else R.drawable.public_24px),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.size(16.dp)
-                )
-                Text(
-                    stringResource(if (wg) R.string.share_protocol_wg else R.string.share_protocol_proxy),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                )
-            }
-        }
-        if (obfOn) {
-            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh) {
-                Row(
-                    modifier = Modifier.padding(start = Spacing.md, end = Spacing.lg, top = Spacing.sm, bottom = Spacing.sm),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
-                ) {
-                    Icon(
-                        painterResource(R.drawable.check_circle_24px),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        stringResource(R.string.share_chip_obf),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-    }
-}

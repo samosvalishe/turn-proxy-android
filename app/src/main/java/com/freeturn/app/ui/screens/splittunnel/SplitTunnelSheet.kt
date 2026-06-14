@@ -42,6 +42,7 @@ import com.freeturn.app.data.HapticUtil
 import com.freeturn.app.data.AppChoice
 import com.freeturn.app.data.installedInternetApps
 import com.freeturn.app.data.toPackageSet
+import com.freeturn.app.ui.components.EmptyState
 import com.freeturn.app.ui.theme.Spacing
 
 /**
@@ -85,8 +86,8 @@ fun SplitTunnelModal(
  * выбор режима (include/exclude), поиск и список приложений с иконками/чекбоксами.
  * Всё пишется сразу в активный сервер через ViewModel - без буфера и "сохранить".
  *
- * Свитч выкл == режим [SplitTunnelMode.ALL] (весь трафик в туннель). Пока прокси
- * активен (`locked`), любые изменения запрещены - контролы disabled.
+ * Свитч выкл == режим [SplitTunnelMode.ALL] (весь трафик в туннель): режим/поиск/список
+ * остаются на месте, но disabled. Пока прокси активен (`locked`), контролы тоже disabled.
  */
 @Composable
 fun SplitTunnelSheetContent(
@@ -97,15 +98,17 @@ fun SplitTunnelSheetContent(
     onAppsChange: (String) -> Unit
 ) {
     val context = LocalContext.current
-    val enabled = mode != SplitTunnelMode.ALL
+    val splitOn = mode != SplitTunnelMode.ALL
+    val controlsEnabled = splitOn && !locked
     // Последний выбранный "рабочий" режим, чтобы свитч вкл возвращал его, а не дефолт.
     var modeChoice by remember {
         mutableStateOf(if (mode != SplitTunnelMode.ALL) mode else SplitTunnelMode.EXCLUDE)
     }
     var query by remember { mutableStateOf("") }
     val selected = remember(apps) { apps.toPackageSet() }
-    val installed by produceState<List<AppChoice>?>(initialValue = null) {
-        value = context.installedInternetApps()
+    // Список приложений нужен только когда сплит включён - выключенным не фетчим.
+    val installed by produceState<List<AppChoice>?>(initialValue = null, splitOn) {
+        value = if (splitOn) context.installedInternetApps() else null
     }
 
     // Высота контента стабильна (список фиксированной высоты), поэтому sheet
@@ -132,7 +135,7 @@ fun SplitTunnelSheetContent(
                 )
             }
             Switch(
-                checked = enabled,
+                checked = splitOn,
                 enabled = !locked,
                 onCheckedChange = { on ->
                     HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
@@ -149,33 +152,33 @@ fun SplitTunnelSheetContent(
             )
         }
 
-        if (enabled) {
-            ModeDropdown(
-                mode = modeChoice,
-                enabled = !locked,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = HorizontalPadding),
-                onSelect = { value ->
-                    modeChoice = value
-                    onModeChange(value)
-                }
-            )
+        ModeDropdown(
+            mode = modeChoice,
+            enabled = controlsEnabled,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = HorizontalPadding),
+            onSelect = { value ->
+                modeChoice = value
+                onModeChange(value)
+            }
+        )
 
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                enabled = !locked,
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = HorizontalPadding),
-                label = { Text(stringResource(R.string.split_tunnel_search)) },
-                leadingIcon = {
-                    Icon(painterResource(R.drawable.search_24px), null)
-                }
-            )
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            enabled = controlsEnabled,
+            singleLine = true,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = HorizontalPadding),
+            label = { Text(stringResource(R.string.split_tunnel_search)) },
+            leadingIcon = {
+                Icon(painterResource(R.drawable.search_24px), null)
+            }
+        )
 
+        if (splitOn) {
             AppList(
                 modifier = Modifier
                     .height(ListHeight)
@@ -183,12 +186,20 @@ fun SplitTunnelSheetContent(
                 installed = installed,
                 selected = selected,
                 query = query,
-                enabled = !locked,
+                enabled = controlsEnabled,
                 onToggle = { pkg ->
                     HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
                     val next = if (pkg in selected) selected - pkg else selected + pkg
                     onAppsChange(next.sorted().joinToString("\n"))
                 }
+            )
+        } else {
+            EmptyState(
+                iconRes = R.drawable.apps_24px,
+                desc = stringResource(R.string.split_tunnel_off_hint),
+                modifier = Modifier
+                    .height(ListHeight)
+                    .fillMaxWidth()
             )
         }
     }

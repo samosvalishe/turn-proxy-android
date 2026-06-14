@@ -20,6 +20,7 @@ import androidx.compose.ui.semantics.Role
 import com.freeturn.app.R
 import com.freeturn.app.data.AppChoice
 import com.freeturn.app.ui.components.AppIcon
+import com.freeturn.app.ui.components.EmptyState
 
 /** Список приложений с иконками/чекбоксами: загрузка, поиск, пустое состояние. */
 @Composable
@@ -54,13 +55,11 @@ internal fun AppList(
     }
 
     if (filtered.isEmpty()) {
-        Box(modifier = modifier, contentAlignment = Alignment.Center) {
-            Text(
-                stringResource(R.string.split_tunnel_empty),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+        EmptyState(
+            iconRes = R.drawable.search_24px,
+            desc = stringResource(R.string.split_tunnel_empty),
+            modifier = modifier
+        )
         return
     }
 

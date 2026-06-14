@@ -81,12 +81,7 @@ fun ShareConnectionTab(
 
         // WG-сервер умеет оба типа доступа -> выбор. Прокси-only сервер - просто статус.
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            SectionLabel(
-                stringResource(
-                    if (state.canChooseMode) R.string.share_access_type
-                    else R.string.share_protocol_section
-                )
-            )
+            SectionLabel(stringResource(R.string.share_access_type))
             if (state.canChooseMode && state.shareInfo != null &&
                 !state.infoLoading && state.infoError == null
             ) {

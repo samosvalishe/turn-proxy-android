@@ -29,7 +29,6 @@
     <string name="share_protocol_proxy">Прокси</string>
     <string name="share_protocol_proxy_desc">Пользователь подключается через прокси</string>
     <string name="share_chip_obf">Обфускация</string>
-    <string name="share_protocol_section">Протокол сервера</string>
     <string name="share_access_type">Тип доступа</string>
     <string name="share_empty_title">Нет серверов с SSH-доступом</string>
     <string name="share_empty_desc">Доступно только для серверов под управлением приложения</string>
@@ -60,13 +59,6 @@
     <string name="import_default_name">Импортированный сервер</string>
     <string name="import_vk_link_label">Ссылка на звонок VK</string>
     <string name="import_vk_link_helper">Укажите ссылку на звонок VK для установки соединения</string>
-    <string name="import_summary_address">Сервер</string>
-    <string name="import_summary_mode">Режим</string>
-    <string name="import_summary_mode_vpn">VPN (WireGuard)</string>
-    <string name="import_summary_mode_proxy">Прокси</string>
-    <string name="import_summary_obf">Обфускация</string>
-    <string name="import_summary_obf_on">Включена</string>
-    <string name="import_summary_obf_off">Выключена</string>
     <string name="import_duplicate_address">Сервер с данным адресом уже существует</string>
     <string name="import_duplicate_conf">Конфигурация уже импортирована</string>
     <string name="import_confirm">Импортировать</string>
@@ -352,6 +344,7 @@
     <string name="split_tunnel_mode_exclude">Приложения из списка не работают через VPN</string>
     <string name="split_tunnel_search">Поиск приложений</string>
     <string name="split_tunnel_empty">Приложения не найдены</string>
+    <string name="split_tunnel_off_hint">Включите, чтобы выбрать приложения</string>
     <string name="split_tunnel_locked">Остановите VPN, чтобы изменить раздельное туннелирование</string>
     <string name="split_tunnel_status_off">Раздельное туннелирование выключено</string>
     <string name="split_tunnel_status_on">Раздельное туннелирование включено</string>
