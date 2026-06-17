@@ -449,5 +449,6 @@ private fun PortField(
 private fun obfProfileLabel(value: String): String = when (value) {
     ObfProfile.NONE -> stringResource(R.string.obf_none)
     ObfProfile.RTPOPUS -> stringResource(R.string.obf_rtpopus)
+    ObfProfile.RTPOPUS2 -> stringResource(R.string.obf_rtpopus2)
     else -> value
 }

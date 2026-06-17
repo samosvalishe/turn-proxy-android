@@ -90,7 +90,7 @@ data class ServerStartOptions(
     val connect: String,
     /** true -> -mode tcp (TCP-форвард). false -> udp-релей (дефолт ядра). */
     val tcpMode: Boolean = false,
-    /** Wire-профиль обфускации: none | rtpopus. */
+    /** Wire-профиль обфускации: none | rtpopus | rtpopus2. */
     val obfProfile: String = "none",
     /** 64-hex obf-ключ. Пустая строка -> запуск без обфускации. */
     val obfKey: String = "",

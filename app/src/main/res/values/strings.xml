@@ -200,6 +200,7 @@
     <string name="obf_profile_title">Обфускация</string>
     <string name="obf_none">Выкл</string>
     <string name="obf_rtpopus">rtpopus</string>
+    <string name="obf_rtpopus2">rtpopus2</string>
     <string name="provider_vk">VK Calls</string>
     <string name="obf_key_empty_hint">Пусто - ключ сгенерируется при применении</string>
     <string name="obf_key_invalid_hint">Неверный формат - нужны 64 hex-символа</string>
@@ -222,7 +223,7 @@
     <string name="dns_custom_hint">Через запятую/пробел. Приоритет над DNS оператора. Пусто - не задавать.</string>
     <string name="dns_custom_invalid">Некорректные DNS-адреса будут пропущены.</string>
 
-    <string name="obf_select_profile_hint">Выберите профиль rtpopus, чтобы задать ключ обфускации.</string>
+    <string name="obf_select_profile_hint">Выберите профиль обфускации, чтобы задать ключ.</string>
 
     <!-- LogsScreen -->
     <string name="logs_title">Логи</string>

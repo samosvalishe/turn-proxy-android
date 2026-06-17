@@ -166,9 +166,9 @@ cmd_probe() {
         cmdline=$(current_cmdline)
         # -mode tcp → MODE=tcp, иначе udp-релей (дефолт ядра).
         if echo "$cmdline" | grep -q -- "-mode tcp"; then emit MODE tcp; else emit MODE udp; fi
-        # OBF=<профиль из cmdline> (rtpopus|none).
+        # OBF=<профиль из cmdline> (none|rtpopus|rtpopus2).
         local obf
-        obf=$(echo "$cmdline" | sed -nE 's/.*-obf-profile[= ]+([a-z]+).*/\1/p')
+        obf=$(echo "$cmdline" | sed -nE 's/.*-obf-profile[= ]+([a-z0-9]+).*/\1/p')
         emit OBF "${obf:-none}"
     else
         emit RUNNING no
@@ -422,7 +422,7 @@ parse_args() {
                 ;;
             --obf-profile=*)
                 ARG_OBF_PROFILE="${1#*=}"
-                [[ "$ARG_OBF_PROFILE" =~ ^(none|rtpopus)$ ]] || die "bad --obf-profile (need none|rtpopus)"
+                [[ "$ARG_OBF_PROFILE" =~ ^(none|rtpopus|rtpopus2)$ ]] || die "bad --obf-profile (need none|rtpopus|rtpopus2)"
                 ;;
             --obf-key=*)
                 ARG_OBF_KEY="${1#*=}"
@@ -950,7 +950,7 @@ cmd_share_info() {
         cmdline=$(current_cmdline)
         if [ -n "$cmdline" ]; then
             if echo "$cmdline" | grep -q -- "-mode tcp"; then mode=tcp; else mode=udp; fi
-            obf=$(echo "$cmdline" | sed -nE 's/.*-obf-profile[= ]+([a-z]+).*/\1/p')
+            obf=$(echo "$cmdline" | sed -nE 's/.*-obf-profile[= ]+([a-z0-9]+).*/\1/p')
             key=$(echo "$cmdline" | sed -nE 's/.*-obf-key[= ]+([0-9a-fA-F]{64}).*/\1/p')
         fi
     fi
