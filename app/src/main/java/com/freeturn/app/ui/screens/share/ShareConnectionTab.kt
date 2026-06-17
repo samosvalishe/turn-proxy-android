@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.data.config.ClientId
 import com.freeturn.app.ui.components.SectionLabel
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.components.SettingsCard
@@ -46,6 +47,7 @@ fun ShareConnectionTab(
     state: ShareUiState,
     onSelectServer: (String) -> Unit,
     onUserNameChange: (String) -> Unit,
+    onClientIdChange: (String) -> Unit,
     onSetMode: (Boolean) -> Unit,
     onRetryInfo: () -> Unit
 ) {
@@ -74,10 +76,32 @@ fun ShareConnectionTab(
         )
 
         ServerSelector(
-            servers = state.sshServers,
+            servers = state.servers,
             selected = state.selectedServer,
             onSelect = onSelectServer
         )
+
+        // Ручной сервер без SSH: cid не завести автоматически - владелец вводит существующий.
+        if (state.localOnly) {
+            val cidInvalid = state.manualClientId.isNotBlank() && !ClientId.isValid(state.manualClientId)
+            OutlinedTextField(
+                value = state.manualClientId,
+                onValueChange = onClientIdChange,
+                label = { Text(stringResource(R.string.share_client_id_label)) },
+                singleLine = true,
+                isError = cidInvalid,
+                enabled = !state.creating,
+                supportingText = {
+                    Text(
+                        stringResource(
+                            if (cidInvalid) R.string.share_client_id_invalid
+                            else R.string.share_client_id_hint
+                        )
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
 
         // WG-сервер умеет оба типа доступа -> выбор. Прокси-only сервер - просто статус.
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {

@@ -79,7 +79,7 @@ fun ShareUsersTab(
     }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
         ServerSelector(
-            servers = state.sshServers,
+            servers = state.servers,
             selected = state.selectedServer,
             onSelect = onSelectServer
         )

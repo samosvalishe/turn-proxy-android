@@ -18,6 +18,9 @@
     <string name="share_tab_users">Пользователи</string>
     <string name="share_connection_desc">Предоставление доступа к VPN без прав управления сервером</string>
     <string name="share_user_name_label">Имя пользователя</string>
+    <string name="share_client_id_label">Client ID</string>
+    <string name="share_client_id_hint">Нужен серверу, чтобы принять подключение (32 hex-символа)</string>
+    <string name="share_client_id_invalid">Неверный формат: 32 hex-символа (0-9, a-f)</string>
     <string name="share_server_label">Сервер</string>
     <string name="share_server_none">Выберите сервер</string>
     <string name="share_create_button">Поделиться</string>
@@ -30,8 +33,8 @@
     <string name="share_protocol_proxy_desc">Пользователь подключается через прокси</string>
     <string name="share_chip_obf">Обфускация</string>
     <string name="share_access_type">Тип доступа</string>
-    <string name="share_empty_title">Нет серверов с SSH-доступом</string>
-    <string name="share_empty_desc">Доступно только для серверов под управлением приложения</string>
+    <string name="share_empty_title">Нет серверов для шаринга</string>
+    <string name="share_empty_desc">Добавьте сервер, чтобы поделиться подключением</string>
     <string name="share_empty_add">Добавить сервер</string>
     <string name="share_users_section">Пользователи</string>
     <string name="share_users_refresh">Обновить список</string>

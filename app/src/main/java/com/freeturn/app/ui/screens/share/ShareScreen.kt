@@ -76,6 +76,11 @@ fun ShareScreen(
     val reducedMotion = LocalReducedMotion.current
     var tab by rememberSaveable { mutableIntStateOf(TAB_CONNECTION) }
 
+    // Ручной сервер без SSH не имеет списка пользователей - держим вкладку "Соединение".
+    LaunchedEffect(state.canManageUsers) {
+        if (!state.canManageUsers && tab != TAB_CONNECTION) tab = TAB_CONNECTION
+    }
+
     // Тихий рефреш (сразу), индикатор - после enter-перехода.
     LaunchedEffect(Unit) { viewModel.revalidateInfo() }
     LaunchedEffect(screenSettled, state.selectedServerId) {
@@ -121,8 +126,8 @@ fun ShareScreen(
         // Экран всегда внутри NavigationSuite - нижний бар сам держит навбар-инсет.
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
-        if (state.sshServers.isEmpty()) {
-            // Делиться можно только сервером с SSH-доступом.
+        if (state.servers.isEmpty()) {
+            // Делиться нечем: нет ни одного сервера с SSH-доступом или адресом.
             EmptyState(
                 iconRes = R.drawable.share_outlined_24px,
                 title = stringResource(R.string.share_empty_title),
@@ -147,27 +152,31 @@ fun ShareScreen(
                     .widthIn(max = SettingsContentMaxWidth)
                     .fillMaxWidth()
             ) {
-                SingleChoiceSegmentedButtonRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg, vertical = Spacing.md)
-                ) {
-                    SegmentedButton(
-                        selected = tab == TAB_CONNECTION,
-                        onClick = {
-                            HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                            tab = TAB_CONNECTION
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                    ) { Text(stringResource(R.string.share_tab_connection)) }
-                    SegmentedButton(
-                        selected = tab == TAB_USERS,
-                        onClick = {
-                            HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                            tab = TAB_USERS
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                    ) { Text(stringResource(R.string.share_tab_users)) }
+                // Переключатель "Соединение / Пользователи" - только для SSH-серверов:
+                // у ручных нет серверного списка выданных доступов.
+                if (state.canManageUsers) {
+                    SingleChoiceSegmentedButtonRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = Spacing.lg, vertical = Spacing.md)
+                    ) {
+                        SegmentedButton(
+                            selected = tab == TAB_CONNECTION,
+                            onClick = {
+                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                                tab = TAB_CONNECTION
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
+                        ) { Text(stringResource(R.string.share_tab_connection)) }
+                        SegmentedButton(
+                            selected = tab == TAB_USERS,
+                            onClick = {
+                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
+                                tab = TAB_USERS
+                            },
+                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
+                        ) { Text(stringResource(R.string.share_tab_users)) }
+                    }
                 }
                 AnimatedContent(
                     targetState = tab,
@@ -193,6 +202,7 @@ fun ShareScreen(
                                 state = state,
                                 onSelectServer = viewModel::selectServer,
                                 onUserNameChange = viewModel::setUserName,
+                                onClientIdChange = viewModel::setManualClientId,
                                 onSetMode = viewModel::setShareMode,
                                 onRetryInfo = viewModel::retryInfo
                             )

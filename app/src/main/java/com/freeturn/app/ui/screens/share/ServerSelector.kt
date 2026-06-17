@@ -31,7 +31,7 @@ import com.freeturn.app.ui.components.SettingsRowIcon
 import com.freeturn.app.ui.util.hapticClickable
 import com.freeturn.app.ui.theme.Spacing
 
-/** Выбор сервера для шаринга: карточка-строка с выпадающим списком SSH-серверов. */
+/** Выбор сервера для шаринга: карточка-строка с выпадающим списком серверов. */
 @Composable
 fun ServerSelector(
     servers: List<Server>,
