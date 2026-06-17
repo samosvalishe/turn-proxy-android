@@ -12,6 +12,7 @@ set -eu
 
 PREFIX="/opt/free-turn-proxy"
 PIDFILE="$PREFIX/proxy.pid"
+LOCKFILE="$PREFIX/control.lock"
 OBFFILE="$PREFIX/obf.key"
 LOGFILE="$PREFIX/server.log"
 VERFILE="$PREFIX/version"
@@ -21,7 +22,8 @@ ENVFILE="$PREFIX/run.env"
 LAUNCHER="$PREFIX/launch.sh"
 UNIT_PATH="/etc/systemd/system/free-turn-proxy.service"
 UNIT_NAME="free-turn-proxy.service"
-BASE_URL="https://github.com/samosvalishe/free-turn-proxy/releases/latest/download"
+RELEASES_URL="https://github.com/samosvalishe/free-turn-proxy/releases"
+BASE_URL="$RELEASES_URL/latest/download"
 
 # WireGuard bootstrap (wg-setup): сеть /24, .1 — сервер, .2 — первый пир.
 WG_DIR="/etc/wireguard"
@@ -84,6 +86,16 @@ has_systemd() {
     command -v systemctl >/dev/null 2>&1 && [ -d /run/systemd/system ]
 }
 
+# Best-effort lock на мутирующие операции: параллельные SSH-сессии не рвут
+# bin/run.args/conf. FD 8 (peer-* ещё берут peers.lock на FD 9). Нет flock - идём дальше.
+_lock() {
+    command -v flock >/dev/null 2>&1 || return 0
+    [ -d "$PREFIX" ] || mkdir -p "$PREFIX" 2>/dev/null || return 0
+    [ -w "$PREFIX" ] || return 0
+    exec 8>"$LOCKFILE" 2>/dev/null || return 0
+    flock -w 300 8 2>/dev/null || true
+}
+
 current_runtime() {
     if [ -f "$RUNTIMEFILE" ]; then
         cat "$RUNTIMEFILE"
@@ -113,6 +125,17 @@ is_running_nohup() {
 
 is_running_systemd() {
     systemctl is-active --quiet "$UNIT_NAME"
+}
+
+# Ждём поднятия процесса до ~5с: быстрый bind-fail/конфиг успевает упасть.
+_wait_running() {  # PREDICATE [ARGS...]
+    local i=0
+    while [ "$i" -lt 5 ]; do
+        "$@" >/dev/null 2>&1 && return 0
+        sleep 1
+        i=$((i + 1))
+    done
+    return 1
 }
 
 # echo текущий PID процесса (или пусто).
@@ -198,9 +221,9 @@ cmd_probe() {
 _dl() {
     local url=$1 out=$2
     if command -v curl >/dev/null 2>&1; then
-        curl -sSL --fail -o "$out" "$url"
+        curl -fsSL --connect-timeout 15 --max-time 300 -o "$out" "$url"
     elif command -v wget >/dev/null 2>&1; then
-        wget -q -O "$out" "$url"
+        wget -q --timeout=300 -O "$out" "$url"
     else
         die "neither curl nor wget present"
     fi
@@ -254,7 +277,8 @@ case "$m" in
     *) echo "unsupported arch: $m" >&2; exit 1 ;;
 esac
 [ -f "$PREFIX/run.args" ] || { echo "run.args missing" >&2; exit 1; }
-mapfile -t a < "$PREFIX/run.args"
+a=()
+while IFS= read -r line || [ -n "$line" ]; do a+=("$line"); done < "$PREFIX/run.args"
 exec "$PREFIX/$arch" "${a[@]}"
 LAUNCH_EOF
 )
@@ -312,29 +336,41 @@ _kill_legacy_nohup() {
 }
 
 cmd_install() {
+    parse_args "$@"
     mkdir -p "$PREFIX" || die "cannot create $PREFIX"
     [ -w "$PREFIX" ] || die "$PREFIX not writable"
-    local bin name asset_url tmp ver curver
+    local bin name latest_url asset_url tmp ver curver
     name=$(detect_arch)
     bin="$PREFIX/$name"
-    tmp="$bin.new"
-    asset_url="$BASE_URL/$name"
+    latest_url="$BASE_URL/$name"
 
-    log "resolving latest version"
-    ver=$(_resolve_version "$asset_url")
-    if [ -z "$ver" ]; then
-        die "cannot resolve latest version (no Location header from $BASE_URL)"
-    fi
     curver=""
     [ -f "$VERFILE" ] && curver=$(cat "$VERFILE")
 
+    log "resolving latest version"
+    ver=$(_resolve_version "$latest_url")
+
     local cached=0
-    if [ -x "$bin" ] && [ "$ver" = "$curver" ]; then
+    if [ -z "$ver" ]; then
+        # Резолв упал (сеть/GitHub), но бинарь стоит - идём как cached, не падаем.
+        if [ -x "$bin" ]; then
+            log "version resolve failed; using installed binary"
+            ver="${curver:-installed}"
+            cached=1
+        else
+            die "cannot resolve latest version (no Location header from $BASE_URL)"
+        fi
+    elif [ -x "$bin" ] && [ "$ver" = "$curver" ]; then
         cached=1
     fi
 
+    # Качаем по тегу, не latest: иначе релиз мог переехать между резолвом и
+    # загрузкой - VERFILE и байты разъехались бы.
+    asset_url="$RELEASES_URL/download/$ver/$name"
+
     if [ "$cached" = "0" ]; then
         log "downloading $name @ $ver"
+        tmp=$(mktemp "$bin.XXXXXX" 2>/dev/null) || tmp="$bin.new.$$"
         if ! _dl "$asset_url" "$tmp"; then
             rm -f "$tmp"
             die "binary download failed"
@@ -346,12 +382,32 @@ cmd_install() {
             rm -f "$tmp"
             die "downloaded file too small ($size bytes)"
         fi
+        # ELF-magic: ловит HTML/обрезок/чужой контент до запуска под root.
+        # od может отсутствовать (busybox) - тогда пропускаем, не валим установку.
+        local magic
+        magic=$(od -An -tx1 -N4 "$tmp" 2>/dev/null | tr -d ' \n')
+        if [ -n "$magic" ] && [ "$magic" != "7f454c46" ]; then
+            rm -f "$tmp"
+            die "downloaded file is not an ELF binary"
+        fi
+        # Необязательная сверка SHA256 (приложение может прислать --sha256).
+        if [ -n "$ARG_SHA256" ] && command -v sha256sum >/dev/null 2>&1; then
+            local got
+            got=$(sha256sum "$tmp" | awk '{print $1}')
+            if [ -n "$got" ] && [ "$got" != "$ARG_SHA256" ]; then
+                rm -f "$tmp"
+                die "sha256 mismatch (got $got)"
+            fi
+        fi
         chmod +x "$tmp"
+        _lock
         if [ -f "$bin" ]; then
             cp -f "$bin" "$bin.bak" 2>/dev/null || true
         fi
         mv -f "$tmp" "$bin"
         echo "$ver" > "$VERFILE"
+    else
+        _lock
     fi
 
     # Решаем режим запуска и подготавливаем инфраструктуру.
@@ -362,10 +418,10 @@ cmd_install() {
     esac
 
     if has_systemd; then
-        # Любой остаточный nohup-процесс убиваем перед enable юнита, иначе он
-        # держит порт и systemctl start не поднимется. Триггеримся на PIDFILE
-        # ИЛИ висящий бинарь — RUNTIMEFILE на свежей машине ещё не показателен.
-        if [ -f "$PIDFILE" ] || pgrep -f "^$PREFIX/server-linux-" >/dev/null 2>&1; then
+        # Остаточный nohup-процесс убиваем перед enable юнита. Маркер легаси -
+        # PIDFILE (его пишет только nohup); systemd PIDFILE не создаёт, поэтому
+        # его живой процесс под pgrep не трогаем.
+        if [ -f "$PIDFILE" ]; then
             log "killing legacy nohup process before systemd takeover"
             _kill_legacy_nohup
         fi
@@ -404,6 +460,8 @@ ARG_WG_ADOPT=""
 ARG_NAME_B64=""
 ARG_PUBKEY=""
 ARG_CLIENT_ID=""
+ARG_SHA256=""
+ARG_DNS="1.1.1.1"
 
 parse_args() {
     while [ $# -gt 0 ]; do
@@ -459,6 +517,14 @@ parse_args() {
                 ARG_CLIENT_ID="${1#*=}"
                 [[ "$ARG_CLIENT_ID" =~ ^[0-9a-fA-F]{32}$ ]] || die "bad --client-id (need 32 hex)"
                 ;;
+            --sha256=*)
+                ARG_SHA256="${1#*=}"
+                [[ "$ARG_SHA256" =~ ^[0-9a-fA-F]{64}$ ]] || die "bad --sha256 (need 64 hex)"
+                ;;
+            --dns=*)
+                ARG_DNS="${1#*=}"
+                [[ "$ARG_DNS" =~ ^[0-9a-zA-Z.:,_-]+$ ]] || die "bad --dns"
+                ;;
             *) die "unknown arg: $1" ;;
         esac
         shift
@@ -469,7 +535,7 @@ parse_args() {
 # Bond на сервере не задаётся — ядро детектит его по magic-префиксу стрима.
 _write_args_file() {
     local tmp="$ARGSFILE.tmp"
-    : > "$tmp"
+    ( umask 077; : > "$tmp" )
     chmod 600 "$tmp"
     {
         echo "-listen"
@@ -502,7 +568,7 @@ _write_args_file() {
 # (KCP FEC выпилен из ядра), файл оставлен для совместимости unit-а.
 _write_env_file() {
     local tmp="$ENVFILE.tmp"
-    : > "$tmp"
+    ( umask 077; : > "$tmp" )
     chmod 600 "$tmp"
     mv -f "$tmp" "$ENVFILE"
     chmod 600 "$ENVFILE"
@@ -519,14 +585,12 @@ cmd_start_systemd() {
     if ! systemctl restart "$UNIT_NAME"; then
         die "systemctl restart failed"
     fi
-    sleep 1
-    if ! is_running_systemd; then
+    if ! _wait_running is_running_systemd; then
         if [ -f "$bin.bak" ]; then
             log "process not active; rolling back .bak"
             mv -f "$bin.bak" "$bin"
             systemctl restart "$UNIT_NAME" || true
-            sleep 1
-            is_running_systemd || die "server failed to start (after rollback); see journalctl -u $UNIT_NAME"
+            _wait_running is_running_systemd || die "server failed to start (after rollback); see journalctl -u $UNIT_NAME"
         else
             die "server failed to start; see journalctl -u $UNIT_NAME"
         fi
@@ -697,7 +761,7 @@ EOF
 [Interface]
 PrivateKey = $cli_priv
 Address = $candidate/32
-DNS = 1.1.1.1
+DNS = $ARG_DNS
 
 [Peer]
 PublicKey = $srv_pub
@@ -726,6 +790,7 @@ cmd_wg_setup() {
     parse_args "$@"
     [ -n "$ARG_WG_PORT" ] || die "--port required"
     [ -n "$ARG_WG_ENDPOINT" ] || die "--endpoint required"
+    _lock
 
     # Существующий WireGuard: берём первый conf в /etc/wireguard (не обязательно wg0),
     # не перетираем — добавляем своего пира и отдаём фактический порт.
@@ -850,7 +915,7 @@ EOF
 [Interface]
 PrivateKey = $cli_priv
 Address = $WG_NET.2/32
-DNS = 1.1.1.1
+DNS = $ARG_DNS
 
 [Peer]
 PublicKey = $srv_pub
@@ -859,6 +924,14 @@ Endpoint = $ARG_WG_ENDPOINT
 PersistentKeepalive = 25
 EOF
     )
+
+    # Приватники вшиты в conf'ы (wg0.conf + wireguard-client.conf) и дальше не
+    # читаются - не держим лишние копии ключей на диске.
+    if command -v shred >/dev/null 2>&1; then
+        shred -u "$WG_DIR/server.key" "$WG_DIR/client.key" 2>/dev/null || true
+    else
+        rm -f "$WG_DIR/server.key" "$WG_DIR/client.key"
+    fi
 
     emit WG_EXISTS no
     emit WG_PORT "$ARG_WG_PORT"
@@ -968,6 +1041,7 @@ cmd_peer_add() {
     command -v wg >/dev/null 2>&1 || die "wireguard-tools not installed"
     # Ссылка без conf бессмысленна — проверяем до любых мутаций.
     command -v base64 >/dev/null 2>&1 || die "base64 not available on server"
+    _lock
     local conf iface
     conf=$(_share_conf)
     [ -n "$conf" ] || die "no wireguard backend"
@@ -1114,6 +1188,7 @@ cmd_peer_remove() {
     parse_args "$@"
     [ -n "$ARG_PUBKEY" ] || die "--pubkey required"
     command -v wg >/dev/null 2>&1 || die "wireguard-tools not installed"
+    _lock
     local conf iface
     conf=$(_share_conf)
     [ -n "$conf" ] || die "no wireguard backend"
@@ -1188,6 +1263,7 @@ cmd_client_add() {
     parse_args "$@"
     [ -n "$ARG_CLIENT_ID" ] || die "--client-id required"
     [ -n "$ARG_NAME_B64" ] || die "--name-b64 required"
+    _lock
     _clients_add "$ARG_CLIENT_ID" "$(_name_from_b64 "$ARG_NAME_B64")"
     echo "RESULT=ok"
     trap - EXIT
@@ -1242,6 +1318,7 @@ cmd_share_list() {
 cmd_client_remove() {
     parse_args "$@"
     [ -n "$ARG_CLIENT_ID" ] || die "--client-id required"
+    _lock
     if [ -f "$OWNERCIDFILE" ] && [ "$(tr -d ' \r\n' < "$OWNERCIDFILE")" = "$ARG_CLIENT_ID" ]; then
         die "cannot remove owner client id"
     fi
@@ -1258,6 +1335,9 @@ _kill_old_services() {
     log "stopping old services (vk-turn-proxy) if any"
     if has_systemd; then
         systemctl stop vk-turn-proxy.service 2>/dev/null || true
+        # Гасим свой юнит штатно ДО fuser -9 по порту ниже - иначе fuser убивает
+        # живой процесс и дерётся с Restart= systemd.
+        systemctl stop "$UNIT_NAME" 2>/dev/null || true
     fi
     pkill -9 -f "vk-turn-proxy" 2>/dev/null || true
 
@@ -1282,6 +1362,8 @@ cmd_start() {
     parse_args "$@"
     [ -n "$ARG_LISTEN" ]  || die "--listen required"
     [ -n "$ARG_CONNECT" ] || die "--connect required"
+
+    _lock
 
     # Владелец сидится в allowlist ДО запуска с -clients-file — иначе после
     # включения авторизации он сам не подключится. И ДО остановки сервера:
@@ -1326,6 +1408,7 @@ _stop_systemd() {
 }
 
 cmd_stop() {
+    _lock
     case "$(current_runtime)" in
         systemd) _stop_systemd ;;
         nohup)   _stop_nohup ;;
