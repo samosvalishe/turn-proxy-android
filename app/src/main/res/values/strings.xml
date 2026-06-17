@@ -389,6 +389,8 @@
     <string name="nerd_launch_server">Сервер</string>
     <string name="nerd_launch_client">Клиент</string>
     <string name="open_logs">Открыть логи</string>
+    <string name="nav_logs">Логи</string>
+    <string name="logs_actions">Действия с логами</string>
 
     <!-- Настройки (новый раздел) -->
     <string name="nav_settings">Настройки</string>

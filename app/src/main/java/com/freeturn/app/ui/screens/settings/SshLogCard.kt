@@ -7,11 +7,6 @@ package com.freeturn.app.ui.screens.settings
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -39,13 +34,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
-import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.theme.Spacing
 
 /**
@@ -154,15 +147,13 @@ internal fun SshLogCard(
 }
 
 /**
- * Консоль SSH-лога: моноширинная панель с приглашением "❯" и мигающим курсором в конце.
- * Автопрокрутка к свежим строкам.
+ * Консоль SSH-лога: моноширинная панель с выводом команд. Автопрокрутка к свежим строкам.
  */
 @Composable
 private fun SshTerminalPane(lines: List<String>) {
     // Тональные роли M3, как у LogPane соседних карточек: панель живёт в теме
-    // (light/dark/dynamic color), консольность несут моно-шрифт, промпт и курсор.
+    // (light/dark/dynamic color), консольность несёт моно-шрифт.
     val fg = MaterialTheme.colorScheme.onSurfaceVariant
-    val accent = MaterialTheme.colorScheme.primary
     Surface(
         shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -188,28 +179,6 @@ private fun SshTerminalPane(lines: List<String>) {
                 // Склейка дорогая (кап 500 строк) - кэшируем по содержимому лога.
                 val text = remember(lines) { lines.joinToString("\n") }
                 Text(text, style = mono, color = fg)
-            }
-            Row {
-                Text("❯ ", style = mono, color = accent)
-                if (LocalReducedMotion.current) {
-                    Text("▍", style = mono, color = accent)
-                } else {
-                    // Альфа в draw-фазе через graphicsLayer: чтение анимации в композиции
-                    // рекомпозило бы строку на каждом кадре мигания.
-                    val blink = rememberInfiniteTransition(label = "ssh_cursor")
-                        .animateFloat(
-                            initialValue = 1f,
-                            targetValue = 0.1f,
-                            animationSpec = infiniteRepeatable(tween(600), RepeatMode.Reverse),
-                            label = "ssh_cursor_alpha"
-                        )
-                    Text(
-                        "▍",
-                        style = mono,
-                        color = accent,
-                        modifier = Modifier.graphicsLayer { alpha = blink.value }
-                    )
-                }
             }
         }
     }

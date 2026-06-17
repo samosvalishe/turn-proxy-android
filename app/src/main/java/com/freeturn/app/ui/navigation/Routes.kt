@@ -10,12 +10,15 @@ import kotlinx.serialization.Serializable
 
 // --- Графы-вкладки ---
 @Serializable data object HomeGraph
+@Serializable data object LogsGraph
 @Serializable data object ShareGraph
 @Serializable data object AddGraph
 @Serializable data object SettingsGraph
 
 // --- Вкладка "Главная" ---
 @Serializable data object Home
+
+// --- Вкладка "Логи" (видна при nerdMode + включённых логах) ---
 @Serializable data object Logs
 
 // --- Вкладка "Поделиться" ---

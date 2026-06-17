@@ -4,15 +4,11 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
-import com.freeturn.app.ui.screens.logs.LogsScreen
 import com.freeturn.app.ui.screens.home.HomeScreen
 import com.freeturn.app.viewmodel.proxy.ProxyViewModel
 import com.freeturn.app.viewmodel.settings.SettingsViewModel
 
-/**
- * Вкладка "Главная". Экран логов живёт в шапке Home (виден при включённом "Показывать
- * логи") и открывается в стеке этой же вкладки.
- */
+/** Вкладка "Главная". Логи - отдельная вкладка нижнего меню (см. [logsGraph]). */
 internal fun NavGraphBuilder.homeGraph(
     navController: NavHostController,
     settingsViewModel: SettingsViewModel,
@@ -23,7 +19,6 @@ internal fun NavGraphBuilder.homeGraph(
             HomeScreen(
                 settingsViewModel = settingsViewModel,
                 proxyViewModel = proxyViewModel,
-                onOpenLogs = { if (entry.isResumed()) navController.navigate(Logs) },
                 // Хаб живёт в графе настроек. Прямой navigate отсюда пушил бы settings-экраны
                 // в стек вкладки "Главная" - save/restore вкладок портится. Поэтому сперва
                 // честно переключаем вкладку, затем пушим хаб в её стек.
@@ -39,9 +34,6 @@ internal fun NavGraphBuilder.homeGraph(
                 // иначе бар перестаёт возвращать на главную).
                 onAddServer = { if (entry.isResumed()) navController.navigateToTab(AddGraph) }
             )
-        }
-        composable<Logs> {
-            LogsScreen(proxyViewModel = proxyViewModel)
         }
     }
 }

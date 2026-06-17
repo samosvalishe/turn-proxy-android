@@ -1,11 +1,17 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@file:OptIn(
+    androidx.compose.material3.ExperimentalMaterial3Api::class,
+    androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class
+)
 
 package com.freeturn.app.ui.screens.logs
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -16,16 +22,22 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.FloatingActionButtonMenu
+import androidx.compose.material3.FloatingActionButtonMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -37,13 +49,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
+import com.freeturn.app.ui.components.EmptyState
 import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.ui.theme.Spacing
 import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.ui.util.copyToClipboard
 import com.freeturn.app.viewmodel.proxy.ProxyViewModel
-import com.freeturn.app.ui.theme.Spacing
 
+/** Вкладка логов: терминальная панель с подсветкой по уровню. */
 @Composable
 fun LogsScreen(proxyViewModel: ProxyViewModel) {
     val context = LocalContext.current
@@ -54,75 +68,108 @@ fun LogsScreen(proxyViewModel: ProxyViewModel) {
         if (logs.isNotEmpty()) listState.animateScrollToItem(logs.lastIndex)
     }
 
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            LargeFlexibleTopAppBar(
                 title = { Text(stringResource(R.string.logs_title)) },
-                scrollBehavior = scrollBehavior,
-                actions = {
-                    IconButton(
-                        onClick = {
-                            context.copyToClipboard("proxy_logs", logs.joinToString("\n"))
-                            HapticUtil.perform(context, HapticUtil.Pattern.SUCCESS)
-                        },
-                        enabled = logs.isNotEmpty()
-                    ) {
-                        Icon(
-                            painterResource(R.drawable.content_copy_24px),
-                            contentDescription = stringResource(R.string.copy)
-                        )
-                    }
-                    IconButton(
-                        onClick = {
-                            HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                            proxyViewModel.clearLogs()
-                        },
-                        enabled = logs.isNotEmpty()
-                    ) {
-                        Icon(
-                            painterResource(R.drawable.delete_24px),
-                            contentDescription = stringResource(R.string.clear)
-                        )
-                    }
+                scrollBehavior = scrollBehavior
+            )
+        },
+        floatingActionButton = {
+            LogsActionsFab(
+                hasLogs = logs.isNotEmpty(),
+                onCopy = {
+                    context.copyToClipboard("proxy_logs", logs.joinToString("\n"))
+                    HapticUtil.perform(context, HapticUtil.Pattern.SUCCESS)
+                },
+                onClear = {
+                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                    proxyViewModel.clearLogs()
                 }
             )
-        }
+        },
+        // Вкладка живёт в NavigationSuite - нижний бар сам держит инсет.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
-        if (logs.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    stringResource(R.string.no_logs),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentAlignment = Alignment.TopCenter
+        ) {
+            if (logs.isEmpty()) {
+                EmptyState(
+                    iconRes = R.drawable.terminal_24px,
+                    desc = stringResource(R.string.no_logs),
+                    modifier = Modifier.fillMaxSize()
                 )
-            }
-        } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.TopCenter
-            ) {
-                LazyColumn(
-                    state = listState,
+            } else {
+                Surface(
+                    shape = MaterialTheme.shapes.large,
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
                     modifier = Modifier
                         .widthIn(max = SettingsContentMaxWidth)
                         .fillMaxSize()
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.md)
                 ) {
-                    itemsIndexed(logs, key = { index, _ -> index }) { _, line ->
-                        LogLine(line = line)
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(vertical = Spacing.md)
+                    ) {
+                        itemsIndexed(logs, key = { index, _ -> index }) { _, line ->
+                            LogLine(line = line)
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+/**
+ * Expressive FAB-меню действий над логами: по тапу раскрывает "Копировать" и "Очистить".
+ * Пункты no-op при пустом логе.
+ */
+@Composable
+private fun LogsActionsFab(
+    hasLogs: Boolean,
+    onCopy: () -> Unit,
+    onClear: () -> Unit
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+
+    FloatingActionButtonMenu(
+        expanded = expanded,
+        button = {
+            ToggleFloatingActionButton(
+                checked = expanded,
+                onCheckedChange = { expanded = it }
+            ) {
+                // ToggleFloatingActionButton не задаёт контентный цвет - тинтуем сами
+                // под контейнер (primaryContainer в покое -> primary при раскрытии).
+                Icon(
+                    painterResource(R.drawable.more_vert_24px),
+                    contentDescription = stringResource(R.string.logs_actions),
+                    tint = if (expanded) MaterialTheme.colorScheme.onPrimary
+                    else MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
+    ) {
+        FloatingActionButtonMenuItem(
+            onClick = { expanded = false; if (hasLogs) onCopy() },
+            icon = { Icon(painterResource(R.drawable.content_copy_24px), contentDescription = null) },
+            text = { Text(stringResource(R.string.copy)) }
+        )
+        FloatingActionButtonMenuItem(
+            onClick = { expanded = false; if (hasLogs) onClear() },
+            icon = { Icon(painterResource(R.drawable.delete_24px), contentDescription = null) },
+            text = { Text(stringResource(R.string.clear)) }
+        )
     }
 }
 

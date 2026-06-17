@@ -73,9 +73,20 @@ fun AppNavigation(
 
     val proxyState by proxyViewModel.proxyState.collectAsStateWithLifecycle()
     val initialTgSubscribeShown by settingsViewModel.initialTgSubscribeShown.collectAsStateWithLifecycle()
+    val nerdMode by settingsViewModel.nerdMode.collectAsStateWithLifecycle()
+    val clientConfig by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
+    // Вкладка логов видна только в режиме отладки при включённых логах.
+    val logsTabVisible = nerdMode && clientConfig.logsEnabled
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val destination = backStackEntry?.destination
+
+    // Логи выключили на их же вкладке - уводим на главную (иначе экран без подсветки).
+    LaunchedEffect(logsTabVisible) {
+        if (!logsTabVisible && destination?.hierarchy?.any { it.hasRoute(LogsGraph::class) } == true) {
+            navController.navigateToTab(HomeGraph)
+        }
+    }
 
     // Смена активного профиля делает сохранённый стек вкладки "Настройки" устаревшим
     // (там мог остаться хаб другого сервера) - сбрасываем его к корню. Если стек
@@ -101,7 +112,10 @@ fun AppNavigation(
     NavigationSuiteScaffold(
         navigationSuiteType = suiteType,
         navigationItems = {
-            navItems.forEach { item ->
+            val items = if (logsTabVisible) {
+                navItems.toMutableList().apply { add(1, logsNavItem) }
+            } else navItems
+            items.forEach { item ->
                 val selected = destination?.hierarchy?.any { it.hasRoute(item.graphRoute::class) } == true
                 NavigationSuiteItem(
                     selected = selected,
@@ -212,6 +226,7 @@ private fun AppNavHost(
         }
     ) {
         homeGraph(navController, settingsViewModel, proxyViewModel)
+        logsGraph(proxyViewModel)
         shareGraph(navController)
         addGraph(navController, settingsViewModel)
         settingsGraph(navController, settingsViewModel, proxyViewModel, serverViewModel)
@@ -245,6 +260,10 @@ private fun TelegramSubscribeDialog(onSubscribe: () -> Unit, onDismiss: () -> Un
         }
     )
 }
+
+// Вставляется вторым пунктом, когда вкладка логов видна (см. logsTabVisible).
+private val logsNavItem =
+    NavItem(LogsGraph, Logs, R.string.nav_logs, R.drawable.terminal_24px, R.drawable.terminal_24px)
 
 private val navItems = listOf(
     NavItem(HomeGraph, Home, R.string.nav_home, R.drawable.home_24px, R.drawable.home_outlined_24px),

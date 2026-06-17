@@ -18,14 +18,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.BottomSheetScaffold
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
@@ -37,11 +34,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.freeturn.app.R
 import com.freeturn.app.data.config.SplitTunnelMode
 import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.data.HapticUtil
@@ -57,7 +51,6 @@ import com.freeturn.app.ui.theme.Spacing
 fun HomeScreen(
     settingsViewModel: SettingsViewModel,
     proxyViewModel: ProxyViewModel,
-    onOpenLogs: () -> Unit,
     onOpenServerSettings: (String) -> Unit,
     onAddServer: () -> Unit
 ) {
@@ -66,7 +59,6 @@ fun HomeScreen(
     val connectedSince by proxyViewModel.connectedSince.collectAsStateWithLifecycle()
     val uptimeText = rememberProxyUptime(connectedSince)
     val clientConfig by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
-    val nerdMode by settingsViewModel.nerdMode.collectAsStateWithLifecycle()
     val updateState by settingsViewModel.updateState.collectAsStateWithLifecycle()
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
     val serversSnapshot by settingsViewModel.serversSnapshot.collectAsStateWithLifecycle()
@@ -104,36 +96,16 @@ fun HomeScreen(
     }
 
     val sheetColor = MaterialTheme.colorScheme.surfaceContainerLow
-    val topBar: @Composable () -> Unit = {
-        // TopAppBar: только иконка логов и инсеты.
-        TopAppBar(
-            title = {},
-            actions = {
-                // Вход в экран логов (nerdMode + logsEnabled).
-                if (clientConfig.logsEnabled && nerdMode) {
-                    IconButton(onClick = {
-                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                        onOpenLogs()
-                    }) {
-                        Icon(
-                            painterResource(R.drawable.terminal_24px),
-                            contentDescription = stringResource(R.string.open_logs)
-                        )
-                    }
-                }
-            }
-        )
-    }
 
     // Без серверов: Scaffold с приглашением добавить. Не загружен: пустое тело.
     when {
         !serversSnapshot.loaded ->
-            Scaffold(topBar = topBar, snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
+            Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
                 Box(Modifier.fillMaxSize().padding(padding))
             }
 
         serversSnapshot.list.isEmpty() ->
-            Scaffold(topBar = topBar, snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
+            Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
                 HomeEmptyState(
                     onAddServer = {
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
@@ -168,7 +140,6 @@ fun HomeScreen(
                     onSaveCallLink = { settingsViewModel.setActiveVkLink(it) }
                 )
             },
-            topBar = topBar,
             snackbarHost = { SnackbarHost(snackbarHostState) }
         ) { padding ->
             Box(modifier = Modifier.fillMaxSize().padding(padding)) {
