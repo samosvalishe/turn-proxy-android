@@ -82,6 +82,10 @@ class SettingsViewModel(
     val privacyMode: StateFlow<Boolean> = prefs.privacyModeFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    // Не StateFlow: .value мог бы вернуть дефолт до первого emit DataStore и скипнуть
+    // диалог в первую сессию - тут ждём реальное значение.
+    suspend fun batteryPromptShownOnce(): Boolean = prefs.batteryPromptShownFlow.first()
+
     // Дебаунс быстрых тыков тоггла синка: persist мгновенный, а дорогой сетевой
     // side-effect (SSH stop+start + рестарт прокси) откладывается и коалесцируется.
     private val syncSideEffectMutex = Mutex()
@@ -114,6 +118,10 @@ class SettingsViewModel(
 
     fun setTgSubscribeShown() {
         viewModelScope.launch { prefs.setTgSubscribeShown() }
+    }
+
+    fun setBatteryPromptShown() {
+        viewModelScope.launch { prefs.setBatteryPromptShown() }
     }
 
     /**

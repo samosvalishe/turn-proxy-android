@@ -71,7 +71,7 @@ fun HomeScreen(
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
     val serversSnapshot by settingsViewModel.serversSnapshot.collectAsStateWithLifecycle()
 
-    RequestStartupPermissions()
+    RequestStartupPermissions(settingsViewModel)
 
     val showSplitSheet = rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }

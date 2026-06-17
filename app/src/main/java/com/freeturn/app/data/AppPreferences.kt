@@ -36,6 +36,7 @@ class AppPreferences(context: Context) {
         val NERD_MODE = booleanPreferencesKey("nerd_mode")
         val PRIVACY_MODE = booleanPreferencesKey("privacy_mode")
         val TG_SUBSCRIBE_SHOWN = booleanPreferencesKey("tg_subscribe_shown")
+        val BATTERY_PROMPT_SHOWN = booleanPreferencesKey("battery_prompt_shown")
         val SERVERS_JSON = stringPreferencesKey("servers_json")
         val ACTIVE_SERVER_ID = stringPreferencesKey("active_server_id")
         val OWN_CLIENT_ID = stringPreferencesKey("own_client_id")
@@ -87,6 +88,10 @@ class AppPreferences(context: Context) {
     val privacyModeFlow: Flow<Boolean> = prefFlow { prefs -> prefs[PRIVACY_MODE] ?: false }
 
     val tgSubscribeShownFlow: Flow<Boolean> = prefFlow { prefs -> prefs[TG_SUBSCRIBE_SHOWN] ?: false }
+
+    // Один раз за установку: на MIUI/HyperOS isIgnoringBatteryOptimizations остаётся false
+    // даже после "не ограничивать" - без флага диалог всплывал бы каждый запуск.
+    val batteryPromptShownFlow: Flow<Boolean> = prefFlow { prefs -> prefs[BATTERY_PROMPT_SHOWN] ?: false }
 
     // --- CRUD серверов ---
     // Каждая операция - одна транзакция dataStore.edit: атомарный read-modify-write,
@@ -213,6 +218,10 @@ class AppPreferences(context: Context) {
 
     suspend fun setTgSubscribeShown() {
         context.dataStore.edit { prefs -> prefs[TG_SUBSCRIBE_SHOWN] = true }
+    }
+
+    suspend fun setBatteryPromptShown() {
+        context.dataStore.edit { prefs -> prefs[BATTERY_PROMPT_SHOWN] = true }
     }
 
     /** Постоянный Client ID владельца. Генерируется один раз. */
