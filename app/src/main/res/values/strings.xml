@@ -339,6 +339,12 @@
     <string name="tile_service_label">Free Turn</string>
     <string name="proxy_active_wireguard">Прокси и WireGuard активны</string>
 
+    <!-- App Shortcuts (long-press иконки) -->
+    <string name="shortcut_start_short">Запуск</string>
+    <string name="shortcut_start_long">Запустить прокси</string>
+    <string name="shortcut_stop_short">Стоп</string>
+    <string name="shortcut_stop_long">Остановить прокси</string>
+
     <!-- Туннельное приложение (WireGuard) -->
     <string name="wireguard_tunnel_name">Имя туннеля</string>
     <string name="wireguard_mtu">MTU</string>

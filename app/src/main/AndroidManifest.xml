@@ -65,7 +65,22 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="freeturn" />
             </intent-filter>
+            <!-- Долгое нажатие плитки Quick Settings открывает приложение. -->
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
+
+        <!-- Трамплин App Shortcuts (long-press иконки): шлёт START/STOP в ProxyReceiver. -->
+        <activity
+            android:name=".service.ProxyShortcutActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <service
             android:name=".service.ProxyService"

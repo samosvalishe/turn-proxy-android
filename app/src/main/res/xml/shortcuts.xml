@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="start_proxy"
+        android:enabled="true"
+        android:icon="@drawable/play_arrow_24px"
+        android:shortcutShortLabel="@string/shortcut_start_short"
+        android:shortcutLongLabel="@string/shortcut_start_long">
+        <intent
+            android:action="com.freeturn.app.START_PROXY"
+            android:targetPackage="com.freeturn.app"
+            android:targetClass="com.freeturn.app.service.ProxyShortcutActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="stop_proxy"
+        android:enabled="true"
+        android:icon="@drawable/stop_24px"
+        android:shortcutShortLabel="@string/shortcut_stop_short"
+        android:shortcutLongLabel="@string/shortcut_stop_long">
+        <intent
+            android:action="com.freeturn.app.STOP_PROXY"
+            android:targetPackage="com.freeturn.app"
+            android:targetClass="com.freeturn.app.service.ProxyShortcutActivity" />
+    </shortcut>
+</shortcuts>
