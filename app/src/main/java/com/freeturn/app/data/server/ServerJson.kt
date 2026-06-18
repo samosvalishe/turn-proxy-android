@@ -78,6 +78,7 @@ internal object ServerJson {
         put("opts", JSONObject().apply {
             put("obfProfile", p.opts.obfProfile)
             put("obfKey", p.opts.obfKey)
+            put("obfTiming", p.opts.obfTiming)
         })
     }
 
@@ -145,7 +146,8 @@ internal object ServerJson {
                 obfProfile = optsO.optString("obfProfile", ObfProfile.NONE).let {
                     if (it in ObfProfile.VALUES) it else ObfProfile.NONE
                 },
-                obfKey = optsO.optString("obfKey", "")
+                obfKey = optsO.optString("obfKey", ""),
+                obfTiming = optsO.optInt("obfTiming", 0)
             )
         )
     }

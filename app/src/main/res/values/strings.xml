@@ -207,6 +207,7 @@
     <string name="obf_none">Выкл</string>
     <string name="obf_rtpopus">rtpopus</string>
     <string name="obf_rtpopus2">rtpopus2</string>
+    <string name="obf_rtpopus3">rtpopus3</string>
     <string name="provider_vk">VK Calls</string>
     <string name="obf_key_empty_hint">Пусто - ключ сгенерируется при применении</string>
     <string name="obf_key_invalid_hint">Неверный формат - нужны 64 hex-символа</string>
@@ -233,6 +234,8 @@
     <string name="dns_custom_hint">Через запятую/пробел. Приоритет над DNS оператора. Пусто - не задавать.</string>
     <string name="dns_custom_invalid">Некорректные DNS-адреса будут пропущены.</string>
 
+    <string name="obf_timing_label">Тайминг обфускации (мс)</string>
+    <string name="obf_timing_hint">0 - отключено. Задержка между пакетами в мс.</string>
     <string name="obf_select_profile_hint">Выберите профиль обфускации, чтобы задать ключ.</string>
 
     <!-- LogsScreen -->

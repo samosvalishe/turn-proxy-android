@@ -31,6 +31,7 @@ class ProxyOrchestrator(
             tcpMode = tcpMode,
             obfProfile = if (opts.obfEnabled) opts.obfProfile else "none",
             obfKey = if (opts.obfEnabled) opts.obfKey else "",
+            obfTiming = if (opts.obfEnabled) opts.obfTiming else 0,
             clientId = prefs.ownClientId()
         )
     }

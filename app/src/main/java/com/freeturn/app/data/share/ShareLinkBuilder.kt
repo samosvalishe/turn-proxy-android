@@ -19,6 +19,7 @@ object ShareLinkBuilder {
         val tcpMode = if (info.hasRunArgs) info.mode == "tcp" else server.client.tcpForward
         val obfProfile = if (info.hasRunArgs) info.obfProfile else server.opts.obfProfile
         val obfKey = if (info.hasRunArgs) info.obfKey else server.opts.obfKey
+        val obfTiming = if (info.hasRunArgs) info.obfTiming else server.opts.obfTiming
         return FreeturnLink(
             provider = server.client.provider,
             peer = server.client.serverAddress,
@@ -27,6 +28,7 @@ object ShareLinkBuilder {
             bond = tcpMode && server.client.bond,
             obfProfile = if (ObfProfile.isValidKey(obfKey)) obfProfile else "",
             obfKey = if (ObfProfile.isValidKey(obfKey)) obfKey else "",
+            obfTiming = if (ObfProfile.isValidKey(obfKey)) obfTiming else 0,
             clientId = clientId.trim(),
             name = userName.trim(),
             wgConf = wgConf?.let(::normalizeConf).orEmpty(),

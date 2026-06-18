@@ -102,6 +102,9 @@ fun ServerManagementScreen(
     var tcpDraft by rememberSaveable(effClient.tcpForward) { mutableStateOf(effClient.tcpForward) }
     var obfDraft by rememberSaveable(effServer.obfProfile) { mutableStateOf(effServer.obfProfile) }
     var keyDraft by rememberSaveable(effServer.obfKey) { mutableStateOf(effServer.obfKey) }
+    var timingDraft by rememberSaveable(effServer.obfTiming) {
+        mutableStateOf(effServer.obfTiming.toString())
+    }
 
     // SSH-сессию держит хаб (свой реконнект не нужен).
 
@@ -120,7 +123,8 @@ fun ServerManagementScreen(
     val configDirty = proxyDirty ||
         tcpDraft != effClient.tcpForward ||
         obfDraft != effServer.obfProfile ||
-        keyDraft != effServer.obfKey
+        keyDraft != effServer.obfKey ||
+        (timingDraft.toIntOrNull() ?: 0) != effServer.obfTiming
     // Ключ валиден: обфускация выкл, 64 hex, или пусто.
     val keyOkForApply = obfDraft == ObfProfile.NONE || keyDraft.isBlank() ||
         ObfProfile.isValidKey(keyDraft)
@@ -131,11 +135,12 @@ fun ServerManagementScreen(
     fun applyConfig() {
         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
         // Активный - apply в живой рантайм (один рестарт). Неактивный - пишем только снимок сервера.
+        val timingMs = timingDraft.toIntOrNull() ?: 0
         if (isActive) {
-            settingsViewModel.applyServerConfig(listenFull, proxyConnect, tcpDraft, obfDraft, keyDraft)
+            settingsViewModel.applyServerConfig(listenFull, proxyConnect, tcpDraft, obfDraft, keyDraft, timingMs)
         } else {
             // !isActive ⇒ serverId != null (см. isActive выше) - smart cast.
-            settingsViewModel.updateServerConfig(serverId, listenFull, proxyConnect, tcpDraft, obfDraft, keyDraft)
+            settingsViewModel.updateServerConfig(serverId, listenFull, proxyConnect, tcpDraft, obfDraft, keyDraft, timingMs)
         }
         onBack()
     }
@@ -300,6 +305,8 @@ fun ServerManagementScreen(
                         keyDraft = keyDraft,
                         onKeyDraft = { keyDraft = it },
                         savedObfKey = effServer.obfKey,
+                        obfTimingDraft = timingDraft,
+                        onObfTimingDraft = { timingDraft = it },
                         privacyMode = privacyMode,
                         onCopyKey = {
                             HapticUtil.perform(context, HapticUtil.Pattern.CLICK)

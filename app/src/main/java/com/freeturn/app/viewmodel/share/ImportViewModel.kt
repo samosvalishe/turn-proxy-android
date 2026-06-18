@@ -148,7 +148,8 @@ class ImportViewModel(
             ),
             opts = ServerOpts(
                 obfProfile = link.obfProfile.ifBlank { ObfProfile.NONE },
-                obfKey = link.obfKey
+                obfKey = link.obfKey,
+                obfTiming = link.obfTiming
             )
         )
     }

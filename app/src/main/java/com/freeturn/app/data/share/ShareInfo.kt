@@ -9,6 +9,7 @@ data class ShareInfo(
     val mode: String = "",
     val obfProfile: String = "",
     val obfKey: String = "",
+    val obfTiming: Int = 0,
     /** Есть WG-conf в /etc/wireguard -> шарим VPN-доступ (peer-add). Иначе - прокси. */
     val wgBackend: Boolean = false
 ) {

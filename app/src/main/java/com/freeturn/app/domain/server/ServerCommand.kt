@@ -59,6 +59,7 @@ sealed class ServerCommand {
             if (opts.obfProfile != "none" && opts.obfKey.isNotBlank()) {
                 add("--obf-profile=${opts.obfProfile}")
                 add("--obf-key=${opts.obfKey}")
+                if (opts.obfTiming > 0) add("--obf-timing=${opts.obfTiming}")
             }
             // cid владельца для allowlist.
             if (opts.clientId.isNotBlank()) add("--client-id=${opts.clientId}")
@@ -90,10 +91,12 @@ data class ServerStartOptions(
     val connect: String,
     /** true -> -mode tcp (TCP-форвард). false -> udp-релей (дефолт ядра). */
     val tcpMode: Boolean = false,
-    /** Wire-профиль обфускации: none | rtpopus | rtpopus2. */
+    /** Wire-профиль обфускации: none | rtpopus | rtpopus2 | rtpopus3. */
     val obfProfile: String = "none",
     /** 64-hex obf-ключ. Пустая строка -> запуск без обфускации. */
     val obfKey: String = "",
+    /** Задержка тайминга обфускации в мс (--obf-timing). 0 - дефолт ядра. */
+    val obfTiming: Int = 0,
     /** Client ID владельца (добавляется в clients.json). */
     val clientId: String = ""
 )

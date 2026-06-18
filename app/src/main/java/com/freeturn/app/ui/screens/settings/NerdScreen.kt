@@ -315,7 +315,8 @@ private fun serverCommandLine(server: Server, privacy: Boolean): String {
         connect = server.proxyConnect,
         tcpMode = server.client.tcpForward,
         obfProfile = if (server.opts.obfEnabled) server.opts.obfProfile else ObfProfile.NONE,
-        obfKey = if (server.opts.obfEnabled) server.opts.obfKey else ""
+        obfKey = if (server.opts.obfEnabled) server.opts.obfKey else "",
+        obfTiming = if (server.opts.obfEnabled) server.opts.obfTiming else 0
     )
     // Серверные флаги в форме --flag=value: маскируем хвост после '=' у секретов.
     val shown = ServerCommand.Start(opts).toArgv().joinToString(" ") { tok ->

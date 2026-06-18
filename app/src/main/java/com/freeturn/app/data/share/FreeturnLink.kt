@@ -16,6 +16,7 @@ data class FreeturnLink(
     val bond: Boolean = false,
     val obfProfile: String = "",
     val obfKey: String = "",
+    val obfTiming: Int = 0,
     val n: Int = 0,
     val streamsPerCred: Int = 0,
     val clientId: String = "",
@@ -38,6 +39,7 @@ data class FreeturnLink(
         if (obfProfile.isNotEmpty() && obfProfile != "none") {
             sb.field("obf", jsonString(obfProfile))
             sb.field("key", jsonString(obfKey))
+            if (obfTiming > 0) sb.field("timing", obfTiming.toString())
         }
         if (n != 0) sb.field("n", n.toString())
         if (streamsPerCred != 0) sb.field("spc", streamsPerCred.toString())
@@ -81,6 +83,7 @@ data class FreeturnLink(
                 bond = o.optBoolean("bond", false),
                 obfProfile = o.optString("obf"),
                 obfKey = o.optString("key"),
+                obfTiming = o.optInt("timing", 0),
                 n = o.optInt("n", 0),
                 streamsPerCred = o.optInt("spc", 0),
                 clientId = o.optString("cid"),
