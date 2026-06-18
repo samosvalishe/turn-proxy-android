@@ -22,8 +22,11 @@ CoreArgs {
     ): List<String> = buildList {
         add("-peer"); add(cfg.serverAddress)
         add("-provider"); add(cfg.provider)
-        // -link нужен только провайдеру vk (callroom URL).
-        if (cfg.provider == Provider.VK) { add("-link"); add(cfg.vkLink) }
+        // -link / -links: одна ссылка или несколько через запятую.
+        if (cfg.provider == Provider.VK) {
+            if (cfg.vkLink.contains(',')) { add("-links"); add(cfg.vkLink) }
+            else { add("-link"); add(cfg.vkLink) }
+        }
         add("-listen"); add(cfg.localPort)
         if (cfg.threads > 0) { add("-n"); add(cfg.threads.toString()) }
         // -streams-per-cred передаём только если пользователь поменял дефолт ядра (10).
@@ -39,6 +42,7 @@ CoreArgs {
         if (srv.obfEnabled && ObfProfile.isValidKey(srv.obfKey)) {
             add("-obf-profile"); add(srv.obfProfile)
             add("-obf-key"); add(srv.obfKey)
+            if (srv.obfTiming > 0) { add("-obf-timing"); add(srv.obfTiming.toString()) }
         }
         if (cfg.manualCaptcha) add("-manual-captcha")
         // -browser: профиль VK-auth, только vk. firefox - дефолт ядра (не шлём), chrome - escape-hatch.

@@ -41,6 +41,7 @@ class ShareRepository(context: Context, ssh: SSHManager) {
                     mode = r.kv["MODE"].orEmpty(),
                     obfProfile = r.kv["OBF_PROFILE"].orEmpty(),
                     obfKey = r.kv["OBF_KEY"].orEmpty(),
+                    obfTiming = r.kv["OBF_TIMING"]?.toIntOrNull() ?: 0,
                     wgBackend = r.kv["WG_BACKEND"] == "yes"
                 )
             )

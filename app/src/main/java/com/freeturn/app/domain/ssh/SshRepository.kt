@@ -191,6 +191,7 @@ class SshRepository(
         tcpMode: Boolean = false,
         obfProfile: String = "none",
         obfKey: String = "",
+        obfTiming: Int = 0,
         clientId: String = ""
     ): Boolean = mutex.withLock {
         val cfg = activeSshConfig ?: return@withLock false
@@ -206,6 +207,7 @@ class SshRepository(
                     tcpMode = tcpMode,
                     obfProfile = obfProfile,
                     obfKey = obfKey,
+                    obfTiming = obfTiming,
                     clientId = clientId
                 )
             )

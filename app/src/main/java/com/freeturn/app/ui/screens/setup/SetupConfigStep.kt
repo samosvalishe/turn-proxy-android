@@ -31,6 +31,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.IntSize
+import com.freeturn.app.ui.components.SettingsRowDivider
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.data.config.ObfProfile
@@ -290,6 +291,20 @@ fun SetupConfigStep(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+        if (draft.obfProfile == ObfProfile.RTPOPUS3) {
+            SettingsRowDivider()
+            SettingsFieldSlot {
+                OutlinedTextField(
+                    value = draft.obfTiming,
+                    onValueChange = { v -> onDraftChange(draft.copy(obfTiming = v.filter { it.isDigit() })) },
+                    label = { Text(stringResource(R.string.obf_timing_label)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    supportingText = { Text(stringResource(R.string.obf_timing_hint)) }
+                )
+            }
+        }
     }
 
     // --- Ссылка на звонок ---
@@ -450,5 +465,6 @@ private fun obfProfileLabel(value: String): String = when (value) {
     ObfProfile.NONE -> stringResource(R.string.obf_none)
     ObfProfile.RTPOPUS -> stringResource(R.string.obf_rtpopus)
     ObfProfile.RTPOPUS2 -> stringResource(R.string.obf_rtpopus2)
+    ObfProfile.RTPOPUS3 -> stringResource(R.string.obf_rtpopus3)
     else -> value
 }

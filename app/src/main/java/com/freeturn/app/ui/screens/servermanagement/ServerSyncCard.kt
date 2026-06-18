@@ -3,6 +3,7 @@
 package com.freeturn.app.ui.screens.servermanagement
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -16,6 +17,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
 import com.freeturn.app.R
 import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.ui.components.SectionLabel
@@ -39,6 +41,8 @@ internal fun ServerSyncCard(
     keyDraft: String,
     onKeyDraft: (String) -> Unit,
     savedObfKey: String,
+    obfTimingDraft: String,
+    onObfTimingDraft: (String) -> Unit,
     privacyMode: Boolean,
     onCopyKey: () -> Unit,
     onRegenKey: () -> Unit
@@ -115,6 +119,20 @@ internal fun ServerSyncCard(
                     }
                 }
             }
+            if (obfProfile == ObfProfile.RTPOPUS3) {
+                SettingsRowDivider()
+                SettingsFieldSlot {
+                    OutlinedTextField(
+                        value = obfTimingDraft,
+                        onValueChange = { v -> onObfTimingDraft(v.filter { it.isDigit() }) },
+                        label = { Text(stringResource(R.string.obf_timing_label)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        supportingText = { Text(stringResource(R.string.obf_timing_hint)) }
+                    )
+                }
+            }
         } else {
             // obfProfile == NONE - подсказка выбрать профиль.
             SettingsFieldSlot {
@@ -133,5 +151,6 @@ private fun obfProfileLabel(value: String): String = when (value) {
     ObfProfile.NONE -> stringResource(R.string.obf_none)
     ObfProfile.RTPOPUS -> stringResource(R.string.obf_rtpopus)
     ObfProfile.RTPOPUS2 -> stringResource(R.string.obf_rtpopus2)
+    ObfProfile.RTPOPUS3 -> stringResource(R.string.obf_rtpopus3)
     else -> value
 }

@@ -65,6 +65,8 @@ data class SetupConfigDraft(
     val vpnMode: Boolean = true,
     /** Wire-профиль обфускации ([ObfProfile]); по умолчанию rtpopus (включена). */
     val obfProfile: String = ObfProfile.RTPOPUS,
+    /** Задержка тайминга обфускации в мс (-obf-timing). 0 - отключено. */
+    val obfTiming: String = "0",
     /** Внешний UDP-порт turn-прокси (56000-56999 по умолчанию). */
     val listenPort: String = "",
     /** Порт WG-бэкенда для бутстрапа (когда WG на сервере не найден). */
@@ -97,6 +99,8 @@ data class SetupSummary(
     val vpnMode: Boolean,
     /** Wire-профиль обфускации ([ObfProfile]); NONE - выключена. */
     val obfProfile: String,
+    /** Задержка тайминга обфускации в мс. */
+    val obfTiming: Int = 0,
     /** Клиентский WG-конфиг получен с сервера и сохранён в сервер. */
     val wgConfImported: Boolean,
     /** Использован существующий WireGuard - свой клиентский .conf импортируется вручную. */
@@ -317,6 +321,7 @@ class ServerSetupViewModel(
             }
 
             val obfOn = c.obfProfile != ObfProfile.NONE
+            val obfTimingMs = if (c.obfProfile == ObfProfile.RTPOPUS3) c.obfTiming.toIntOrNull() ?: 0 else 0
             repo.start(
                 cfg,
                 ServerStartOptions(
@@ -325,6 +330,7 @@ class ServerSetupViewModel(
                     tcpMode = !c.vpnMode && c.backendTcp,
                     obfProfile = c.obfProfile,
                     obfKey = if (obfOn) obfKey else "",
+                    obfTiming = obfTimingMs,
                     // Авторизация по allowlist с первого запуска: владелец сидится
                     // в clients.json, сервер стартует с -clients-file.
                     clientId = prefs.ownClientId()
@@ -351,6 +357,7 @@ class ServerSetupViewModel(
                             serverAddress = "${cfg.ip}:${c.listenPort}",
                             vpnMode = c.vpnMode,
                             obfProfile = c.obfProfile,
+                            obfTiming = c.obfTiming.toIntOrNull() ?: 0,
                             // Хинты только про авто-путь: свой conf пользователь дал сам.
                             wgConfImported = !c.wgCustomConf && wgClientConf != null,
                             usedExistingWg = c.vpnMode && !c.wgCustomConf && s.wgDetectedPort != null
@@ -382,7 +389,8 @@ class ServerSetupViewModel(
         proxyConnect = "127.0.0.1:$backendPort",
         opts = ServerOpts(
             obfProfile = c.obfProfile,
-            obfKey = if (c.obfProfile != ObfProfile.NONE) obfKey else ""
+            obfKey = if (c.obfProfile != ObfProfile.NONE) obfKey else "",
+            obfTiming = if (c.obfProfile == ObfProfile.RTPOPUS3) c.obfTiming.toIntOrNull() ?: 0 else 0
         )
     )
 

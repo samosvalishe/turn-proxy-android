@@ -284,7 +284,8 @@ class SettingsViewModel(
         connect: String,
         tcpForward: Boolean,
         obfProfile: String,
-        obfKey: String
+        obfKey: String,
+        obfTiming: Int
     ) {
         viewModelScope.launch {
             val sync = prefs.clientConfigFlow.first().syncServerSwitches
@@ -295,11 +296,12 @@ class SettingsViewModel(
                         if (obfProfile != ObfProfile.NONE) ObfProfile.generateKey() else ""
                     }
                 }
+                val actualTiming = if (obfProfile == ObfProfile.RTPOPUS3) obfTiming else 0
                 s.copy(
                     proxyListen = listen,
                     proxyConnect = connect,
                     client = s.client.copy(tcpForward = tcpForward),
-                    opts = s.opts.copy(obfProfile = obfProfile, obfKey = effKey)
+                    opts = s.opts.copy(obfProfile = obfProfile, obfKey = effKey, obfTiming = actualTiming)
                 )
             }
             if (changed) {
@@ -321,7 +323,8 @@ class SettingsViewModel(
         connect: String,
         tcpForward: Boolean,
         obfProfile: String,
-        obfKey: String
+        obfKey: String,
+        obfTiming: Int
     ) {
         viewModelScope.launch {
             prefs.updateServer(id) { target ->
@@ -330,11 +333,12 @@ class SettingsViewModel(
                         if (obfProfile != ObfProfile.NONE) ObfProfile.generateKey() else ""
                     }
                 }
+                val actualTiming = if (obfProfile == ObfProfile.RTPOPUS3) obfTiming else 0
                 target.copy(
                     proxyListen = listen,
                     proxyConnect = connect,
                     client = target.client.copy(tcpForward = tcpForward),
-                    opts = target.opts.copy(obfProfile = obfProfile, obfKey = effKey)
+                    opts = target.opts.copy(obfProfile = obfProfile, obfKey = effKey, obfTiming = actualTiming)
                 )
             }
         }

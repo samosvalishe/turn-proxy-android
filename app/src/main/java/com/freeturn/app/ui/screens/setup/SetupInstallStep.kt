@@ -269,7 +269,7 @@ private fun SetupDoneCard(summary: SetupSummary) {
                 SummaryRow(
                     stringResource(R.string.setup_summary_obf),
                     if (summary.obfProfile == ObfProfile.NONE) stringResource(R.string.setup_obf_off)
-                    else summary.obfProfile
+                    else summary.obfProfile + if (summary.obfTiming > 0) " (${summary.obfTiming}ms)" else ""
                 )
             }
 

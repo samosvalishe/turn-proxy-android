@@ -1,5 +1,8 @@
 package com.freeturn.app.domain
 
+import com.freeturn.app.domain.proxy.CoreConnectionTracker
+import com.freeturn.app.domain.proxy.CoreLogEvent
+import com.freeturn.app.domain.proxy.CoreLogParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
