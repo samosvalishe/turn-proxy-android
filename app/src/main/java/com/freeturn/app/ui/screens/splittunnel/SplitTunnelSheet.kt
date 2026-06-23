@@ -42,6 +42,8 @@ import com.freeturn.app.data.HapticUtil
 import com.freeturn.app.data.AppChoice
 import com.freeturn.app.data.installedInternetApps
 import com.freeturn.app.data.toPackageSet
+import com.freeturn.app.domain.proxy.HARD_EXCLUDED_APPS
+import com.freeturn.app.domain.proxy.isHardExcluded
 import com.freeturn.app.ui.components.EmptyState
 import com.freeturn.app.ui.theme.Spacing
 
@@ -102,13 +104,14 @@ fun SplitTunnelSheetContent(
     val controlsEnabled = splitOn && !locked
     // Последний выбранный "рабочий" режим, чтобы свитч вкл возвращал его, а не дефолт.
     var modeChoice by remember {
-        mutableStateOf(if (mode != SplitTunnelMode.ALL) mode else SplitTunnelMode.EXCLUDE)
+        mutableStateOf(if (mode != SplitTunnelMode.ALL) mode else SplitTunnelMode.INCLUDE)
     }
     var query by remember { mutableStateOf("") }
-    val selected = remember(apps) { apps.toPackageSet() }
+    val selected = remember(apps) { apps.toPackageSet() - HARD_EXCLUDED_APPS }
     // Список приложений нужен только когда сплит включён - выключенным не фетчим.
     val installed by produceState<List<AppChoice>?>(initialValue = null, splitOn) {
-        value = if (splitOn) context.installedInternetApps() else null
+        value = if (splitOn) context.installedInternetApps()
+            .filter { !isHardExcluded(it.packageName) } else null
     }
 
     // Высота контента стабильна (список фиксированной высоты), поэтому sheet

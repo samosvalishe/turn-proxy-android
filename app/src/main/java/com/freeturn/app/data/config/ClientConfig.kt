@@ -43,9 +43,9 @@ data class ClientConfig(
     /** MTU WG-интерфейса. Инжектится в [Interface] при подъёме (в сыром conf не хранится). */
     val wireGuardMtu: Int = DEFAULT_WG_MTU,
     /** Режим split-tunneling: all | include | exclude. */
-    val splitTunnelMode: String = SplitTunnelMode.ALL,
+    val splitTunnelMode: String = SplitTunnelMode.INCLUDE,
     /** Список package-имён для include/exclude (разделители: запятая/пробел/перенос строки). */
-    val splitTunnelApps: String = "",
+    val splitTunnelApps: String = DEFAULT_INCLUDED_APPS,
     /** Сбор логов ядра в UI. false = ProxyServiceState.addLog глотает строки. */
     val logsEnabled: Boolean = true,
     /** -client-id для сервера (cid из share-ссылки). Пусто = общий ID устройства. */
@@ -58,6 +58,7 @@ data class ClientConfig(
     companion object {
         const val DEFAULT_LOCAL_PORT = "127.0.0.1:9000"
         const val DEFAULT_STREAMS_PER_CRED = 6
+        const val DEFAULT_INCLUDED_APPS = "org.telegram.messenger\ncom.android.chrome\ncom.microsoft.emmx"
         // TURN-релей добавляет overhead - 1280 (минимум IPv6) против фрагментации.
         const val DEFAULT_WG_MTU = 1280
         // Диапазон валидного MTU: 1280 = минимум IPv6, 1500 = потолок Ethernet.

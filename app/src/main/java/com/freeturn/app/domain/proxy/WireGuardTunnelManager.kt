@@ -13,6 +13,47 @@ import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
+/** Приложения, которые всегда ходят напрямую, минуя туннель. */
+val HARD_EXCLUDED_APPS: Set<String> = setOf(
+    "ru.wildberries.buyer",
+    "ru.ozon.app.android",
+    "ru.sbermegamarket.app",
+    "ru.samokat.app",
+    "ru.dublgis.dgismobile",
+    "ru.vk.store",
+    "ru.ok.android",
+    "com.yandex.browser",
+    "ru.yandex.yandexmaps",
+    "ru.yandex.music",
+    "ru.kinopoisk",
+    "ru.yandex.eda",
+    "ru.yandex.taxi",
+    "ru.yandex.market",
+    "ru.sberbankmobile",
+    "com.tinkoff.itinkoff",
+    "ru.tbank.mobile",
+    "ru.alfabank.mobile.android",
+    "ru.vtb24.mobileandroid",
+    "com.vkontakte.android",
+    "ru.vk.video",
+    "ru.rutube.app",
+    "com.zen.android",
+    "ru.gosuslugi.app",
+    "ru.nspk.mirpay",
+    "ru.rzd.pass",
+    "ru.mos.parking",
+    "ru.megafon.mlk",
+    "ru.beeline.services",
+    "ru.tele2.mytele2",
+    "com.avito.android",
+    "ru.hh.android",
+    "ru.cian.main",
+    "ru.mail.mailapp",
+    "ru.oneme.app"
+)
+
+fun isHardExcluded(packageName: String): Boolean = packageName in HARD_EXCLUDED_APPS
+
 /**
  * Поднимает WireGuard-туннель поверх локального прокси.
  * Заменяет Endpoint в первом [Peer] на localPort прокси.
@@ -157,15 +198,20 @@ private fun String.withSplitTunnel(
 
     val splitLines = when (mode) {
         SplitTunnelMode.INCLUDE -> {
-            val included = packages.filter { it != appPackage }.distinct()
+            val included = packages
+                .filter { it != appPackage && !isHardExcluded(it) }
+                .distinct()
             if (included.isEmpty()) emptyList()
             else listOf("IncludedApplications = ${included.joinToString(",")}")
         }
         SplitTunnelMode.EXCLUDE -> {
-            val excluded = (packages + appPackage).distinct()
+            val excluded = (packages + HARD_EXCLUDED_APPS + appPackage).distinct()
             listOf("ExcludedApplications = ${excluded.joinToString(",")}")
         }
-        else -> listOf("ExcludedApplications = $appPackage")
+        else -> {
+            val excluded = (HARD_EXCLUDED_APPS + appPackage).distinct()
+            listOf("ExcludedApplications = ${excluded.joinToString(",")}")
+        }
     }
 
     if (splitLines.isNotEmpty()) {
