@@ -17,12 +17,12 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.freeturn.app"
+        applicationId = "com.freeturn_dev.app"
         // WireGuard GoBackend (com.wireguard.android:tunnel) требует minSdk 24.
         minSdk = 24
         targetSdk = 37
         versionCode = 32
-        versionName = "3.1.2-alfa"
+        versionName = "3.2.2-alfa"
     }
 
     splits {

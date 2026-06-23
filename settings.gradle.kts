@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "FreeTurn"
+rootProject.name = "FreeTurn_dev"
 include(":app")
