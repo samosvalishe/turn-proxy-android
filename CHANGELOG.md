@@ -4,6 +4,7 @@
 ### Fixes
 
 - .sh text eol=lf
+- резолв версии на Ubuntu 24.04+ (совместимость curl с HTTP/2)
 
 ## 3.1.4
 
