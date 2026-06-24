@@ -234,7 +234,12 @@ _resolve_version() {
     # вида .../releases/download/vX.Y.Z/<asset>. Берём из URL.
     local url="$1" loc=""
     if command -v curl >/dev/null 2>&1; then
-        loc=$(curl -sI "$url" 2>/dev/null | awk -F': ' 'tolower($1)=="location"{print $2}' | tr -d '\r' | head -n1)
+        # Способ 1: redirect_url (HTTP/1.1 и HTTP/2, curl ≥ 7.18)
+        loc=$(curl -sS -o /dev/null -w '%{redirect_url}' --max-redirs 0 "$url" 2>/dev/null)
+        # Способ 2: fallback - форсируем HTTP/1.1 и парсим Location
+        if [ -z "$loc" ]; then
+            loc=$(curl --http1.1 -sI "$url" 2>/dev/null | awk -F': ' 'tolower($1)=="location"{print $2}' | tr -d '\r' | head -n1)
+        fi
     elif command -v wget >/dev/null 2>&1; then
         loc=$(wget --spider --server-response "$url" 2>&1 | awk '/[Ll]ocation:/{print $2}' | tr -d '\r' | head -n1)
     fi
