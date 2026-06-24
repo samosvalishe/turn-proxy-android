@@ -1,4 +1,10 @@
 # Changelog
+## 3.1.5
+
+### Fixes
+
+- .sh text eol=lf
+
 ## 3.1.4
 
 ### Fixes
