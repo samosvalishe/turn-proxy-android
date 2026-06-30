@@ -17,7 +17,7 @@ sealed class ServerState {
         val running: Boolean,
         /** true - сервер запущен с -mode tcp. null если не запущен/неизвестно. */
         val tcpMode: Boolean? = null,
-        /** Профиль обфускации сервера (none|rtpopus|rtpopus2). null если не запущен/неизвестно. */
+        /** Профиль обфускации сервера (none|rtpopus|rtpopus2|rtpopus3). null если не запущен/неизвестно. */
         val obfProfile: String? = null,
         val version: String? = null
     ) : ServerState()

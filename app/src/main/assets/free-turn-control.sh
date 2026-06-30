@@ -189,7 +189,7 @@ cmd_probe() {
         cmdline=$(current_cmdline)
         # -mode tcp → MODE=tcp, иначе udp-релей (дефолт ядра).
         if echo "$cmdline" | grep -q -- "-mode tcp"; then emit MODE tcp; else emit MODE udp; fi
-        # OBF=<профиль из cmdline> (none|rtpopus|rtpopus2).
+        # OBF=<профиль из cmdline> (none|rtpopus|rtpopus2|rtpopus3).
         local obf
         obf=$(echo "$cmdline" | sed -nE 's/.*-obf-profile[= ]+([a-z0-9]+).*/\1/p')
         emit OBF "${obf:-none}"
@@ -487,7 +487,7 @@ parse_args() {
                 ;;
             --obf-profile=*)
                 ARG_OBF_PROFILE="${1#*=}"
-                [[ "$ARG_OBF_PROFILE" =~ ^(none|rtpopus|rtpopus2)$ ]] || die "bad --obf-profile (need none|rtpopus|rtpopus2)"
+                [[ "$ARG_OBF_PROFILE" =~ ^(none|rtpopus|rtpopus2|rtpopus3)$ ]] || die "bad --obf-profile (need none|rtpopus|rtpopus2|rtpopus3)"
                 ;;
             --obf-key=*)
                 ARG_OBF_KEY="${1#*=}"

@@ -41,8 +41,9 @@ CoreArgs {
             add("-obf-key"); add(srv.obfKey)
         }
         if (cfg.manualCaptcha) add("-manual-captcha")
-        // -browser: профиль VK-auth, только vk. firefox - дефолт ядра (не шлём), chrome - escape-hatch.
-        if (cfg.provider == Provider.VK && cfg.browser == Browser.CHROME) { add("-browser"); add(Browser.CHROME) }
+        // -browser: профиль VK-auth, только vk. firefox - дефолт ядра (не шлём).
+        val browser = cfg.browser.takeIf { it in Browser.VALUES } ?: Browser.DEFAULT
+        if (cfg.provider == Provider.VK && browser != Browser.FIREFOX) { add("-browser"); add(browser) }
         if (cfg.debugMode) add("-debug")
         // Ручной список DNS имеет приоритет над DNS оператора.
         val manualDns = DnsList.normalize(cfg.customDns)

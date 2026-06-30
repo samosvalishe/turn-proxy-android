@@ -11,8 +11,8 @@ data class ClientConfig(
     /** TURN-транспорт UDP (-transport udp). false = TCP/TLS (дефолт ядра и наш). */
     val useUdp: Boolean = false,
     val manualCaptcha: Boolean = false,
-    /** Браузерный профиль VK-авторизации (-browser). firefox - дефолт ядра, chrome - escape-hatch. */
-    val browser: String = Browser.FIREFOX,
+    /** Браузерный профиль VK-авторизации (-browser). */
+    val browser: String = Browser.DEFAULT,
     val localPort: String = DEFAULT_LOCAL_PORT,
     val isRawMode: Boolean = false,
     val rawCommand: String = "",

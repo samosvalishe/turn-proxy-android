@@ -7,6 +7,8 @@ import android.os.SystemClock
 import com.freeturn.app.R
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.CoreArgs
+import com.freeturn.app.data.config.Browser
+import com.freeturn.app.data.config.ClientConfig
 import com.freeturn.app.domain.CaptchaSession
 import com.freeturn.app.domain.ConnectionStats
 import com.freeturn.app.domain.proxy.CoreConnectionTracker
@@ -114,11 +116,11 @@ class CoreProcessController(
 
         // Ищем ядро (libfreeturn*.so) в nativeLibraryDir (лексикографически старшее).
         val libDir = File(context.applicationInfo.nativeLibraryDir)
-        val executable = libDir.listFiles { f ->
+        val executableFile = libDir.listFiles { f ->
             f.name.startsWith("libfreeturn") && f.name.endsWith(".so")
-        }?.maxByOrNull { it.name }?.absolutePath
+        }?.maxByOrNull { it.name }
 
-        if (executable == null) {
+        if (executableFile == null) {
             ProxyServiceState.addLog(
                 "Ядро libfreeturn*.so не найдено в ${libDir.path}. " +
                 "Положите бинарник в jniLibs/arm64-v8a/ (имя начинается с lib и оканчивается на .so)."
@@ -128,6 +130,7 @@ class CoreProcessController(
             onStopRequested()
             return
         }
+        val executable = executableFile.absolutePath
 
         val cmdArgs = mutableListOf<String>()
 
@@ -167,9 +170,7 @@ class CoreProcessController(
 
             val proc = withContext(Dispatchers.IO) {
                 val pb = ProcessBuilder(cmdArgs).redirectErrorStream(true)
-                // Перенаправляем vk_profile.json из read-only CWD в filesDir.
-                pb.environment()["VK_PROFILE_PATH"] =
-                    File(context.filesDir, "vk_profile.json").absolutePath
+                pb.environment()["VK_PROFILE_PATH"] = vkProfileFile(cfg, executableFile).absolutePath
                 // CWD подменяем на writeable dir для логов кэша tls-client и т.п.
                 pb.directory(context.filesDir)
                 pb.start()
@@ -363,6 +364,17 @@ class CoreProcessController(
         handler.postDelayed({
             if (!userStopped.get()) scope.launch { startBinaryProcess() }
         }, delayMs)
+    }
+
+    private fun vkProfileFile(cfg: ClientConfig, executable: File): File {
+        val browser = cfg.browser.takeIf { it in Browser.VALUES } ?: Browser.DEFAULT
+        val stamp = executable.lastModified().takeIf { it > 0L } ?: 0L
+        val currentName = "vk_profile_${browser}_$stamp.json"
+        context.filesDir.listFiles { file ->
+            file.name == "vk_profile.json" ||
+                (file.name.startsWith("vk_profile_${browser}_") && file.name != currentName)
+        }?.forEach { it.delete() }
+        return File(context.filesDir, currentName)
     }
 }
 

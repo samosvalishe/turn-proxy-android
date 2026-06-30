@@ -108,8 +108,8 @@ internal object ServerJson {
                 streamsPerCred = cliO.optInt("streamsPerCred", 6),
                 useUdp = cliO.optBoolean("useUdp", false),
                 manualCaptcha = cliO.optBoolean("manualCaptcha", false),
-                browser = cliO.optString("browser", Browser.FIREFOX).let {
-                    if (it in Browser.VALUES) it else Browser.FIREFOX
+                browser = cliO.optString("browser", Browser.DEFAULT).let {
+                    if (it in Browser.VALUES) it else Browser.DEFAULT
                 },
                 localPort = cliO.optString("localPort", ClientConfig.DEFAULT_LOCAL_PORT),
                 isRawMode = cliO.optBoolean("isRawMode", false),

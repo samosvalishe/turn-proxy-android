@@ -3,12 +3,20 @@
 package com.freeturn.app.ui.screens.clientsetup
 
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.freeturn.app.R
@@ -92,25 +100,13 @@ internal fun AdvancedSection(
         }
     }
 
-    // Браузерный профиль VK-авторизации (-browser): firefox (дефолт) | chrome (escape-hatch).
     SettingsCard {
         SettingsFieldSlot {
             SettingsControlLabel(
                 title = stringResource(R.string.client_browser_title),
                 desc = stringResource(R.string.client_browser_desc)
             )
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                SegmentedButton(
-                    selected = browser == Browser.FIREFOX,
-                    onClick = { onBrowser(Browser.FIREFOX) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                ) { Text(stringResource(R.string.browser_firefox)) }
-                SegmentedButton(
-                    selected = browser == Browser.CHROME,
-                    onClick = { onBrowser(Browser.CHROME) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                ) { Text(stringResource(R.string.browser_chrome)) }
-            }
+            BrowserDropdown(browser = browser, onBrowser = onBrowser)
         }
     }
 
@@ -134,6 +130,50 @@ internal fun AdvancedSection(
                     singleLine = true,
                     readOnly = privacyMode,
                     supportingText = { Text(stringResource(R.string.magic_switch_address_support)) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrowserDropdown(
+    browser: String,
+    onBrowser: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val options = listOf(
+        Browser.CHROME to stringResource(R.string.browser_chrome),
+        Browser.SAFARI to stringResource(R.string.browser_safari),
+        Browser.FIREFOX to stringResource(R.string.browser_firefox)
+    )
+    val current = options.firstOrNull { it.first == browser }?.second
+        ?: stringResource(R.string.browser_chrome)
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+        modifier = modifier
+    ) {
+        OutlinedTextField(
+            value = current,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(stringResource(R.string.client_browser_label)) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true)
+                .fillMaxWidth()
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { (value, label) ->
+                DropdownMenuItem(
+                    text = { Text(label) },
+                    onClick = {
+                        expanded = false
+                        onBrowser(value)
+                    }
                 )
             }
         }

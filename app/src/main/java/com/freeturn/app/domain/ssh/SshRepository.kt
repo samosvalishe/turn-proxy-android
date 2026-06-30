@@ -139,7 +139,7 @@ class SshRepository(
                 val running = r.kv["RUNNING"] == "yes"
                 val installed = r.kv["INSTALLED"] == "yes"
                 val tcpMode = if (running) r.kv["MODE"] == "tcp" else null
-                // OBF=<profile> (none|rtpopus|rtpopus2); null если сервер не запущен.
+                // OBF=<profile> (none|rtpopus|rtpopus2|rtpopus3); null если сервер не запущен.
                 val obfProfile = if (running) r.kv["OBF"] else null
                 val version   = r.kv["VERSION"]
                 _serverState.value = ServerState.Known(

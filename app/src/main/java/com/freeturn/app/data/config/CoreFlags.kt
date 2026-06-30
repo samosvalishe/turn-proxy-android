@@ -19,7 +19,9 @@ object Provider {
 object Browser {
     const val FIREFOX = "firefox"
     const val CHROME = "chrome"
-    val VALUES = listOf(FIREFOX, CHROME)
+    const val SAFARI = "safari"
+    const val DEFAULT = CHROME
+    val VALUES = listOf(FIREFOX, CHROME, SAFARI)
 }
 
 /** Wire-профиль обфускации payload (флаг -obf-profile ядра). Должен совпадать с сервером. */
@@ -27,7 +29,8 @@ object ObfProfile {
     const val NONE = "none"
     const val RTPOPUS = "rtpopus"
     const val RTPOPUS2 = "rtpopus2"
-    val VALUES = listOf(NONE, RTPOPUS, RTPOPUS2)
+    const val RTPOPUS3 = "rtpopus3"
+    val VALUES = listOf(NONE, RTPOPUS, RTPOPUS2, RTPOPUS3)
 
     private val KEY_REGEX = Regex("^[0-9a-fA-F]{64}$")
 

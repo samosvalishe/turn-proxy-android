@@ -5,18 +5,14 @@
 
 package com.freeturn.app.ui.screens.captcha
 
-import android.annotation.SuppressLint
-import android.graphics.Bitmap
-import android.view.ViewGroup
-import android.webkit.WebResourceRequest
-import android.webkit.WebSettings
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -24,29 +20,26 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.net.toUri
 import com.freeturn.app.R
 
-/** Разрешённые схемы для топ-навигации внутри капча-WebView. */
+/** Разрешённые схемы для открытия ручной капчи во внешнем браузере. */
 private val ALLOWED_SCHEMES = setOf("http", "https")
 
-@SuppressLint("SetJavaScriptEnabled")
 @Composable
 fun CaptchaWebViewDialog(
     captchaUrl: String,
     onDismiss: () -> Unit
 ) {
-    var isLoading by remember { mutableStateOf(true) }
+    val context = LocalContext.current
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -80,10 +73,16 @@ fun CaptchaWebViewDialog(
                 )
             }
         ) { padding ->
-            // URL приходит из лога ядра - грузим только http(s). javascript:/file:/
-            // data: в WebView с включённым JS исполнились бы в его контексте.
+            // URL приходит из лога ядра - открываем только http(s).
             val isValidUrl = remember(captchaUrl) {
                 captchaUrl.toUri().scheme?.lowercase() in ALLOWED_SCHEMES
+            }
+            LaunchedEffect(captchaUrl, isValidUrl) {
+                if (isValidUrl) {
+                    openCaptchaInBrowser(context, captchaUrl)
+                } else {
+                    onDismiss()
+                }
             }
 
             Box(
@@ -94,80 +93,33 @@ fun CaptchaWebViewDialog(
                 if (!isValidUrl) {
                     LaunchedEffect(captchaUrl) { onDismiss() }
                 } else {
-                    AndroidView(
-                        factory = { ctx ->
-                            WebView(ctx).apply {
-                                layoutParams = ViewGroup.LayoutParams(
-                                    ViewGroup.LayoutParams.MATCH_PARENT,
-                                    ViewGroup.LayoutParams.MATCH_PARENT
-                                )
-
-                                settings.apply {
-                                    javaScriptEnabled = true
-                                    domStorageEnabled = true
-                                    useWideViewPort = true
-                                    loadWithOverviewMode = true
-                                    setSupportZoom(true)
-                                    builtInZoomControls = true
-                                    displayZoomControls = false
-                                    // Капча отдаётся ядром по http://localhost - COMPATIBILITY
-                                    // блокирует active mixed content, но не ломает поток.
-                                    // ALWAYS_ALLOW (было) открывал MITM.
-                                    mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-                                    allowFileAccess = false
-                                    allowContentAccess = false
-                                    @Suppress("DEPRECATION")
-                                    allowFileAccessFromFileURLs = false
-                                    @Suppress("DEPRECATION")
-                                    allowUniversalAccessFromFileURLs = false
-                                    userAgentString = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
-                                }
-
-                                webViewClient = object : WebViewClient() {
-                                    // Блокируем навигацию вне http(s): intent://, market://,
-                                    // tel:, javascript: и пр. - частые векторы редиректа.
-                                    override fun shouldOverrideUrlLoading(
-                                        view: WebView?,
-                                        request: WebResourceRequest?
-                                    ): Boolean {
-                                        val scheme = request?.url?.scheme?.lowercase()
-                                        return scheme !in ALLOWED_SCHEMES
-                                    }
-
-                                    override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-                                        super.onPageStarted(view, url, favicon)
-                                        isLoading = true
-                                    }
-
-                                    override fun onPageFinished(view: WebView?, url: String?) {
-                                        super.onPageFinished(view, url)
-                                        isLoading = false
-                                    }
-                                }
-
-                                loadUrl(captchaUrl)
-                            }
-                        },
-                        onRelease = { webView ->
-                            // Без явной очистки WebView держит Activity-context и
-                            // продолжает крутить JS/таймеры в фоне до GC.
-                            webView.stopLoading()
-                            webView.loadUrl("about:blank")
-                            webView.clearHistory()
-                            (webView.parent as? ViewGroup)?.removeView(webView)
-                            webView.removeAllViews()
-                            webView.destroy()
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
-
-                    if (isLoading) {
-                        CircularWavyProgressIndicator(
-                            modifier = Modifier.align(Alignment.Center)
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(horizontal = 24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = stringResource(R.string.captcha_browser_hint),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                        TextButton(onClick = { openCaptchaInBrowser(context, captchaUrl) }) {
+                            Text(stringResource(R.string.captcha_open_browser))
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+private fun openCaptchaInBrowser(context: Context, url: String) {
+    val intent = Intent(Intent.ACTION_VIEW, url.toUri())
+        .addCategory(Intent.CATEGORY_BROWSABLE)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    try {
+        context.startActivity(intent)
+    } catch (_: ActivityNotFoundException) {
     }
 }

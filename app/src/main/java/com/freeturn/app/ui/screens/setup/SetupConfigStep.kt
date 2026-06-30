@@ -14,6 +14,10 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +28,10 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -261,24 +269,14 @@ fun SetupConfigStep(
         }
     }
 
-    // --- Обфускация: сегмент по всем профилям (расширяется вместе с ObfProfile.VALUES) ---
+    // --- Обфускация ---
     SectionLabel(stringResource(R.string.obf_profile_title))
     SettingsCard {
         SettingsFieldSlot {
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                ObfProfile.VALUES.forEachIndexed { idx, value ->
-                    SegmentedButton(
-                        selected = draft.obfProfile == value,
-                        onClick = {
-                            if (draft.obfProfile != value) {
-                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                onDraftChange(draft.copy(obfProfile = value))
-                            }
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = idx, count = ObfProfile.VALUES.size)
-                    ) { Text(obfProfileLabel(value)) }
-                }
-            }
+            ObfProfileDropdown(
+                obfProfile = draft.obfProfile,
+                onObfProfile = { value -> onDraftChange(draft.copy(obfProfile = value)) }
+            )
             Text(
                 stringResource(
                     when (draft.obfProfile) {
@@ -450,5 +448,46 @@ private fun obfProfileLabel(value: String): String = when (value) {
     ObfProfile.NONE -> stringResource(R.string.obf_none)
     ObfProfile.RTPOPUS -> stringResource(R.string.obf_rtpopus)
     ObfProfile.RTPOPUS2 -> stringResource(R.string.obf_rtpopus2)
+    ObfProfile.RTPOPUS3 -> stringResource(R.string.obf_rtpopus3)
     else -> value
+}
+
+@Composable
+private fun ObfProfileDropdown(
+    obfProfile: String,
+    onObfProfile: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    var expanded by remember { mutableStateOf(false) }
+    val current = obfProfileLabel(obfProfile)
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+        modifier = modifier
+    ) {
+        OutlinedTextField(
+            value = current,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(stringResource(R.string.obf_profile_title)) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true)
+                .fillMaxWidth()
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            ObfProfile.VALUES.forEach { value ->
+                DropdownMenuItem(
+                    text = { Text(obfProfileLabel(value)) },
+                    onClick = {
+                        HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
+                        expanded = false
+                        onObfProfile(value)
+                    }
+                )
+            }
+        }
+    }
 }

@@ -207,6 +207,7 @@
     <string name="obf_none">Выкл</string>
     <string name="obf_rtpopus">rtpopus</string>
     <string name="obf_rtpopus2">rtpopus2</string>
+    <string name="obf_rtpopus3">rtpopus3</string>
     <string name="provider_vk">VK Calls</string>
     <string name="obf_key_empty_hint">Пусто - ключ сгенерируется при применении</string>
     <string name="obf_key_invalid_hint">Неверный формат - нужны 64 hex-символа</string>
@@ -217,10 +218,12 @@
     <string name="transport_protocol_desc">UDP снижает задержки, TCP - стабильнее</string>
     <string name="manual_captcha">Ручной ввод капчи</string>
     <string name="manual_captcha_desc">Решать капчу вручную вместо автоматического распознавания</string>
-    <string name="client_browser_title">Браузер VK-авторизации</string>
-    <string name="client_browser_desc">Профиль TLS и User-Agent для входа в VK. Firefox - по умолчанию.</string>
+    <string name="client_browser_title">Профиль VK-авторизации</string>
+    <string name="client_browser_desc">Профиль TLS и User-Agent для входа в VK.</string>
+    <string name="client_browser_label">Профиль</string>
     <string name="browser_firefox">Firefox</string>
     <string name="browser_chrome">Chrome</string>
+    <string name="browser_safari">Safari</string>
     <string name="use_carrier_dns">DNS оператора связи</string>
     <string name="use_carrier_dns_desc">Использовать DNS текущей сети вместо системного резолвера</string>
     <string name="use_carrier_dns_overridden">Отключено: действует ручной DNS-список выше</string>
@@ -327,6 +330,8 @@
     <string name="captcha_title">Проверка VK</string>
     <string name="captcha_subtitle">Пройдите проверку для продолжения</string>
     <string name="captcha_close">Закрыть</string>
+    <string name="captcha_browser_hint">Капча открыта во внешнем браузере. После прохождения вернитесь в приложение.</string>
+    <string name="captcha_open_browser">Открыть в браузере</string>
 
     <!-- Telegram -->
     <string name="tg_channel">Telegram-канал</string>
