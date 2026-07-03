@@ -137,6 +137,7 @@ class ImportViewModel(
                 tcpForward = link.mode == "tcp",
                 bond = link.bond,
                 useUdp = link.transport == "udp",
+                threads = link.n.takeIf { it > 0 } ?: ClientConfig.DEFAULT_THREADS,
                 streamsPerCred = link.streamsPerCred.takeIf { it > 0 }
                     ?: ClientConfig.DEFAULT_STREAMS_PER_CRED,
                 tunnelTransport = if (wgConf.isNotEmpty()) TunnelTransport.WIREGUARD

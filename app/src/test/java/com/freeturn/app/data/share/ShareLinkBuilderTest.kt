@@ -104,6 +104,17 @@ class ShareLinkBuilderTest {
     }
 
     @Test
+    fun `threads and streams-per-cred carried over`() {
+        val srv = Server(
+            name = "s",
+            client = ClientConfig(serverAddress = "1.2.3.4:56000", threads = 6, streamsPerCred = 4)
+        )
+        val link = FreeturnLink.parse(ShareLinkBuilder.build(srv, ShareInfo(), "u", null)).getOrThrow()
+        assertEquals(6, link.n)
+        assertEquals(4, link.streamsPerCred)
+    }
+
+    @Test
     fun `udp transport flag carried over`() {
         val link = FreeturnLink.parse(
             ShareLinkBuilder.build(server(useUdp = true), ShareInfo(), "u", null)

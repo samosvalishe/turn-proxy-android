@@ -27,6 +27,8 @@ object ShareLinkBuilder {
             bond = tcpMode && server.client.bond,
             obfProfile = if (ObfProfile.isValidKey(obfKey)) obfProfile else "",
             obfKey = if (ObfProfile.isValidKey(obfKey)) obfKey else "",
+            n = server.client.threads,
+            streamsPerCred = server.client.streamsPerCred,
             clientId = clientId.trim(),
             name = userName.trim(),
             wgConf = wgConf?.let(::normalizeConf).orEmpty(),
