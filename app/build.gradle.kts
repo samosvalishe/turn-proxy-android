@@ -21,8 +21,8 @@ android {
         // WireGuard GoBackend (com.wireguard.android:tunnel) требует minSdk 24.
         minSdk = 24
         targetSdk = 37
-        versionCode = 33
-        versionName = "3.2.0"
+        versionCode = 34
+        versionName = "3.3.0"
     }
 
     splits {
@@ -55,11 +55,6 @@ android {
     }
 
     buildTypes {
-        debug {
-            // Временно: debug ставится рядом с основным приложением (проверка билда).
-            applicationIdSuffix = ".dev"
-            versionNameSuffix = "-dev"
-        }
         release {
             signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
