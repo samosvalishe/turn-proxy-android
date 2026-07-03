@@ -20,6 +20,7 @@ mlkitBarcode = "17.3.0"
 zxingCore = "3.5.4"
 junit = "4.13.2"
 orgJson = "20260522"
+kotlinxSerializationJson = "1.11.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -42,6 +43,7 @@ jsch = { group = "com.github.mwiede", name = "jsch", version.ref = "jsch" }
 # ed25519-ключи и современный KEX не работают.
 bouncycastle = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncycastle" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutinesAndroid" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
 koin-androidx-compose = { group = "io.insert-koin", name = "koin-androidx-compose", version.ref = "koin" }
 wireguard-tunnel = { group = "com.wireguard.android", name = "tunnel", version.ref = "wireguardTunnel" }
 desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugarJdkLibs" }

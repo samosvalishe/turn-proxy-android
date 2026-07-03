@@ -55,6 +55,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Временно: debug ставится рядом с основным приложением (проверка билда).
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+        }
         release {
             signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
@@ -85,6 +90,7 @@ dependencies {
     implementation(libs.jsch)
     implementation(libs.bouncycastle)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.wireguard.tunnel)
 
     implementation(libs.androidx.core.ktx)
@@ -114,4 +120,37 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.org.json)
+}
+
+abstract class AssembleControlScript : DefaultTask() {
+    @get:InputDirectory
+    abstract val srcDir: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val outDir: DirectoryProperty
+
+    @TaskAction
+    fun assemble() {
+        val out = outDir.get().file("free-turn-control.sh").asFile
+        out.parentFile.mkdirs()
+        val parts = srcDir.get().asFile.listFiles { f -> f.isFile && f.extension == "sh" }
+            ?.sortedBy { it.name } ?: emptyList()
+        require(parts.isNotEmpty()) { "no .sh modules in ${srcDir.get().asFile}" }
+        out.writeText(parts.joinToString("\n") { it.readText().trimEnd('\n') } + "\n")
+    }
+}
+
+val assembleControlScript = tasks.register<AssembleControlScript>("assembleControlScript") {
+    description = "Склеивает server-control/src/*.sh в free-turn-control.sh"
+    group = "build"
+    srcDir.set(rootProject.layout.projectDirectory.dir("server-control/src"))
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(
+            assembleControlScript,
+            AssembleControlScript::outDir
+        )
+    }
 }
