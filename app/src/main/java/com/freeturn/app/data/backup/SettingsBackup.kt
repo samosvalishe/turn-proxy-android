@@ -15,7 +15,9 @@ data class BackupData(
     val dynamicTheme: Boolean,
     val nerdMode: Boolean,
     val privacyMode: Boolean,
-    val restartServerOnSwitch: Boolean
+    val restartServerOnSwitch: Boolean,
+    val suppressUpdatePrompt: Boolean,
+    val suppressTgPrompt: Boolean
 )
 
 /** Сериализация [BackupData] в JSON (серверы - через тот же [ServerJson], что и в DataStore). */
@@ -31,6 +33,8 @@ object SettingsBackup {
         put("nerdMode", data.nerdMode)
         put("privacyMode", data.privacyMode)
         put("restartServerOnSwitch", data.restartServerOnSwitch)
+        put("suppressUpdatePrompt", data.suppressUpdatePrompt)
+        put("suppressTgPrompt", data.suppressTgPrompt)
     }.toString()
 
     fun decode(json: String): BackupData {
@@ -47,7 +51,9 @@ object SettingsBackup {
             dynamicTheme = o.optBoolean("dynamicTheme", true),
             nerdMode = o.optBoolean("nerdMode", true),
             privacyMode = o.optBoolean("privacyMode", false),
-            restartServerOnSwitch = o.optBoolean("restartServerOnSwitch", false)
+            restartServerOnSwitch = o.optBoolean("restartServerOnSwitch", false),
+            suppressUpdatePrompt = o.optBoolean("suppressUpdatePrompt", false),
+            suppressTgPrompt = o.optBoolean("suppressTgPrompt", false)
         )
     }
 }

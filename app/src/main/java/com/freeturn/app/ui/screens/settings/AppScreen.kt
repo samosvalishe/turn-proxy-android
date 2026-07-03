@@ -82,6 +82,8 @@ fun AppScreen(
     val context = LocalContext.current
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
     val dynamicTheme by settingsViewModel.dynamicTheme.collectAsStateWithLifecycle()
+    val suppressUpdatePrompt by settingsViewModel.suppressUpdatePrompt.collectAsStateWithLifecycle()
+    val suppressTgPrompt by settingsViewModel.suppressTgPrompt.collectAsStateWithLifecycle()
     val updateState by settingsViewModel.updateState.collectAsStateWithLifecycle()
     val appVersion = rememberAppVersion()
     var showResetDialog by rememberSaveable { mutableStateOf(false) }
@@ -148,6 +150,28 @@ fun AppScreen(
                             iconRes = R.drawable.palette_24px,
                             checked = dynamicTheme,
                             onCheckedChange = { settingsViewModel.setDynamicTheme(it) }
+                        )
+                    }
+                }
+
+                SectionLabel(stringResource(R.string.app_section_prompts))
+                SettingsGroup {
+                    SettingsGroupItem(0, 2) {
+                        SettingsSwitchRow(
+                            title = stringResource(R.string.suppress_update_prompt_title),
+                            subtitle = stringResource(R.string.suppress_update_prompt_desc),
+                            iconRes = R.drawable.cloud_download_24px,
+                            checked = suppressUpdatePrompt,
+                            onCheckedChange = { settingsViewModel.setSuppressUpdatePrompt(it) }
+                        )
+                    }
+                    SettingsGroupItem(1, 2) {
+                        SettingsSwitchRow(
+                            title = stringResource(R.string.suppress_tg_prompt_title),
+                            subtitle = stringResource(R.string.suppress_tg_prompt_desc),
+                            iconRes = R.drawable.group_off_24px,
+                            checked = suppressTgPrompt,
+                            onCheckedChange = { settingsViewModel.setSuppressTgPrompt(it) }
                         )
                     }
                 }

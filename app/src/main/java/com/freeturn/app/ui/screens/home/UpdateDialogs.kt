@@ -30,6 +30,7 @@ import com.freeturn.app.ui.components.BusyProgressIndicator
 @Composable
 internal fun UpdateDialogs(
     updateState: UpdateState,
+    suppressAvailablePrompt: Boolean,
     onDownload: () -> Unit,
     onInstall: () -> Unit,
     onReset: () -> Unit
@@ -40,7 +41,7 @@ internal fun UpdateDialogs(
     var dismissedVersion by rememberSaveable { mutableStateOf<String?>(null) }
 
     when (val state = updateState) {
-        is UpdateState.Available -> if (dismissedVersion != state.version) {
+        is UpdateState.Available -> if (!suppressAvailablePrompt && dismissedVersion != state.version) {
             AlertDialog(
                 onDismissRequest = { dismissedVersion = state.version },
                 title = { Text(stringResource(R.string.update_available_title)) },

@@ -77,6 +77,7 @@ fun AppNavigation(
 
     val proxyState by proxyViewModel.proxyState.collectAsStateWithLifecycle()
     val initialTgSubscribeShown by settingsViewModel.initialTgSubscribeShown.collectAsStateWithLifecycle()
+    val initialSuppressTgPrompt by settingsViewModel.initialSuppressTgPrompt.collectAsStateWithLifecycle()
     val nerdMode by settingsViewModel.nerdMode.collectAsStateWithLifecycle()
     val clientConfig by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
     // Вкладка логов видна только в режиме отладки при включённых логах.
@@ -103,7 +104,9 @@ fun AppNavigation(
             .collect { navController.clearBackStack<SettingsGraph>() }
     }
 
-    var showTgDialog by rememberSaveable { mutableStateOf(!initialTgSubscribeShown) }
+    var showTgDialog by rememberSaveable {
+        mutableStateOf(!initialTgSubscribeShown && !initialSuppressTgPrompt)
+    }
 
     // Все маршруты живут внутри графов-вкладок - бар виден всегда.
     // navigationSuiteType (а не layoutType) - expressive-дефолт: на телефоне компактный

@@ -91,6 +91,17 @@ class SettingsViewModel(
     private val _initialTgSubscribeShown = MutableStateFlow(false)
     val initialTgSubscribeShown: StateFlow<Boolean> = _initialTgSubscribeShown.asStateFlow()
 
+    // Снимок на старте (как initialTgSubscribeShown): гейт диалога читается один раз при
+    // построении UI - живой StateFlow с дефолтом false мигнул бы диалогом до первого emit.
+    private val _initialSuppressTgPrompt = MutableStateFlow(false)
+    val initialSuppressTgPrompt: StateFlow<Boolean> = _initialSuppressTgPrompt.asStateFlow()
+
+    val suppressUpdatePrompt: StateFlow<Boolean> = prefs.suppressUpdatePromptFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    val suppressTgPrompt: StateFlow<Boolean> = prefs.suppressTgPromptFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     val privacyMode: StateFlow<Boolean> = prefs.privacyModeFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
@@ -110,6 +121,7 @@ class SettingsViewModel(
     init {
         viewModelScope.launch {
             _initialTgSubscribeShown.value = prefs.tgSubscribeShownFlow.first()
+            _initialSuppressTgPrompt.value = prefs.suppressTgPromptFlow.first()
             // Восстанавливаем сохранённое состояние тоггла логов при старте.
             ProxyServiceState.setLogsEnabled(prefs.clientConfigFlow.first().logsEnabled)
             _isInitialized.value = true
@@ -141,6 +153,14 @@ class SettingsViewModel(
 
     fun setBatteryPromptShown() {
         viewModelScope.launch { prefs.setBatteryPromptShown() }
+    }
+
+    fun setSuppressUpdatePrompt(enabled: Boolean) {
+        viewModelScope.launch { prefs.setSuppressUpdatePrompt(enabled) }
+    }
+
+    fun setSuppressTgPrompt(enabled: Boolean) {
+        viewModelScope.launch { prefs.setSuppressTgPrompt(enabled) }
     }
 
     /**

@@ -36,6 +36,8 @@ class AppPreferences(context: Context) {
         val NERD_MODE = booleanPreferencesKey("nerd_mode")
         val PRIVACY_MODE = booleanPreferencesKey("privacy_mode")
         val TG_SUBSCRIBE_SHOWN = booleanPreferencesKey("tg_subscribe_shown")
+        val SUPPRESS_UPDATE_PROMPT = booleanPreferencesKey("suppress_update_prompt")
+        val SUPPRESS_TG_PROMPT = booleanPreferencesKey("suppress_tg_prompt")
         val BATTERY_PROMPT_SHOWN = booleanPreferencesKey("battery_prompt_shown")
         val RESTART_SERVER_ON_SWITCH = booleanPreferencesKey("restart_server_on_switch")
         val SERVERS_JSON = stringPreferencesKey("servers_json")
@@ -93,6 +95,12 @@ class AppPreferences(context: Context) {
         prefFlow { prefs -> prefs[RESTART_SERVER_ON_SWITCH] ?: false }
 
     val tgSubscribeShownFlow: Flow<Boolean> = prefFlow { prefs -> prefs[TG_SUBSCRIBE_SHOWN] ?: false }
+
+    /** Не показывать диалог "Доступно обновление" на главной. */
+    val suppressUpdatePromptFlow: Flow<Boolean> = prefFlow { prefs -> prefs[SUPPRESS_UPDATE_PROMPT] ?: false }
+
+    /** Не показывать диалог с предложением подписаться на Telegram. */
+    val suppressTgPromptFlow: Flow<Boolean> = prefFlow { prefs -> prefs[SUPPRESS_TG_PROMPT] ?: false }
 
     // Один раз за установку: на MIUI/HyperOS isIgnoringBatteryOptimizations остаётся false
     // даже после "не ограничивать" - без флага диалог всплывал бы каждый запуск.
@@ -233,6 +241,14 @@ class AppPreferences(context: Context) {
         context.dataStore.edit { prefs -> prefs[TG_SUBSCRIBE_SHOWN] = true }
     }
 
+    suspend fun setSuppressUpdatePrompt(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[SUPPRESS_UPDATE_PROMPT] = enabled }
+    }
+
+    suspend fun setSuppressTgPrompt(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[SUPPRESS_TG_PROMPT] = enabled }
+    }
+
     suspend fun setBatteryPromptShown() {
         context.dataStore.edit { prefs -> prefs[BATTERY_PROMPT_SHOWN] = true }
     }
@@ -266,7 +282,9 @@ class AppPreferences(context: Context) {
             dynamicTheme = dynamicThemeFlow.first(),
             nerdMode = nerdModeFlow.first(),
             privacyMode = privacyModeFlow.first(),
-            restartServerOnSwitch = restartServerOnSwitchFlow.first()
+            restartServerOnSwitch = restartServerOnSwitchFlow.first(),
+            suppressUpdatePrompt = suppressUpdatePromptFlow.first(),
+            suppressTgPrompt = suppressTgPromptFlow.first()
         )
     }
 
@@ -303,6 +321,8 @@ class AppPreferences(context: Context) {
                 prefs[NERD_MODE] = data.nerdMode
                 prefs[PRIVACY_MODE] = data.privacyMode
                 prefs[RESTART_SERVER_ON_SWITCH] = data.restartServerOnSwitch
+                prefs[SUPPRESS_UPDATE_PROMPT] = data.suppressUpdatePrompt
+                prefs[SUPPRESS_TG_PROMPT] = data.suppressTgPrompt
             }
         }
         return added
