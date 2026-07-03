@@ -175,9 +175,13 @@ fun ClientSetupScreen(
 
                 PerformanceCard(
                     threads = threads,
-                    onThreads = { threads = it },
+                    // потоки-на-аккаунт не могут превышать общее число потоков
+                    onThreads = {
+                        threads = it
+                        if (streamsPerCred > it) streamsPerCred = it
+                    },
                     streamsPerCred = streamsPerCred,
-                    onStreamsPerCred = { streamsPerCred = it },
+                    onStreamsPerCred = { streamsPerCred = it.coerceAtMost(threads) },
                     onTick = { HapticUtil.perform(context, HapticUtil.Pattern.SELECTION) }
                 )
 

@@ -6,7 +6,7 @@ data class ClientConfig(
     /** Источник TURN-creds (-provider). Пока только "vk". */
     val provider: String = Provider.VK,
     val threads: Int = 12,
-    /** Соответствует флагу `-streams-per-cred` ядра. Дефолт ядра = 10, наш = 6. */
+    /** Соответствует флагу `-streams-per-cred` ядра. Дефолт ядра = 10, наш = 12 (= threads). */
     val streamsPerCred: Int = DEFAULT_STREAMS_PER_CRED,
     /** TURN-транспорт UDP (-transport udp). false = TCP/TLS (дефолт ядра и наш). */
     val useUdp: Boolean = false,
@@ -57,7 +57,7 @@ data class ClientConfig(
 
     companion object {
         const val DEFAULT_LOCAL_PORT = "127.0.0.1:9000"
-        const val DEFAULT_STREAMS_PER_CRED = 6
+        const val DEFAULT_STREAMS_PER_CRED = 12
         // TURN-релей добавляет overhead - 1280 (минимум IPv6) против фрагментации.
         const val DEFAULT_WG_MTU = 1280
         // Диапазон валидного MTU: 1280 = минимум IPv6, 1500 = потолок Ethernet.
