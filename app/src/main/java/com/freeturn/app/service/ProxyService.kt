@@ -1,5 +1,6 @@
 package com.freeturn.app.service
 import com.freeturn.app.domain.proxy.ProxyServiceState
+import com.freeturn.app.domain.proxy.Socks5Server
 
 import android.app.Service
 import android.content.Intent
@@ -15,6 +16,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
 /**
@@ -32,6 +34,7 @@ class ProxyService : Service() {
     private lateinit var speedMonitor: SpeedMonitor
 
     private val prefs: AppPreferences by inject()
+    private var socks5Server: Socks5Server? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -56,6 +59,20 @@ class ProxyService : Service() {
             isStopped = { controller.isUserStopped },
             onSpeed = { notifier.setSpeed(it) },
         )
+        
+        serviceScope.launch {
+            prefs.hotspotProxyEnabledFlow.collect { enabled ->
+                if (enabled) {
+                    if (socks5Server == null) {
+                        socks5Server = Socks5Server()
+                        socks5Server?.start()
+                    }
+                } else {
+                    socks5Server?.stop()
+                    socks5Server = null
+                }
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -109,6 +126,8 @@ class ProxyService : Service() {
         notifier.cancelCaptcha()
         ProxyServiceState.addLog("Остановка")
         controller.destroyProcessAndTunnel()
+        socks5Server?.stop()
+        socks5Server = null
         serviceScope.cancel()
         if (wakeLock?.isHeld == true) wakeLock?.release()
     }

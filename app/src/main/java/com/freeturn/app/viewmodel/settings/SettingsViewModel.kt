@@ -80,6 +80,9 @@ class SettingsViewModel(
     val nerdMode: StateFlow<Boolean> = prefs.nerdModeFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
+    val hotspotProxyEnabled: StateFlow<Boolean> = prefs.hotspotProxyEnabledFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     val serversSnapshot: StateFlow<ServersSnapshot> = prefs.serversSnapshot
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ServersSnapshot())
 
@@ -145,6 +148,10 @@ class SettingsViewModel(
 
     fun setNerdMode(enabled: Boolean) {
         viewModelScope.launch { prefs.setNerdMode(enabled) }
+    }
+
+    fun setHotspotProxyEnabled(enabled: Boolean) {
+        viewModelScope.launch { prefs.setHotspotProxyEnabled(enabled) }
     }
 
     fun setTgSubscribeShown() {

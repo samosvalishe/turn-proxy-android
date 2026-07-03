@@ -43,6 +43,7 @@ class AppPreferences(context: Context) {
         val SERVERS_JSON = stringPreferencesKey("servers_json")
         val ACTIVE_SERVER_ID = stringPreferencesKey("active_server_id")
         val OWN_CLIENT_ID = stringPreferencesKey("own_client_id")
+        val HOTSPOT_PROXY_ENABLED = booleanPreferencesKey("hotspot_proxy_enabled")
     }
 
     /** DataStore-флоу: IOException (битый файл) -> дефолты, остальное пробрасываем. */
@@ -105,6 +106,9 @@ class AppPreferences(context: Context) {
     // Один раз за установку: на MIUI/HyperOS isIgnoringBatteryOptimizations остаётся false
     // даже после "не ограничивать" - без флага диалог всплывал бы каждый запуск.
     val batteryPromptShownFlow: Flow<Boolean> = prefFlow { prefs -> prefs[BATTERY_PROMPT_SHOWN] ?: false }
+
+    /** Разрешает запуск SOCKS5 сервера на 0.0.0.0:1080 для раздачи интернета. */
+    val hotspotProxyEnabledFlow: Flow<Boolean> = prefFlow { prefs -> prefs[HOTSPOT_PROXY_ENABLED] ?: false }
 
     // --- CRUD серверов ---
     // Каждая операция - одна транзакция dataStore.edit: атомарный read-modify-write,
@@ -234,7 +238,11 @@ class AppPreferences(context: Context) {
     }
 
     suspend fun setRestartServerOnSwitch(enabled: Boolean) {
-        context.dataStore.edit { prefs -> prefs[RESTART_SERVER_ON_SWITCH] = enabled }
+        context.dataStore.edit { it[RESTART_SERVER_ON_SWITCH] = enabled }
+    }
+
+    suspend fun setHotspotProxyEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[HOTSPOT_PROXY_ENABLED] = enabled }
     }
 
     suspend fun setTgSubscribeShown() {
