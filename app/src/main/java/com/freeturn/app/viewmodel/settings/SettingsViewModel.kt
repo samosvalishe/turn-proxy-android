@@ -239,6 +239,12 @@ class SettingsViewModel(
                 orchestrator.restartServerIfRunning()
             }
 
+            sshRepository.activeSshConfig?.let { prev ->
+                if (prev.ip != target.ssh.ip || prev.port != target.ssh.port) {
+                    sshRepository.disconnect()
+                }
+            }
+
             if (ProxyServiceState.isRunning.value) {
                 proxyManager.stopProxy()
                 withTimeoutOrNull(2_000) {
