@@ -1,8 +1,9 @@
 package com.freeturn.app.data.share
 
+import com.freeturn.app.data.control.ShareListData
 import java.util.Base64
 
-/** WG-пир сервера из subcommand `peer-list`. */
+/** WG-пир сервера из subcommand `share-list`. */
 data class WgPeer(
     val pubkey: String,
     /** Имя из маркера ft-user. Пусто - пир без маркера (старые установки, ручные правки). */
@@ -16,23 +17,19 @@ data class WgPeer(
     val isSelf: Boolean
 )
 
-/**
- * Разбор KEY=VALUE-вывода `peer-list`: PEER_COUNT, PEER_<i>_PUB/_NAME_B64/_IP/
- * _HS/_CONF, SELF_PUB.
- */
+/** Маппинг `share-list` data ([ShareListData]) в доменные [WgPeer]. */
 object WgPeerParser {
 
-    fun parse(kv: Map<String, String>): List<WgPeer> {
-        val count = kv["PEER_COUNT"]?.toIntOrNull() ?: 0
-        val selfPub = kv["SELF_PUB"].orEmpty()
-        return (0 until count).mapNotNull { i ->
-            val pub = kv["PEER_${i}_PUB"]?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+    fun from(data: ShareListData): List<WgPeer> {
+        val selfPub = data.selfPub
+        return data.peers.mapNotNull { p ->
+            val pub = p.pub.takeIf { it.isNotBlank() } ?: return@mapNotNull null
             WgPeer(
                 pubkey = pub,
-                name = decodeNameB64(kv["PEER_${i}_NAME_B64"]),
-                ip = kv["PEER_${i}_IP"].orEmpty(),
-                lastHandshakeEpoch = kv["PEER_${i}_HS"]?.toLongOrNull()?.takeIf { it > 0 },
-                hasStoredConf = kv["PEER_${i}_CONF"] == "yes",
+                name = decodeNameB64(p.nameB64),
+                ip = p.ip,
+                lastHandshakeEpoch = p.hs?.takeIf { it > 0 },
+                hasStoredConf = p.hasConf,
                 isSelf = selfPub.isNotEmpty() && pub == selfPub
             )
         }

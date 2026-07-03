@@ -41,6 +41,8 @@ internal object ServerJson {
             put("authType", p.ssh.authType)
             put("sshKey", p.ssh.sshKey)
             put("hostFingerprint", p.ssh.hostFingerprint)
+            put("rootMode", p.ssh.rootMode)
+            put("sudoPassword", p.ssh.sudoPassword)
         })
         put("client", JSONObject().apply {
             put("serverAddress", p.client.serverAddress)
@@ -95,7 +97,9 @@ internal object ServerJson {
                 password = sshO.optString("password"),
                 authType = sshO.optString("authType", SshConfig.AUTH_PASSWORD),
                 sshKey = sshO.optString("sshKey"),
-                hostFingerprint = sshO.optString("hostFingerprint")
+                hostFingerprint = sshO.optString("hostFingerprint"),
+                rootMode = sshO.optString("rootMode", SshConfig.ROOT),
+                sudoPassword = sshO.optString("sudoPassword")
             ),
             client = ClientConfig(
                 serverAddress = cliO.optString("serverAddress"),

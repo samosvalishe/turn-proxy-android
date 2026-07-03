@@ -2,12 +2,16 @@ package com.freeturn.app.domain.ssh
 
 import android.content.Context
 import com.freeturn.app.data.config.SshConfig
+import com.freeturn.app.data.control.ControlResponse
+import com.freeturn.app.data.control.InstallData
+import com.freeturn.app.data.control.ProbeData
 import com.freeturn.app.domain.ServerState
 import com.freeturn.app.domain.SshConnectionState
-import com.freeturn.app.domain.server.CmdResult
 import com.freeturn.app.domain.server.ServerCommand
 import com.freeturn.app.domain.server.ServerControl
 import com.freeturn.app.domain.server.ServerStartOptions
+import com.freeturn.app.domain.server.errorText
+import com.freeturn.app.domain.server.requireData
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +19,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
@@ -62,20 +68,25 @@ class SshRepository(
         appendSshLog("", "=== $label [${timestamp()}] ===", "  ssh $target")
     }
 
-    private fun logCmdResult(result: CmdResult) {
+    private fun logCmdResult(result: ControlResponse) {
         // Одним обновлением состояния: построчный append на длинном выводе (журнал
         // на 200 строк) дёргал подписчиков UI (бейдж и автоскролл) на каждую строку.
         val batch = buildList {
             addAll(result.logs)
-            when (result) {
-                is CmdResult.Ok -> result.kv.forEach { (k, v) -> add("  $k=$v") }
-                is CmdResult.Err -> add("ERROR: ${result.message}")
+            if (result.isOk) {
+                // Примитивы - без кавычек JsonElement.toString (version=1.6.0, а не "1.6.0");
+                // объекты/массивы (wg, conflicts) остаются компактным JSON.
+                result.data.forEach { (k, v) ->
+                    add("  $k=" + ((v as? JsonPrimitive)?.contentOrNull ?: v.toString()))
+                }
+            } else {
+                add("ERROR: ${result.errorText()}")
             }
         }
         appendSshLog(batch)
     }
 
-    private suspend fun runCmd(cfg: SshConfig, label: String, cmd: ServerCommand): CmdResult {
+    private suspend fun runCmd(cfg: SshConfig, label: String, cmd: ServerCommand): ControlResponse {
         logHeader(label, "${cfg.username}@${cfg.ip}:${cfg.port}")
         val result = serverControl.run(cfg, cmd)
         logCmdResult(result)
@@ -101,9 +112,12 @@ class SshRepository(
         // из .bashrc могут попасть в stdout перед "OK" и сломать строгое равенство.
         if (result.lines().any { it.trim() == "OK" }) {
             val fp = sshManager.lastSeenFingerprint ?: config.hostFingerprint
-            activeSshConfig = config.copy(hostFingerprint = fp)
+            // Preflight rootMode для сессии (сохранённый мог устареть/быть дефолтным).
+            // sudoPassword не трогаем - он из сохранённого конфига.
+            val mode = serverControl.detectRootMode(config) ?: config.rootMode
+            activeSshConfig = config.copy(hostFingerprint = fp, rootMode = mode)
             _sshState.value = SshConnectionState.Connected(config.ip)
-            checkServerStateLocked(config, silent = false)
+            checkServerStateLocked(activeSshConfig, silent = false)
             Pair(true, sshManager.lastSeenFingerprint)
         } else {
             _sshState.value = SshConnectionState.Error(result.removePrefix("ERROR: "))
@@ -133,24 +147,19 @@ class SshRepository(
         }
         if (!silent) _serverState.value = ServerState.Checking
 
-        when (val r = runCmd(cfg, "Проверка состояния", ServerCommand.Probe)) {
-            is CmdResult.Err -> _serverState.value = ServerState.Error(r.message)
-            is CmdResult.Ok -> {
-                val running = r.kv["RUNNING"] == "yes"
-                val installed = r.kv["INSTALLED"] == "yes"
-                val tcpMode = if (running) r.kv["MODE"] == "tcp" else null
-                // OBF=<profile> (none|rtpopus|rtpopus2|rtpopus3); null если сервер не запущен.
-                val obfProfile = if (running) r.kv["OBF"] else null
-                val version   = r.kv["VERSION"]
+        val r = runCmd(cfg, "Проверка состояния", ServerCommand.Probe)
+        r.requireData<ProbeData>()
+            .onSuccess { d ->
                 _serverState.value = ServerState.Known(
-                    installed = installed,
-                    running = running,
-                    tcpMode = tcpMode,
-                    obfProfile = obfProfile,
-                    version = version
+                    installed = d.installed,
+                    running = d.running,
+                    // tcpMode/obfProfile значимы только когда сервер запущен.
+                    tcpMode = if (d.running) d.mode == "tcp" else null,
+                    obfProfile = if (d.running) d.obf else null,
+                    version = d.version
                 )
             }
-        }
+            .onFailure { e -> _serverState.value = ServerState.Error(e.message ?: r.errorText()) }
     }
 
     /** Идемпотентная установка: скрипт сам решает, скачивать или нет (по sha256). */
@@ -159,30 +168,28 @@ class SshRepository(
         if (cfg.ip.isEmpty()) return@withLock InstallResult.Failed("no SSH config")
         _serverState.value = ServerState.Working("Установка free-turn-proxy...")
 
-        when (val result = runCmd(cfg, "Установка", ServerCommand.Install)) {
-            is CmdResult.Err -> {
-                _serverState.value = ServerState.Error(result.message)
-                InstallResult.Failed(result.message)
-            }
-            is CmdResult.Ok -> {
-                val stage = result.kv["STAGE"] ?: "ok"
-                val version = result.kv["VERSION"]
-                val needsRestart = result.kv["NEEDS_RESTART"] == "yes"
+        val result = runCmd(cfg, "Установка", ServerCommand.Install)
+        result.requireData<InstallData>().fold(
+            onSuccess = { d ->
                 // Если при update сервер был запущен, скрипт перезаписал бинарь,
                 // но процесс всё ещё крутит старую версию. Перезапускаем сами,
                 // иначе пользователь думает что обновился, а live-running старый.
-                if (needsRestart) {
-                    appendSshLog("  NEEDS_RESTART=yes → авто-рестарт сервера")
+                if (d.needsRestart) {
+                    appendSshLog("  needs_restart -> авто-рестарт сервера")
                     runCmd(cfg, "Авто-остановка перед рестартом", ServerCommand.Stop)
                     // start вызвать без аргументов нельзя - нужны listen/connect.
-                    // Их знает только VM. Сигнализируем через отдельный outcome,
-                    // VM решает, как стартовать (с актуальными prefs).
+                    // Их знает только VM. Сигнализируем через outcome.
                 }
                 delay(300)
                 checkServerStateLocked(cfg, silent = true)
-                InstallResult.Success(stage = stage, version = version, needsRestart = needsRestart)
+                InstallResult.Success(stage = d.stage, version = d.version, needsRestart = d.needsRestart)
+            },
+            onFailure = { e ->
+                val msg = e.message ?: result.errorText()
+                _serverState.value = ServerState.Error(msg)
+                InstallResult.Failed(msg)
             }
-        }
+        )
     }
 
     suspend fun startServer(
@@ -210,8 +217,8 @@ class SshRepository(
                 )
             )
         )
-        if (result is CmdResult.Err) {
-            _serverState.value = ServerState.Error(result.message)
+        if (!result.isOk) {
+            _serverState.value = ServerState.Error(result.errorText())
             return@withLock false
         }
         delay(1500)
@@ -225,8 +232,8 @@ class SshRepository(
         _serverState.value = ServerState.Working("Остановка сервера...")
 
         val result = runCmd(cfg, "Остановка", ServerCommand.Stop)
-        if (result is CmdResult.Err) {
-            _serverState.value = ServerState.Error(result.message)
+        if (!result.isOk) {
+            _serverState.value = ServerState.Error(result.errorText())
             return@withLock
         }
         delay(1000)

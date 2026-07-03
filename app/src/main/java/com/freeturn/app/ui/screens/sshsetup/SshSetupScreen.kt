@@ -85,6 +85,9 @@ fun SshSetupScreen(
     var password by remember { mutableStateOf(savedConfig.password) }
     var authType by rememberSaveable(savedConfig.authType) { mutableStateOf(savedConfig.authType) }
     var sshKey by rememberSaveable(savedConfig.sshKey) { mutableStateOf(savedConfig.sshKey) }
+    // Секрет - не в saved instance state (как password). rootMode ре-детектится
+    // при коннекте, тут лишь сохраняем существующий, чтобы не сбросить в ROOT.
+    var sudoPassword by remember { mutableStateOf(savedConfig.sudoPassword) }
 
     // Переходим только если подключение было установлено ПОСЛЕ открытия экрана.
     // Если sshState уже Connected при входе (пользователь хочет изменить настройки) -
@@ -148,7 +151,9 @@ fun SshSetupScreen(
                                     username = username.trim(),
                                     password = password,
                                     authType = authType,
-                                    sshKey = sshKey
+                                    sshKey = sshKey,
+                                    rootMode = savedConfig.rootMode,
+                                    sudoPassword = sudoPassword
                                 )
                             )
                         }
@@ -183,7 +188,10 @@ fun SshSetupScreen(
                         password = password, onPasswordChange = { password = it },
                         authType = authType, onAuthTypeChange = { authType = it },
                         sshKey = sshKey, onSshKeyChange = { sshKey = it },
-                        showErrors = highlightErrors
+                        showErrors = highlightErrors,
+                        sudoPassword = sudoPassword,
+                        onSudoPasswordChange = { sudoPassword = it },
+                        showSudoPassword = true
                     )
                     // Ошибка подключения - тональная карточка в тон ошибки.
                     (sshState as? SshConnectionState.Error)?.let { InlineErrorCard(it.message) }

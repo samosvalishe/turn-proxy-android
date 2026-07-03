@@ -38,7 +38,11 @@ data class SetupSshDraft(
     val username: String = "root",
     val password: String = "",
     val authType: String = SshConfig.AUTH_PASSWORD,
-    val sshKey: String = ""
+    val sshKey: String = "",
+    /** Определяется preflight'ом в submitSsh; ROOT до проверки. */
+    val rootMode: String = SshConfig.ROOT,
+    /** Пароль sudo для key-auth (password-auth переиспользует [password]). */
+    val sudoPassword: String = ""
 ) {
     val valid: Boolean
         get() = ip.isNotBlank() &&
@@ -54,7 +58,9 @@ data class SetupSshDraft(
         username = username.trim(),
         password = password,
         authType = authType,
-        sshKey = sshKey
+        sshKey = sshKey,
+        rootMode = rootMode,
+        sudoPassword = sudoPassword
     )
 }
 
@@ -206,7 +212,12 @@ class ServerSetupViewModel(
         if (s.checkingSsh || !s.ssh.valid) return
         _uiState.update { it.copy(checkingSsh = true, sshError = null) }
         viewModelScope.launch {
-            repo.probe(s.ssh.toSshConfig())
+            // Preflight rootMode ДО probe: probe уже идёт под нужной эскалацией,
+            // а определённый режим сохраняется в драфт (-> в сервер при persist).
+            val baseCfg = s.ssh.toSshConfig()
+            val mode = repo.detectRootMode(baseCfg) ?: SshConfig.ROOT
+            _uiState.update { it.copy(ssh = it.ssh.copy(rootMode = mode)) }
+            repo.probe(baseCfg.copy(rootMode = mode))
                 .onSuccess { probe ->
                     fingerprint = repo.lastSeenFingerprint.orEmpty()
                     val ip = s.ssh.ip.trim()
@@ -302,14 +313,12 @@ class ServerSetupViewModel(
                 wgClientConf = c.wgConfText.trim()
             } else if (c.vpnMode) {
                 // Endpoint клиентского конфига = локальный прокси устройства; рантайм
-                // туннеля всё равно подменяет его при подъёме. adopt: WG найден -
-                // скрипт добавит отдельного пира в существующий conf, а не бутстрапит
-                // новый; conf может не вернуться (внешний WG) - тогда ручной импорт.
+                // туннеля всё равно подменяет его при подъёме. wg-setup идемпотентно
+                // поднимает НАШ ft-wg0 (создаёт или докручивает) и возвращает порт+conf.
                 val wg = repo.wgSetup(
                     cfg,
                     port = backendPort,
-                    endpoint = ClientConfig.DEFAULT_LOCAL_PORT,
-                    adopt = s.wgDetectedPort != null
+                    endpoint = ClientConfig.DEFAULT_LOCAL_PORT
                 ).getOrElse { fail(it.message); return@launch }
                 wgClientConf = wg.clientConf
                 backendPort = wg.port

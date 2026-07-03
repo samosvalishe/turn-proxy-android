@@ -75,6 +75,11 @@ class ServerViewModel(
                 if (config.hostFingerprint.isEmpty() && fp != null) {
                     prefs.saveSshFingerprint(fp)
                 }
+                // Детект rootMode живёт только в сессии; без персиста cleanup/share
+                // (factory, читают сохранённый cfg) упирались бы в stale needs_root.
+                sshRepository.activeSshConfig?.rootMode
+                    ?.takeIf { it != config.rootMode }
+                    ?.let { prefs.saveSshRootMode(it) }
                 HapticUtil.perform(appContext, HapticUtil.Pattern.SUCCESS)
             } else {
                 HapticUtil.perform(appContext, HapticUtil.Pattern.ERROR)

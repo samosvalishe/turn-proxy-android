@@ -280,6 +280,8 @@
     <string name="authentication">Аутентификация</string>
     <string name="private_key_pem">Приватный ключ (PEM)</string>
     <string name="private_key_placeholder">-----BEGIN RSA PRIVATE KEY-----\n…</string>
+    <string name="sudo_password">Пароль sudo</string>
+    <string name="sudo_password_hint">Требуется, если вход выполняется не под root и sudo запрашивает пароль. Иначе оставьте поле пустым.</string>
     <string name="connect_btn">Подключиться</string>
     <string name="step_connecting">Сопряжение с сервером…</string>
     <string name="step_auth">Аутентификация…</string>
@@ -411,6 +413,34 @@
     <string name="provider_vk_calls">VK Звонки</string>
     <string name="server_delete_confirm_title">Удалить сервер?</string>
     <string name="server_delete_confirm_desc">Сервер \"%1$s\" и все его настройки будут удалены из приложения.</string>
+    <!-- Раздел "Управление" в хабе сервера -->
+    <string name="server_management">Управление</string>
+    <string name="server_clean_title">Удалить FreeTurn с сервера</string>
+    <string name="server_clean_subtitle">Удалить с удалённого сервера службу, WireGuard и список пользователей</string>
+    <string name="server_delete_app">Удалить сервер из приложения</string>
+    <string name="server_delete_app_subtitle">Удаляется только запись в приложении - сервер не изменится</string>
+    <!-- Диалог очистки сервера от FreeTurn -->
+    <string name="server_clean_confirm_title">Удалить FreeTurn с сервера?</string>
+    <string name="server_clean_confirm_desc">С сервера будут удалены все компоненты FreeTurn. Пользователи, с которыми вы поделились доступом, потеряют подключение.</string>
+    <string name="server_clean_confirm_btn">Удалить</string>
+    <string name="server_delete_retry">Повторить</string>
+    <string name="server_delete_cleaning_title">Удаление с сервера</string>
+    <string name="server_delete_cleaning_desc">Удаление компонентов FreeTurn с сервера по SSH…</string>
+    <string name="server_delete_done_title">Сервер очищен</string>
+    <string name="server_delete_done_desc">Компоненты FreeTurn удалены с сервера.</string>
+    <string name="server_delete_done_confirm">Готово</string>
+    <string name="cleanup_removed_label">Удалено с сервера:</string>
+    <string name="cleanup_kept_label">Оставлено без изменений:</string>
+    <string name="cleanup_nothing">Компоненты FreeTurn на сервере не найдены - удалять нечего.</string>
+    <string name="cleanup_item_binary">Исполняемый файл free-turn-proxy</string>
+    <string name="cleanup_item_service">Служба systemd</string>
+    <string name="cleanup_item_wg">Интерфейс WireGuard (ft-wg0)</string>
+    <string name="cleanup_item_wg_pkg">Пакет wireguard-tools</string>
+    <string name="cleanup_item_firewall">Правило файрвола (ufw)</string>
+    <string name="cleanup_item_files">Рабочие файлы и список пользователей</string>
+    <string name="cleanup_kept_foreign_wg">Интерфейс ft-wg0 (создан не приложением)</string>
+    <string name="cleanup_kept_wg_tools">Пакет wireguard-tools (установлен не приложением)</string>
+    <string name="cleanup_kept_ip_forward">Системная настройка ip_forward</string>
     <string name="provider_connection_settings">Настройки подключения</string>
     <string name="provider_connection_settings_desc">Параметры клиента: адрес, потоки, DNS</string>
     <string name="provider_server_settings">Настройки сервера</string>

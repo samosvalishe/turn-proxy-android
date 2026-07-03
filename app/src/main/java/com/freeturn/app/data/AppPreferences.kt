@@ -209,6 +209,10 @@ class AppPreferences(context: Context) {
         updateActiveServer { it.copy(ssh = it.ssh.copy(hostFingerprint = fingerprint)) }
     }
 
+    suspend fun saveSshRootMode(mode: String) {
+        updateActiveServer { it.copy(ssh = it.ssh.copy(rootMode = mode)) }
+    }
+
     suspend fun setDynamicTheme(enabled: Boolean) {
         context.dataStore.edit { prefs -> prefs[DYNAMIC_THEME] = enabled }
     }

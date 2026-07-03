@@ -2,13 +2,17 @@ package com.freeturn.app.domain.server
 
 import android.content.Context
 import com.freeturn.app.data.config.SshConfig
+import com.freeturn.app.data.control.ProbeData
+import com.freeturn.app.data.control.UninstallData
+import com.freeturn.app.data.control.WgSetupData
+import com.freeturn.app.data.control.decodeBase64
 import com.freeturn.app.domain.ssh.SSHManager
 
 /**
  * SSH-операции мастера добавления self-hosted сервера. Собственный [SSHManager] и
  * [ServerControl]: мастер работает с черновиком конфига и не трогает живую сессию
- * активного сервера ([SshRepository]). Состояния не держит - каждая операция
- * самостоятельный вызов, ошибки приходят типизированным [Result].
+ * активного сервера ([com.freeturn.app.domain.ssh.SshRepository]). Состояния не
+ * держит - каждая операция самостоятельный вызов, ошибки приходят [Result].
  */
 class ServerSetupRepository(context: Context, private val ssh: SSHManager) {
 
@@ -17,9 +21,12 @@ class ServerSetupRepository(context: Context, private val ssh: SSHManager) {
     /** Отпечаток хоста, увиденный последней командой (TOFU) - сохраняется в сервер. */
     val lastSeenFingerprint: String? get() = ssh.lastSeenFingerprint
 
+    /** Preflight: определяет rootMode (ROOT/SUDO_NOPASS/SUDO_PASS). null - SSH-ошибка. */
+    suspend fun detectRootMode(cfg: SshConfig): String? = control.detectRootMode(cfg)
+
     /** Снимок состояния хоста после probe. */
     data class ProbeResult(
-        /** Порт активного/сконфигурированного WireGuard; null - WG-бэкенда нет. */
+        /** Порт активного/сконфигурированного НАШЕГО WireGuard; null - бэкенда нет. */
         val wgPort: Int?
     )
 
@@ -27,18 +34,15 @@ class ServerSetupRepository(context: Context, private val ssh: SSHManager) {
     data class WgSetupResult(
         val port: Int,
         val clientConf: String?,
-        /** true - найден существующий wg0.conf, бутстрап не выполнялся. */
+        /** true - наш ft-wg0 уже существовал, бутстрап не выполнялся. */
         val existed: Boolean
     )
 
     /** Проверка SSH-доступа + probe. Ошибка SSH/скрипта - failure с текстом. */
     suspend fun probe(cfg: SshConfig): Result<ProbeResult> =
-        when (val r = control.run(cfg, ServerCommand.Probe)) {
-            is CmdResult.Err -> r.toFailure()
-            is CmdResult.Ok -> Result.success(
-                ProbeResult(wgPort = r.kv["WG_PORT"]?.toIntOrNull())
-            )
-        }
+        control.run(cfg, ServerCommand.Probe)
+            .requireData<ProbeData>()
+            .map { ProbeResult(wgPort = it.wg.port) }
 
     suspend fun install(cfg: SshConfig): Result<Unit> =
         control.run(cfg, ServerCommand.Install).asUnit()
@@ -46,20 +50,27 @@ class ServerSetupRepository(context: Context, private val ssh: SSHManager) {
     suspend fun wgSetup(
         cfg: SshConfig,
         port: Int,
-        endpoint: String,
-        adopt: Boolean = false
+        endpoint: String
     ): Result<WgSetupResult> =
-        when (val r = control.run(cfg, ServerCommand.WgSetup(port, endpoint, adopt))) {
-            is CmdResult.Err -> r.toFailure()
-            is CmdResult.Ok -> Result.success(
+        control.run(cfg, ServerCommand.WgSetup(port, endpoint))
+            .requireData<WgSetupData>()
+            .map {
                 WgSetupResult(
-                    port = r.kv["WG_PORT"]?.toIntOrNull() ?: port,
-                    clientConf = r.kv["WG_CLIENT_CONF_B64"]?.let(::decodeBase64),
-                    existed = r.kv["WG_EXISTS"] == "yes"
+                    port = it.wg.port.takeIf { p -> p > 0 } ?: port,
+                    clientConf = decodeBase64(it.clientConfB64),
+                    existed = it.wg.existed
                 )
-            )
-        }
+            }
 
     suspend fun start(cfg: SshConfig, opts: ServerStartOptions): Result<Unit> =
         control.run(cfg, ServerCommand.Start(opts)).asUnit()
+
+    /**
+     * Снос free-turn-proxy с сервера: бинарь, unit, НАШ ft-wg0, clients, PREFIX.
+     * Чужой WG/общий ip_forward не трогаем (скрипт сам решает по маркерам).
+     * [withWgPkg] - снести и пакет wireguard-tools, но лишь если ставили его мы.
+     */
+    suspend fun uninstall(cfg: SshConfig, withWgPkg: Boolean = false): Result<UninstallData> =
+        control.run(cfg, ServerCommand.Uninstall(withWgPkg = withWgPkg))
+            .requireData<UninstallData>()
 }

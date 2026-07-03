@@ -1,8 +1,10 @@
 package com.freeturn.app.domain.server
 
 import android.content.Context
-import com.freeturn.app.domain.ssh.SSHManager
 import com.freeturn.app.data.config.SshConfig
+import com.freeturn.app.data.control.ControlResponse
+import com.freeturn.app.data.control.ControlResponseParser
+import com.freeturn.app.domain.ssh.SSHManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -18,26 +20,56 @@ class ServerControl(
             .use { it.readText() }
     }
 
-    /** Сырая команда для запуска (без скрипта). */
-    private fun remoteCmd(argv: List<String>): String {
-        val quoted = argv.joinToString(" ") { shellQuote(it) }
-        return "bash -s -- $quoted"
+    /** Команда запуска скрипта с эскалацией по rootMode (скрипт идёт в stdin). */
+    private fun remoteCmd(argv: List<String>, cfg: SshConfig): String {
+        val base = "bash -s -- " + argv.joinToString(" ") { shellQuote(it) }
+        return when (cfg.rootMode) {
+            SshConfig.SUDO_NOPASS -> "sudo -n $base"
+            // -k сбрасывает кэш timestamp - иначе sudo может не спросить пароль, и он утечёт в stderr как команда.
+            SshConfig.SUDO_PASS   -> "sudo -k -S -p '' $base"
+            else                  -> base
+        }
     }
 
-    suspend fun run(cfg: SshConfig, cmd: ServerCommand): CmdResult = withContext(Dispatchers.IO) {
-        if (cfg.ip.isBlank()) return@withContext CmdResult.Err("no SSH config", emptyList())
-        // Сборка команды и чтение скрипта на IO-потоке.
+    // SUDO_PASS: пароль идёт ПЕРВОЙ строкой stdin (sudo -S съест её, остаток -
+    // скрипт - достаётся bash). Пусто для key-auth -> sudo не пройдёт -> sudo_auth_failed.
+    private fun effectiveSudoPassword(cfg: SshConfig): String =
+        cfg.sudoPassword.ifBlank { if (cfg.authType == SshConfig.AUTH_PASSWORD) cfg.password else "" }
+
+    suspend fun run(cfg: SshConfig, cmd: ServerCommand): ControlResponse = withContext(Dispatchers.IO) {
+        if (cfg.ip.isBlank()) {
+            return@withContext ControlResponse(proto = 2, result = "err", code = "transport", msg = "no SSH config")
+        }
+        val stdin = if (cfg.rootMode == SshConfig.SUDO_PASS) {
+            effectiveSudoPassword(cfg) + "\n" + script
+        } else {
+            script
+        }
         val output = ssh.executeWithStdin(
             ip = cfg.ip,
             port = cfg.port,
             user = cfg.username,
             pass = cfg.password,
-            command = remoteCmd(cmd.toArgv()),
-            stdin = script,
+            command = remoteCmd(cmd.toArgv(), cfg),
+            stdin = stdin,
             knownFingerprint = cfg.hostFingerprint.ifEmpty { null },
             sshKey = if (cfg.authType == SshConfig.AUTH_SSH_KEY) cfg.sshKey else ""
         )
-        ServerOutputParser.parse(output)
+        ControlResponseParser.parse(output)
+    }
+
+    /**
+     * Preflight: определяет [SshConfig.rootMode]. Дешёвый exec без большого скрипта.
+     * null - транспортная ошибка (соединение не удалось).
+     */
+    suspend fun detectRootMode(cfg: SshConfig): String? = withContext(Dispatchers.IO) {
+        val out = ssh.executeSilentCommand(
+            cfg.ip, cfg.port, cfg.username, cfg.password,
+            "id -u; command -v sudo >/dev/null 2>&1 && { sudo -n true 2>/dev/null && echo FT_SUDO_NOPASS || echo FT_SUDO_PASS; }",
+            knownFingerprint = cfg.hostFingerprint.ifEmpty { null },
+            sshKey = if (cfg.authType == SshConfig.AUTH_SSH_KEY) cfg.sshKey else ""
+        )
+        if (out.startsWith("ERROR:")) null else classifyRootMode(out)
     }
 
     /**
@@ -53,5 +85,20 @@ class ServerControl(
 
     companion object {
         const val SCRIPT_ASSET = "free-turn-control.sh"
+
+        /** Классификация вывода preflight в [SshConfig].rootMode-константу. */
+        fun classifyRootMode(output: String): String {
+            val euid = output.lineSequence()
+                .map { it.trim() }
+                .firstOrNull { it.toIntOrNull() != null }
+                ?.toIntOrNull()
+            return when {
+                euid == 0 -> SshConfig.ROOT
+                output.contains("FT_SUDO_NOPASS") -> SshConfig.SUDO_NOPASS
+                output.contains("FT_SUDO_PASS") -> SshConfig.SUDO_PASS
+                // Нет sudo / неясно: bare bash, скрипт честно вернёт needs_root.
+                else -> SshConfig.ROOT
+            }
+        }
     }
 }

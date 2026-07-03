@@ -5,15 +5,20 @@ sealed class ServerCommand {
     data object Probe : ServerCommand()
     data object Install : ServerCommand()
 
-    /** Идемпотентная настройка WG-бэкенда (бутстрап или создание пира). */
+    /** Идемпотентный бутстрап НАШЕГО ft-wg0 (создание или докрутка). */
     data class WgSetup(
         val port: Int,
-        val endpoint: String,
-        val adopt: Boolean = false
+        val endpoint: String
     ) : ServerCommand()
     data class Start(val opts: ServerStartOptions) : ServerCommand()
     data object Stop : ServerCommand()
     data class FetchLogs(val lines: Int = 80) : ServerCommand()
+
+    /** Снос free-turn-proxy и установленного им WG. [dryRun] - вернуть план без мутаций. */
+    data class Uninstall(
+        val withWgPkg: Boolean = false,
+        val dryRun: Boolean = false
+    ) : ServerCommand()
 
     /** Фактические параметры запущенного сервера (run.args) - для share-ссылки. */
     data object ShareInfo : ServerCommand()
@@ -47,7 +52,6 @@ sealed class ServerCommand {
             add("wg-setup")
             add("--port=$port")
             add("--endpoint=$endpoint")
-            if (adopt) add("--adopt=1")
         }
         is Start -> buildList {
             add("start")
@@ -82,6 +86,11 @@ sealed class ServerCommand {
         is PeerRemove -> listOf("peer-remove", "--pubkey=$pubkey")
         is ClientAdd -> listOf("client-add", "--name-b64=$nameB64", "--client-id=$clientId")
         is ClientRemove -> listOf("client-remove", "--client-id=$clientId")
+        is Uninstall -> buildList {
+            add("uninstall")
+            if (withWgPkg) add("--with-wg-pkg")
+            if (dryRun) add("--dry-run")
+        }
     }
 }
 

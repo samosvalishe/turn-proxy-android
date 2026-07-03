@@ -44,10 +44,15 @@ fun SshFormFields(
     password: String, onPasswordChange: (String) -> Unit,
     authType: String, onAuthTypeChange: (String) -> Unit,
     sshKey: String, onSshKeyChange: (String) -> Unit,
-    showErrors: Boolean = false
+    showErrors: Boolean = false,
+    // sudo-пароль для key-auth (password-auth переиспользует логин-пароль).
+    // Показывается только при showSudoPassword && key-auth.
+    sudoPassword: String = "", onSudoPasswordChange: (String) -> Unit = {},
+    showSudoPassword: Boolean = false
 ) {
     val context = LocalContext.current
     var showPassword by remember { mutableStateOf(false) }
+    var showSudoPw by remember { mutableStateOf(false) }
     val portInvalid = port.toIntOrNull()?.let { it in 1..65535 } != true
 
     // --- Сервер: адрес и порт ---
@@ -163,6 +168,35 @@ fun SshFormFields(
                         { Text(stringResource(R.string.setup_field_required)) }
                     } else null,
                     maxLines = 10
+                )
+            }
+        }
+        if (showSudoPassword && authType == SshConfig.AUTH_SSH_KEY) {
+            SettingsRowDivider()
+            SettingsFieldSlot {
+                OutlinedTextField(
+                    value = sudoPassword,
+                    onValueChange = onSudoPasswordChange,
+                    label = { Text(stringResource(R.string.sudo_password)) },
+                    supportingText = { Text(stringResource(R.string.sudo_password_hint)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    visualTransformation = if (showSudoPw) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailingIcon = {
+                        IconButton(onClick = {
+                            HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
+                            showSudoPw = !showSudoPw
+                        }) {
+                            Icon(
+                                painterResource(if (showSudoPw) R.drawable.visibility_off_24px else R.drawable.visibility_24px),
+                                contentDescription = if (showSudoPw) stringResource(R.string.hide_password) else stringResource(R.string.show_password)
+                            )
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Password,
+                        imeAction = ImeAction.Done
+                    )
                 )
             }
         }

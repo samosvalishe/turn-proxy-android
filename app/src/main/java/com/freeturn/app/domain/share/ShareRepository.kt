@@ -2,25 +2,28 @@ package com.freeturn.app.domain.share
 
 import android.content.Context
 import com.freeturn.app.data.config.SshConfig
+import com.freeturn.app.data.control.PeerAddData
+import com.freeturn.app.data.control.PeerConfData
+import com.freeturn.app.data.control.ShareInfoData
+import com.freeturn.app.data.control.ShareListData
+import com.freeturn.app.data.control.decodeBase64
 import com.freeturn.app.data.share.ShareInfo
 import com.freeturn.app.data.share.SharedClient
 import com.freeturn.app.data.share.SharedClientParser
 import com.freeturn.app.data.share.WgPeer
 import com.freeturn.app.data.share.WgPeerParser
-import com.freeturn.app.domain.server.CmdResult
 import com.freeturn.app.domain.server.ServerCommand
 import com.freeturn.app.domain.server.ServerCommandException
 import com.freeturn.app.domain.server.ServerControl
 import com.freeturn.app.domain.server.asUnit
-import com.freeturn.app.domain.server.decodeBase64
-import com.freeturn.app.domain.server.toFailure
+import com.freeturn.app.domain.server.requireData
 import com.freeturn.app.domain.ssh.SSHManager
 import java.util.Base64
 
 /**
  * SSH-операции шаринга доступа (вкладка "Поделиться"). Собственный [SSHManager]
- * и [ServerControl] - как у [ServerSetupRepository]: не трогаем живую сессию
- * активного сервера. Состояния не держит, ошибки - типизированным [Result].
+ * и [ServerControl] - как у [com.freeturn.app.domain.server.ServerSetupRepository]:
+ * не трогаем живую сессию активного сервера. Состояния не держит, ошибки - [Result].
  */
 class ShareRepository(context: Context, ssh: SSHManager) {
 
@@ -34,17 +37,9 @@ class ShareRepository(context: Context, ssh: SSHManager) {
     data class PeerAccess(val clientConf: String, val clientId: String)
 
     suspend fun shareInfo(cfg: SshConfig): Result<ShareInfo> =
-        when (val r = control.run(cfg, ServerCommand.ShareInfo)) {
-            is CmdResult.Err -> r.toFailure()
-            is CmdResult.Ok -> Result.success(
-                ShareInfo(
-                    mode = r.kv["MODE"].orEmpty(),
-                    obfProfile = r.kv["OBF_PROFILE"].orEmpty(),
-                    obfKey = r.kv["OBF_KEY"].orEmpty(),
-                    wgBackend = r.kv["WG_BACKEND"] == "yes"
-                )
-            )
-        }
+        control.run(cfg, ServerCommand.ShareInfo)
+            .requireData<ShareInfoData>()
+            .map { ShareInfo(it.mode, it.obfProfile, it.obfKey, it.wgBackend) }
 
     /** [clientId] - свежий cid гостя: скрипт сажает его в allowlist (comment = имя). */
     suspend fun addPeer(
@@ -52,29 +47,22 @@ class ShareRepository(context: Context, ssh: SSHManager) {
         name: String,
         endpoint: String,
         clientId: String
-    ): Result<NewPeer> {
-        return when (val r = control.run(cfg, ServerCommand.PeerAdd(nameB64(name), endpoint, clientId))) {
-            is CmdResult.Err -> r.toFailure()
-            is CmdResult.Ok -> {
-                val pubkey = r.kv["PEER_PUB"]
-                val conf = r.kv["WG_CLIENT_CONF_B64"]?.let(::decodeBase64)
-                if (pubkey.isNullOrBlank() || conf.isNullOrBlank()) {
-                    Result.failure(ServerCommandException("server returned no peer config"))
-                } else {
-                    Result.success(NewPeer(pubkey, r.kv["PEER_IP"].orEmpty(), conf))
+    ): Result<NewPeer> =
+        control.run(cfg, ServerCommand.PeerAdd(nameB64(name), endpoint, clientId))
+            .requireData<PeerAddData>()
+            .mapCatching { d ->
+                val conf = decodeBase64(d.clientConfB64)
+                if (d.peer.pub.isBlank() || conf.isNullOrBlank()) {
+                    throw ServerCommandException("server returned no peer config")
                 }
+                NewPeer(d.peer.pub, d.peer.ip, conf)
             }
-        }
-    }
 
     /** WG-пиры + allowlist-гости одной SSH-сессией (вкладка "Пользователи"). */
     suspend fun listShared(cfg: SshConfig): Result<Pair<List<WgPeer>, List<SharedClient>>> =
-        when (val r = control.run(cfg, ServerCommand.ShareList)) {
-            is CmdResult.Err -> r.toFailure()
-            is CmdResult.Ok -> Result.success(
-                WgPeerParser.parse(r.kv) to SharedClientParser.parse(r.kv)
-            )
-        }
+        control.run(cfg, ServerCommand.ShareList)
+            .requireData<ShareListData>()
+            .map { WgPeerParser.from(it) to SharedClientParser.from(it) }
 
     /**
      * Conf пира + его cid. [candidateClientId]/[name] - backfill: пир без
@@ -86,12 +74,13 @@ class ShareRepository(context: Context, ssh: SSHManager) {
         candidateClientId: String,
         name: String
     ): Result<PeerAccess> =
-        when (val r = control.run(cfg, ServerCommand.PeerConf(pubkey, candidateClientId, nameB64(name)))) {
-            is CmdResult.Err -> r.toFailure()
-            is CmdResult.Ok -> r.kv["WG_CLIENT_CONF_B64"]?.let(::decodeBase64)
-                ?.let { Result.success(PeerAccess(it, r.kv["CLIENT_ID"].orEmpty())) }
-                ?: Result.failure(ServerCommandException("server returned no peer config"))
-        }
+        control.run(cfg, ServerCommand.PeerConf(pubkey, candidateClientId, nameB64(name)))
+            .requireData<PeerConfData>()
+            .mapCatching { d ->
+                val conf = decodeBase64(d.clientConfB64)
+                    ?: throw ServerCommandException("server returned no peer config")
+                PeerAccess(conf, d.clientId)
+            }
 
     suspend fun removePeer(cfg: SshConfig, pubkey: String): Result<Unit> =
         control.run(cfg, ServerCommand.PeerRemove(pubkey)).asUnit()
