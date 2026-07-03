@@ -6,23 +6,24 @@
 package com.freeturn.app.ui.screens.serverdetail
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.FloatingActionButtonMenu
+import androidx.compose.material3.FloatingActionButtonMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,6 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
 import com.freeturn.app.data.HapticUtil
@@ -112,7 +114,6 @@ fun ServerDetailScreen(
         }
     }
 
-    var showMenu by rememberSaveable { mutableStateOf(false) }
     var showDelete by rememberSaveable { mutableStateOf(false) }
     var showCleanup by rememberSaveable { mutableStateOf(false) }
     var showRename by rememberSaveable { mutableStateOf(false) }
@@ -135,92 +136,34 @@ fun ServerDetailScreen(
                     { Text(sub, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                 },
                 navigationIcon = { SettingsBackButton(onBack) },
-                scrollBehavior = scrollBehavior,
-                actions = {
-                    Box {
-                        IconButton(onClick = { showMenu = true }) {
-                            Icon(
-                                painterResource(R.drawable.more_vert_24px),
-                                contentDescription = stringResource(R.string.menu_delete_server)
-                            )
-                        }
-                        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                            // Управление ядром - только при живом сервере (Online). Пункты
-                            // адаптивны к состоянию: установка/обновление, старт, стоп. Во время
-                            // действия статус уходит в Working -> online == null -> пункты прячутся.
-                            if (online != null) {
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(stringResource(
-                                            if (online.installed) R.string.server_update else R.string.server_install
-                                        ))
-                                    },
-                                    onClick = {
-                                        showMenu = false
-                                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                                        serverViewModel.installServer()
-                                    },
-                                    leadingIcon = {
-                                        Icon(painterResource(R.drawable.cloud_download_24px), contentDescription = null)
-                                    }
-                                )
-                                if (online.installed && !online.running) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.start_server)) },
-                                        onClick = {
-                                            showMenu = false
-                                            HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                                            serverViewModel.startServer()
-                                        },
-                                        leadingIcon = {
-                                            Icon(painterResource(R.drawable.play_arrow_24px), contentDescription = null)
-                                        }
-                                    )
-                                }
-                                if (online.running) {
-                                    DropdownMenuItem(
-                                        text = { Text(stringResource(R.string.stop_server)) },
-                                        onClick = {
-                                            showMenu = false
-                                            HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                                            serverViewModel.stopServer()
-                                        },
-                                        leadingIcon = {
-                                            Icon(painterResource(R.drawable.stop_24px), contentDescription = null)
-                                        }
-                                    )
-                                }
-                                HorizontalDivider()
-                            }
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.menu_rename_server)) },
-                                onClick = { showMenu = false; showRename = true },
-                                leadingIcon = {
-                                    Icon(
-                                        painterResource(R.drawable.edit_24px),
-                                        contentDescription = null
-                                    )
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.menu_clone_server)) },
-                                onClick = {
-                                    showMenu = false
-                                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                                    settingsViewModel.cloneServer(serverId, onCloned)
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        painterResource(R.drawable.content_copy_24px),
-                                        contentDescription = null
-                                    )
-                                }
-                            )
-                            // Удаление/очистка - в разделе "Управление" внизу хаба, не здесь.
-                        }
-                    }
-                }
+                scrollBehavior = scrollBehavior
             )
+        },
+        floatingActionButton = {
+            // Действия сервера - expressive FAB-меню (как в логах), а не overflow ⋮.
+            // Удаление/очистка живут в разделе "Управление" внизу хаба, не здесь.
+            if (server != null) {
+                ServerHubActionsFab(
+                    online = online,
+                    onInstall = {
+                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                        serverViewModel.installServer()
+                    },
+                    onStart = {
+                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                        serverViewModel.startServer()
+                    },
+                    onStop = {
+                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                        serverViewModel.stopServer()
+                    },
+                    onRename = { showRename = true },
+                    onClone = {
+                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                        settingsViewModel.cloneServer(serverId, onCloned)
+                    }
+                )
+            }
         },
         // Экран всегда внутри NavigationSuite - нижний бар сам держит навбар-инсет.
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
@@ -358,6 +301,9 @@ fun ServerDetailScreen(
                         }
                     }
                 }
+
+                // Клиренс под плавающее FAB-меню, чтобы оно не перекрывало нижний контент.
+                Spacer(Modifier.height(88.dp))
             }
         }
     }
@@ -394,6 +340,79 @@ fun ServerDetailScreen(
                 showRename = false
             },
             onDismiss = { showRename = false }
+        )
+    }
+}
+
+/**
+ * Expressive FAB-меню действий хаба: по тапу раскрывает управление ядром (установка/старт/стоп)
+ * и общие действия (переименовать/клонировать). Пункты ядра видны только при живом сервере (Online).
+ */
+@Composable
+private fun ServerHubActionsFab(
+    online: ServerHubState.Online?,
+    onInstall: () -> Unit,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
+    onRename: () -> Unit,
+    onClone: () -> Unit
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+
+    FloatingActionButtonMenu(
+        expanded = expanded,
+        button = {
+            ToggleFloatingActionButton(
+                checked = expanded,
+                onCheckedChange = { expanded = it }
+            ) {
+                // ToggleFloatingActionButton не задаёт контентный цвет - тинтуем сами
+                // под контейнер (primaryContainer в покое -> primary при раскрытии).
+                Icon(
+                    painterResource(R.drawable.more_vert_24px),
+                    contentDescription = stringResource(R.string.server_actions),
+                    tint = if (expanded) MaterialTheme.colorScheme.onPrimary
+                    else MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+        }
+    ) {
+        // Управление ядром - только при Online. Во время действия статус уходит в Working ->
+        // online == null -> пункты сами исчезают.
+        if (online != null) {
+            FloatingActionButtonMenuItem(
+                onClick = { expanded = false; onInstall() },
+                icon = { Icon(painterResource(R.drawable.cloud_download_24px), contentDescription = null) },
+                text = {
+                    Text(stringResource(
+                        if (online.installed) R.string.server_update else R.string.server_install
+                    ))
+                }
+            )
+            if (online.installed && !online.running) {
+                FloatingActionButtonMenuItem(
+                    onClick = { expanded = false; onStart() },
+                    icon = { Icon(painterResource(R.drawable.play_arrow_24px), contentDescription = null) },
+                    text = { Text(stringResource(R.string.start_server)) }
+                )
+            }
+            if (online.running) {
+                FloatingActionButtonMenuItem(
+                    onClick = { expanded = false; onStop() },
+                    icon = { Icon(painterResource(R.drawable.stop_24px), contentDescription = null) },
+                    text = { Text(stringResource(R.string.stop_server)) }
+                )
+            }
+        }
+        FloatingActionButtonMenuItem(
+            onClick = { expanded = false; onRename() },
+            icon = { Icon(painterResource(R.drawable.edit_24px), contentDescription = null) },
+            text = { Text(stringResource(R.string.menu_rename_server)) }
+        )
+        FloatingActionButtonMenuItem(
+            onClick = { expanded = false; onClone() },
+            icon = { Icon(painterResource(R.drawable.content_copy_24px), contentDescription = null) },
+            text = { Text(stringResource(R.string.menu_clone_server)) }
         )
     }
 }

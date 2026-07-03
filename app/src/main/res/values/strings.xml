@@ -462,6 +462,7 @@
     <string name="make_active">Сделать активным</string>
     <string name="server_active_badge">Активный</string>
     <string name="server_has_ssh">SSH</string>
+    <string name="server_actions">Действия с сервером</string>
     <string name="menu_delete_server">Удалить сервер</string>
     <string name="menu_rename_server">Переименовать</string>
     <string name="menu_clone_server">Клонировать</string>
