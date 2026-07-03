@@ -5,10 +5,13 @@ import com.freeturn.app.data.server.ServerJson
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Содержимое бэкапа: профили + активный + интерфейсные тоггл-настройки. */
+/** Содержимое бэкапа: профили + активный + личность устройства + интерфейсные тоггл-настройки. */
 data class BackupData(
     val servers: List<Server>,
     val activeId: String?,
+    // Постоянный client-id устройства (allowlist на сервере). Без него restore на новом
+    // девайсе даёт свежий cid -> сервер отклоняет подключение.
+    val ownClientId: String?,
     val dynamicTheme: Boolean,
     val nerdMode: Boolean,
     val privacyMode: Boolean,
@@ -17,12 +20,13 @@ data class BackupData(
 
 /** Сериализация [BackupData] в JSON (серверы - через тот же [ServerJson], что и в DataStore). */
 object SettingsBackup {
-    private const val FORMAT_VERSION = 1
+    private const val FORMAT_VERSION = 2
 
     fun encode(data: BackupData): String = JSONObject().apply {
         put("v", FORMAT_VERSION)
         put("servers", JSONArray(ServerJson.encodeList(data.servers)))
         data.activeId?.let { put("activeId", it) }
+        data.ownClientId?.let { put("ownClientId", it) }
         put("dynamicTheme", data.dynamicTheme)
         put("nerdMode", data.nerdMode)
         put("privacyMode", data.privacyMode)
@@ -39,6 +43,7 @@ object SettingsBackup {
         return BackupData(
             servers = ServerJson.decodeList(serversJson),
             activeId = o.optString("activeId").takeIf { it.isNotBlank() },
+            ownClientId = o.optString("ownClientId").takeIf { it.isNotBlank() },
             dynamicTheme = o.optBoolean("dynamicTheme", true),
             nerdMode = o.optBoolean("nerdMode", true),
             privacyMode = o.optBoolean("privacyMode", false),

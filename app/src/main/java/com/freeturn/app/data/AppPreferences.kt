@@ -262,6 +262,7 @@ class AppPreferences(context: Context) {
         return BackupData(
             servers = snap.list,
             activeId = snap.activeId,
+            ownClientId = ownClientId(),
             dynamicTheme = dynamicThemeFlow.first(),
             nerdMode = nerdModeFlow.first(),
             privacyMode = privacyModeFlow.first(),
@@ -271,29 +272,38 @@ class AppPreferences(context: Context) {
 
     /**
      * Применяет бэкап: добавляет серверы к существующим (не заменяет - новые id и
-     * уникализация имён) и восстанавливает интерфейсные тоггл-настройки. Всё одной
-     * транзакцией. Возвращает число добавленных серверов.
+     * уникализация имён). Тогглы, личность (own client-id) и активный сервер восстанавливает
+     * только на чистый профиль (не было серверов): иначе импорт "подмешать серверы" в живой
+     * профиль молча менял бы тему/приватность/cid. Всё одной транзакцией. Возвращает число
+     * добавленных серверов.
      */
     suspend fun importBackup(data: BackupData): Int {
         var added = 0
         context.dataStore.edit { prefs ->
             val list = ServerJson.decodeList(prefs[SERVERS_JSON]).toMutableList()
+            val freshProfile = list.isEmpty()
+            val idMap = HashMap<String, String>()
             data.servers.forEach { incoming ->
+                val newId = UUID.randomUUID().toString()
+                idMap[incoming.id] = newId
                 val base = incoming.name.trim().ifBlank { Server.FALLBACK_NAME }
-                list += incoming.copy(
-                    id = UUID.randomUUID().toString(),
-                    name = uniqueServerName(base, list)
-                )
+                list += incoming.copy(id = newId, name = uniqueServerName(base, list))
                 added++
             }
             prefs[SERVERS_JSON] = ServerJson.encodeList(list)
-            if (prefs[ACTIVE_SERVER_ID].isNullOrBlank() && list.isNotEmpty()) {
-                prefs[ACTIVE_SERVER_ID] = list.first().id
+            val restoredActive = data.activeId?.let { idMap[it] }
+            when {
+                freshProfile && restoredActive != null -> prefs[ACTIVE_SERVER_ID] = restoredActive
+                prefs[ACTIVE_SERVER_ID].isNullOrBlank() && list.isNotEmpty() ->
+                    prefs[ACTIVE_SERVER_ID] = list.first().id
             }
-            prefs[DYNAMIC_THEME] = data.dynamicTheme
-            prefs[NERD_MODE] = data.nerdMode
-            prefs[PRIVACY_MODE] = data.privacyMode
-            prefs[RESTART_SERVER_ON_SWITCH] = data.restartServerOnSwitch
+            if (freshProfile) {
+                data.ownClientId?.takeIf { ClientId.isValid(it) }?.let { prefs[OWN_CLIENT_ID] = it }
+                prefs[DYNAMIC_THEME] = data.dynamicTheme
+                prefs[NERD_MODE] = data.nerdMode
+                prefs[PRIVACY_MODE] = data.privacyMode
+                prefs[RESTART_SERVER_ON_SWITCH] = data.restartServerOnSwitch
+            }
         }
         return added
     }
