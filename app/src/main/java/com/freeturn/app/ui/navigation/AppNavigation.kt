@@ -1,5 +1,6 @@
 package com.freeturn.app.ui.navigation
 
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -33,6 +34,8 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavHostController
@@ -205,15 +208,27 @@ private fun AppNavHost(
             .fillMaxSize()
             .statusBarsPadding(),
         // Быстрый emphasized shared-axis X вместо дефолтного медленного 700ms-fade.
+        // Переход между вкладками латеральный - направление слайда по их порядку в баре
+        // (уход на левую вкладку едет вправо, как back), внутри вкладки push всегда forward.
         enterTransition = {
             if (reducedMotion) EnterTransition.None
-            else fadeIn(tween(NAV_FADE_IN_MS, easing = EmphasizedEasing)) +
-                slideInHorizontally(tween(NAV_SLIDE_MS, easing = EmphasizedEasing)) { it / 5 }
+            else {
+                val back = !isForwardNav()
+                fadeIn(tween(NAV_FADE_IN_MS, easing = EmphasizedEasing)) +
+                    slideInHorizontally(tween(NAV_SLIDE_MS, easing = EmphasizedEasing)) {
+                        if (back) -it / 5 else it / 5
+                    }
+            }
         },
         exitTransition = {
             if (reducedMotion) ExitTransition.None
-            else fadeOut(tween(NAV_FADE_OUT_MS, easing = EmphasizedEasing)) +
-                slideOutHorizontally(tween(NAV_SLIDE_MS, easing = EmphasizedEasing)) { -it / 12 }
+            else {
+                val back = !isForwardNav()
+                fadeOut(tween(NAV_FADE_OUT_MS, easing = EmphasizedEasing)) +
+                    slideOutHorizontally(tween(NAV_SLIDE_MS, easing = EmphasizedEasing)) {
+                        if (back) it / 12 else -it / 12
+                    }
+            }
         },
         popEnterTransition = {
             if (reducedMotion) EnterTransition.None
@@ -232,6 +247,25 @@ private fun AppNavHost(
         addGraph(navController, settingsViewModel)
         settingsGraph(navController, settingsViewModel, proxyViewModel, serverViewModel)
     }
+}
+
+// Порядок вкладок в баре (Logs вставляется вторым при видимости - см. logsNavItem).
+private val tabOrder = listOf(
+    HomeGraph::class, LogsGraph::class, ShareGraph::class, SettingsGraph::class, AddGraph::class
+)
+
+// Индекс вкладки, которой принадлежит назначение, либо null для не-вкладочного (сюда не попадает).
+private fun NavDestination.tabRank(): Int? =
+    hierarchy.firstNotNullOfOrNull { d ->
+        tabOrder.indexOfFirst { d.hasRoute(it) }.takeIf { it >= 0 }
+    }
+
+// Латеральный переход между вкладками "вперёд" = целевая вкладка правее исходной.
+// Внутри одной вкладки (from == to или null) push всегда forward.
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.isForwardNav(): Boolean {
+    val from = initialState.destination.tabRank()
+    val to = targetState.destination.tabRank()
+    return if (from != null && to != null && from != to) to > from else true
 }
 
 private data class NavItem(
