@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Фолбэк для API < 31, тёмная. -->
+<resources>
+    <color name="widget_surface">#FF141218</color>
+    <color name="widget_on_surface">#FFE6E0E9</color>
+    <color name="widget_on_surface_variant">#FFCAC4D0</color>
+    <color name="widget_primary">#FFD0BCFF</color>
+    <color name="widget_tertiary">#FFEFB8C8</color>
+    <color name="widget_outline">#FF938F99</color>
+</resources>

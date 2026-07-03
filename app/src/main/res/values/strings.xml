@@ -353,6 +353,15 @@
     <string name="tile_service_label">Free Turn</string>
     <string name="proxy_active_wireguard">Прокси и WireGuard активны</string>
 
+    <!-- Виджет домашнего экрана -->
+    <string name="widget_label">FreeTurn - прокси</string>
+    <string name="widget_status_on">Подключено</string>
+    <string name="widget_status_connecting">Подключение…</string>
+    <string name="widget_status_off">Отключено</string>
+    <string name="widget_server_none">Нет активного сервера</string>
+    <string name="widget_action_start">Запустить</string>
+    <string name="widget_action_stop">Остановить</string>
+
     <!-- App Shortcuts (long-press иконки) -->
     <string name="shortcut_start_short">Запуск</string>
     <string name="shortcut_start_long">Запустить прокси</string>
