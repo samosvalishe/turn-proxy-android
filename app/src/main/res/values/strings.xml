@@ -185,7 +185,7 @@
     <string name="server_address_support">IP и порт turn-proxy на вашем VPS</string>
     <string name="call_link_label">Ссылка на звонок</string>
     <string name="call_link_placeholder">https://site.ru/call/…</string>
-    <string name="call_link_support">Звонки → Создать → Скопировать ссылку (не нажимайте \"Завершить\")</string>
+    <string name="call_link_support">Звонки -> Создать -> Скопировать ссылку (не нажимайте \"Завершить\")</string>
     <string name="call_link_edit">Изменить ссылку на звонок</string>
     <string name="call_link_empty_error">Введите ссылку на звонок</string>
     <string name="paste">Вставить</string>

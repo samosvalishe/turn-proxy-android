@@ -11,7 +11,7 @@
 
 # ── Bouncy Castle (Ed25519 / curve25519 / chacha20) ───────────────────────────
 # mwiede/jsch 2.x подгружает алгоритмы BC через reflection. R8 стрипает эти
-# классы в release → Ed25519-ключи и современный KEX не работают.
+# классы в release -> Ed25519-ключи и современный KEX не работают.
 -keep class org.bouncycastle.** { *; }
 -dontwarn org.bouncycastle.**
 -dontwarn javax.naming.**
