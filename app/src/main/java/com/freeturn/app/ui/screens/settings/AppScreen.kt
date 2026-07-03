@@ -27,7 +27,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
-import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -54,6 +53,7 @@ import com.freeturn.app.R
 import com.freeturn.app.domain.UpdateState
 import com.freeturn.app.data.HapticUtil
 import com.freeturn.app.ui.components.BackupPasswordDialog
+import com.freeturn.app.ui.components.BusyProgressIndicator
 import com.freeturn.app.ui.components.SectionLabel
 import com.freeturn.app.ui.components.SettingsBackButton
 import com.freeturn.app.ui.components.SettingsCard
@@ -298,10 +298,7 @@ private fun UpdateCard(
                 }
             }
             if (state is UpdateState.Downloading) {
-                LinearWavyProgressIndicator(
-                    progress = { state.progress / 100f },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                BusyProgressIndicator(progress = { state.progress / 100f })
             } else {
                 val action = when (state) {
                     is UpdateState.Available -> onDownload

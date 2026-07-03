@@ -8,11 +8,11 @@ import androidx.navigation.toRoute
 import com.freeturn.app.ui.screens.clientsetup.ClientSetupScreen
 import com.freeturn.app.ui.screens.connectionmode.ConnectionModeScreen
 import com.freeturn.app.ui.screens.servermanagement.ServerManagementScreen
+import com.freeturn.app.ui.screens.serverdetail.ServerDetailScreen
 import com.freeturn.app.ui.screens.settings.AboutScreen
 import com.freeturn.app.ui.screens.settings.AdvancedScreen
 import com.freeturn.app.ui.screens.settings.AppScreen
 import com.freeturn.app.ui.screens.settings.NerdScreen
-import com.freeturn.app.ui.screens.settings.ServerDetailScreen
 import com.freeturn.app.ui.screens.settings.ServersListScreen
 import com.freeturn.app.ui.screens.settings.SettingsScreen
 import com.freeturn.app.ui.screens.sshsetup.SshSetupScreen

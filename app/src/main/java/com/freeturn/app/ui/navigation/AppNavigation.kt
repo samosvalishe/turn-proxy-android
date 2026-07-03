@@ -55,7 +55,8 @@ import org.koin.androidx.compose.koinViewModel
 
 // MD3 emphasized-кривая + длительности навигационных переходов (единый источник).
 private val EmphasizedEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
-private const val NAV_SLIDE_MS = 300
+// internal: экраны откладывают тяжёлую работу на время перехода (ServerDetailScreen).
+internal const val NAV_SLIDE_MS = 300
 private const val NAV_FADE_IN_MS = 180
 private const val NAV_FADE_OUT_MS = 120
 

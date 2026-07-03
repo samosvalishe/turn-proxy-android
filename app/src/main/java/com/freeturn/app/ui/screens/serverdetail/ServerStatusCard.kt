@@ -3,18 +3,16 @@
     androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class
 )
 
-package com.freeturn.app.ui.screens.settings
+package com.freeturn.app.ui.screens.serverdetail
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -29,7 +27,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -43,9 +40,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import com.freeturn.app.R
+import com.freeturn.app.ui.components.BusyProgressIndicator
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.viewmodel.server.ServerHubState
@@ -68,6 +67,9 @@ internal fun ServerStatusCard(
     // сервером не общается. Схлопываем их в нейтральную заглушку. Actionable-состояния
     // (Offline/NotPaired) остаются - это setup, а не live-статус.
     val effective = if (!syncOn && status.isLivePhase()) ServerHubState.SyncOff else status
+    // Спеки из MotionScheme (не сырые spring/tween) - единый источник с SetupInstallStep.
+    val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
     Surface(
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -82,15 +84,8 @@ internal fun ServerStatusCard(
                     (fadeIn(snap()) togetherWith fadeOut(snap()))
                         .using(SizeTransform(clip = false) { _, _ -> snap() })
                 } else {
-                    (fadeIn(tween(200)) togetherWith fadeOut(tween(120)))
-                        .using(
-                            SizeTransform(clip = false) { _, _ ->
-                                spring(
-                                    dampingRatio = Spring.DampingRatioNoBouncy,
-                                    stiffness = Spring.StiffnessMediumLow
-                                )
-                            }
-                        )
+                    (fadeIn(effectsSpec) togetherWith fadeOut(effectsSpec))
+                        .using(SizeTransform(clip = false) { _, _ -> spatialSpec })
                 }
             },
             label = "hub_status",
@@ -206,7 +201,7 @@ private fun BusyContent(title: String) {
         title = title,
         pulsing = true
     )
-    LinearWavyProgressIndicator(modifier = Modifier.fillMaxWidth())
+    BusyProgressIndicator()
 }
 
 /**

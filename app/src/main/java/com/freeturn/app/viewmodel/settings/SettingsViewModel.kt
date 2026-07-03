@@ -9,13 +9,16 @@ import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.backup.BackupCrypto
 import com.freeturn.app.data.config.ClientConfig
 import com.freeturn.app.data.config.ObfProfile
+import com.freeturn.app.data.control.UninstallData
 import com.freeturn.app.data.server.Server
 import com.freeturn.app.data.server.ServersSnapshot
 import com.freeturn.app.domain.backup.BackupManager
 import com.freeturn.app.domain.update.AppUpdater
 import com.freeturn.app.domain.proxy.LocalProxyManager
 import com.freeturn.app.domain.proxy.ProxyOrchestrator
+import com.freeturn.app.domain.server.ServerSetupRepository
 import com.freeturn.app.domain.ssh.SshRepository
+import com.freeturn.app.viewmodel.uiError
 import com.freeturn.app.domain.UpdateState
 import com.freeturn.app.domain.proxy.ProxyServiceState
 import kotlinx.coroutines.CancellationException
@@ -39,10 +42,19 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.IOException
 
+/** Состояние очистки сервера от FreeTurn (snapshot для диалога). */
+sealed interface ServerCleanupState {
+    data object Idle : ServerCleanupState
+    data object Running : ServerCleanupState
+    data class Done(val data: UninstallData) : ServerCleanupState
+    data class Error(val message: String) : ServerCleanupState
+}
+
 class SettingsViewModel(
     private val prefs: AppPreferences,
     private val proxyManager: LocalProxyManager,
     private val sshRepository: SshRepository,
+    private val serverSetup: ServerSetupRepository,
     private val appUpdater: AppUpdater,
     private val orchestrator: ProxyOrchestrator,
     private val backupManager: BackupManager,
@@ -210,8 +222,32 @@ class SettingsViewModel(
         }
     }
 
+    private val _cleanupState = MutableStateFlow<ServerCleanupState>(ServerCleanupState.Idle)
+    /** Прогресс очистки сервера от FreeTurn (диалог в разделе "Управление"). */
+    val cleanupState: StateFlow<ServerCleanupState> = _cleanupState.asStateFlow()
+
+    fun resetCleanupState() { _cleanupState.value = ServerCleanupState.Idle }
+
+    /** Удаление сервера из приложения (локально, без серверной очистки). */
     fun deleteServer(id: String) {
         viewModelScope.launch { prefs.deleteServer(id) }
+    }
+
+    /**
+     * Снос free-turn-proxy с удалённого сервера по SSH. Сервер из приложения НЕ
+     * удаляет - это отдельное действие. Результат/ошибка - в [cleanupState].
+     */
+    fun cleanupServer(id: String) {
+        viewModelScope.launch {
+            val cfg = serversSnapshot.value.list.firstOrNull { it.id == id }?.ssh ?: return@launch
+            _cleanupState.value = ServerCleanupState.Running
+            // Деструктив под верной эскалацией: сохранённый rootMode мог устареть/быть
+            // дефолтным ROOT (сервер ни разу не подключали) -> preflight перед сносом.
+            val mode = serverSetup.detectRootMode(cfg) ?: cfg.rootMode
+            serverSetup.uninstall(cfg.copy(rootMode = mode), withWgPkg = true)
+                .onSuccess { _cleanupState.value = ServerCleanupState.Done(it) }
+                .onFailure { _cleanupState.value = ServerCleanupState.Error(it.uiError(appContext)) }
+        }
     }
 
     // Правит client-конфиг сервера по id, НЕ требуя его активации. Для активного

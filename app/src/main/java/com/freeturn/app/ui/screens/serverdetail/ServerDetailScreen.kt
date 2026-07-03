@@ -3,7 +3,7 @@
     androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class
 )
 
-package com.freeturn.app.ui.screens.settings
+package com.freeturn.app.ui.screens.serverdetail
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,25 +15,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -45,8 +39,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
-import com.freeturn.app.domain.SshConnectionState
 import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.domain.SshConnectionState
 import com.freeturn.app.ui.components.SectionLabel
 import com.freeturn.app.ui.components.SettingsBackButton
 import com.freeturn.app.ui.components.SettingsCard
@@ -55,12 +49,13 @@ import com.freeturn.app.ui.components.SettingsEntryRow
 import com.freeturn.app.ui.components.SettingsGroup
 import com.freeturn.app.ui.components.SettingsGroupItem
 import com.freeturn.app.ui.components.SettingsSwitchRow
+import com.freeturn.app.ui.navigation.NAV_SLIDE_MS
+import com.freeturn.app.ui.theme.Spacing
 import com.freeturn.app.ui.util.redact
 import com.freeturn.app.viewmodel.server.ServerHubState
 import com.freeturn.app.viewmodel.server.ServerViewModel
-import com.freeturn.app.viewmodel.settings.SettingsViewModel
 import com.freeturn.app.viewmodel.server.serverSettingsAvailable
-import com.freeturn.app.ui.theme.Spacing
+import com.freeturn.app.viewmodel.settings.SettingsViewModel
 
 /**
  * Детальный экран сервера - плоский хаб: шапка-сводка, вход в настройки провайдера
@@ -112,13 +107,14 @@ fun ServerDetailScreen(
     // одновременно со slide-переходом - это и есть пролаг при заходе. После перехода - плавно.
     LaunchedEffect(isActive, sshConfig.ip, sshState) {
         if (isActive && sshConfig.ip.isNotBlank() && sshState is SshConnectionState.Disconnected) {
-            kotlinx.coroutines.delay(350)
+            kotlinx.coroutines.delay(NAV_SLIDE_MS + 50L)
             serverViewModel.reconnectSsh()
         }
     }
 
     var showMenu by rememberSaveable { mutableStateOf(false) }
     var showDelete by rememberSaveable { mutableStateOf(false) }
+    var showCleanup by rememberSaveable { mutableStateOf(false) }
     var showRename by rememberSaveable { mutableStateOf(false) }
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
@@ -220,22 +216,7 @@ fun ServerDetailScreen(
                                     )
                                 }
                             )
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        stringResource(R.string.menu_delete_server),
-                                        color = MaterialTheme.colorScheme.error
-                                    )
-                                },
-                                onClick = { showMenu = false; showDelete = true },
-                                leadingIcon = {
-                                    Icon(
-                                        painterResource(R.drawable.delete_24px),
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.error
-                                    )
-                                }
-                            )
+                            // Удаление/очистка - в разделе "Управление" внизу хаба, не здесь.
                         }
                     }
                 }
@@ -348,62 +329,71 @@ fun ServerDetailScreen(
                         )
                     }
                 }
+
+                if (server != null) {
+                    SectionLabel(stringResource(R.string.server_management))
+                    // Очистка - только при SSH-доступе (есть что сносить с удалённого хоста).
+                    val canCleanup = server.ssh.ip.isNotBlank()
+                    val mgmtCount = if (canCleanup) 2 else 1
+                    SettingsGroup {
+                        if (canCleanup) {
+                            SettingsGroupItem(0, mgmtCount) {
+                                SettingsEntryRow(
+                                    iconRes = R.drawable.mop_24px,
+                                    title = stringResource(R.string.server_clean_title),
+                                    subtitle = stringResource(R.string.server_clean_subtitle),
+                                    trailingRes = null,
+                                    onClick = { showCleanup = true }
+                                )
+                            }
+                        }
+                        SettingsGroupItem(mgmtCount - 1, mgmtCount) {
+                            SettingsEntryRow(
+                                iconRes = R.drawable.delete_24px,
+                                title = stringResource(R.string.server_delete_app),
+                                subtitle = stringResource(R.string.server_delete_app_subtitle),
+                                trailingRes = null,
+                                onClick = { showDelete = true }
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 
     if (showDelete && server != null) {
-        AlertDialog(
-            onDismissRequest = { showDelete = false },
-            title = { Text(stringResource(R.string.server_delete_confirm_title)) },
-            text = { Text(stringResource(R.string.server_delete_confirm_desc, server.name)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        HapticUtil.perform(context, HapticUtil.Pattern.ERROR)
-                        settingsViewModel.deleteServer(serverId)
-                        showDelete = false
-                        // Навигацию назад делает null-guard выше (server станет null
-                        // после async-удаления) - не зовём pop тут, иначе двойной pop.
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
-                ) { Text(stringResource(R.string.server_delete)) }
+        DeleteServerDialog(
+            serverName = server.name,
+            onConfirm = {
+                settingsViewModel.deleteServer(serverId)
+                showDelete = false
+                // Навигацию назад делает null-guard выше (server станет null).
             },
-            dismissButton = {
-                TextButton(onClick = { showDelete = false }) { Text(stringResource(R.string.cancel)) }
+            onDismiss = { showDelete = false }
+        )
+    }
+
+    if (showCleanup && server != null) {
+        val cleanupState by settingsViewModel.cleanupState.collectAsStateWithLifecycle()
+        ServerCleanupDialog(
+            state = cleanupState,
+            onConfirm = { settingsViewModel.cleanupServer(serverId) },
+            onClose = {
+                showCleanup = false
+                settingsViewModel.resetCleanupState()
             }
         )
     }
 
     if (showRename && server != null) {
-        var newName by remember(server.id) { mutableStateOf(server.name) }
-        AlertDialog(
-            onDismissRequest = { showRename = false },
-            title = { Text(stringResource(R.string.rename_server_title)) },
-            text = {
-                OutlinedTextField(
-                    value = newName,
-                    onValueChange = { newName = it },
-                    label = { Text(stringResource(R.string.server_name_label)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+        RenameServerDialog(
+            currentName = server.name,
+            onSave = { name ->
+                settingsViewModel.renameServer(serverId, name)
+                showRename = false
             },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                        settingsViewModel.renameServer(serverId, newName)
-                        showRename = false
-                    },
-                    enabled = newName.isNotBlank()
-                ) { Text(stringResource(R.string.save)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRename = false }) { Text(stringResource(R.string.cancel)) }
-            }
+            onDismiss = { showRename = false }
         )
     }
 }

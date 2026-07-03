@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -22,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.data.HapticUtil
 import com.freeturn.app.domain.UpdateState
+import com.freeturn.app.ui.components.BusyProgressIndicator
 
 /**
  * Диалоги цикла обновления приложения: доступно -> качается -> готово к установке.
@@ -68,10 +68,7 @@ internal fun UpdateDialogs(
                     Column {
                         Text(stringResource(R.string.update_downloading, state.progress))
                         Spacer(Modifier.height(12.dp))
-                        LinearWavyProgressIndicator(
-                            progress = { state.progress / 100f },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        BusyProgressIndicator(progress = { state.progress / 100f })
                     }
                 },
                 confirmButton = {}
