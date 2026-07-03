@@ -278,6 +278,7 @@
     <string name="password">Пароль</string>
     <string name="private_key">Приватный ключ</string>
     <string name="authentication">Аутентификация</string>
+    <string name="auth_method_label">Способ входа</string>
     <string name="private_key_pem">Приватный ключ (PEM)</string>
     <string name="private_key_placeholder">-----BEGIN RSA PRIVATE KEY-----\n…</string>
     <string name="sudo_password">Пароль sudo</string>

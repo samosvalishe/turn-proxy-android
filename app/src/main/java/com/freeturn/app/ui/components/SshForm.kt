@@ -5,12 +5,13 @@ package com.freeturn.app.ui.components
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -101,28 +102,10 @@ fun SshFormFields(
         }
         SettingsRowDivider()
         SettingsFieldSlot {
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                SegmentedButton(
-                    selected = authType == SshConfig.AUTH_PASSWORD,
-                    onClick = {
-                        if (authType != SshConfig.AUTH_PASSWORD) {
-                            HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
-                            onAuthTypeChange(SshConfig.AUTH_PASSWORD)
-                        }
-                    },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                ) { Text(stringResource(R.string.password)) }
-                SegmentedButton(
-                    selected = authType == SshConfig.AUTH_SSH_KEY,
-                    onClick = {
-                        if (authType != SshConfig.AUTH_SSH_KEY) {
-                            HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
-                            onAuthTypeChange(SshConfig.AUTH_SSH_KEY)
-                        }
-                    },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                ) { Text(stringResource(R.string.private_key)) }
-            }
+            AuthMethodDropdown(
+                authType = authType,
+                onAuthTypeChange = onAuthTypeChange
+            )
         }
         SettingsRowDivider()
         SettingsFieldSlot {
@@ -197,6 +180,53 @@ fun SshFormFields(
                         keyboardType = KeyboardType.Password,
                         imeAction = ImeAction.Done
                     )
+                )
+            }
+        }
+    }
+}
+
+/** Селект способа входа: пароль / приватный ключ (сегменты не влезали по ширине). */
+@Composable
+private fun AuthMethodDropdown(
+    authType: String,
+    onAuthTypeChange: (String) -> Unit
+) {
+    val context = LocalContext.current
+    var expanded by remember { mutableStateOf(false) }
+    val options = listOf(
+        SshConfig.AUTH_PASSWORD to stringResource(R.string.password),
+        SshConfig.AUTH_SSH_KEY to stringResource(R.string.private_key)
+    )
+    val current = options.firstOrNull { it.first == authType }?.second.orEmpty()
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        OutlinedTextField(
+            value = current,
+            onValueChange = {},
+            readOnly = true,
+            singleLine = true,
+            label = { Text(stringResource(R.string.auth_method_label)) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                .fillMaxWidth()
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEach { (value, label) ->
+                DropdownMenuItem(
+                    text = { Text(label) },
+                    onClick = {
+                        expanded = false
+                        if (value != authType) {
+                            HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
+                            onAuthTypeChange(value)
+                        }
+                    }
                 )
             }
         }
