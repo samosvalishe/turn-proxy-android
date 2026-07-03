@@ -20,7 +20,7 @@ object Browser {
     const val FIREFOX = "firefox"
     const val CHROME = "chrome"
     const val SAFARI = "safari"
-    const val DEFAULT = CHROME
+    const val DEFAULT = SAFARI
     val VALUES = listOf(FIREFOX, CHROME, SAFARI)
 }
 
