@@ -123,9 +123,13 @@ fun SettingsEntryRow(
     trailingRes: Int? = R.drawable.chevron_right_24px,
     trailingTint: Color = Color.Unspecified,
     enabled: Boolean = true,
+    iconContainer: Color = MaterialTheme.colorScheme.secondaryContainer,
+    iconTint: Color = MaterialTheme.colorScheme.onSecondaryContainer,
+    titleColorOverride: Color = Color.Unspecified,
     onClick: () -> Unit
 ) {
-    val titleColor = if (enabled) MaterialTheme.colorScheme.onSurface
+    val titleColor = if (titleColorOverride != Color.Unspecified) titleColorOverride
+    else if (enabled) MaterialTheme.colorScheme.onSurface
     else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
     val subtitleColor = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant
     else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
@@ -137,7 +141,7 @@ fun SettingsEntryRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
     ) {
-        SettingsRowIcon(iconRes, enabled = enabled)
+        SettingsRowIcon(iconRes, enabled = enabled, container = iconContainer, tint = iconTint)
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyLarge, color = titleColor)
             if (subtitle != null) {

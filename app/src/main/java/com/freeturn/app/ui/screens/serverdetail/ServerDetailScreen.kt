@@ -286,6 +286,9 @@ fun ServerDetailScreen(
                                     title = stringResource(R.string.server_clean_title),
                                     subtitle = stringResource(R.string.server_clean_subtitle),
                                     trailingRes = null,
+                                    iconContainer = MaterialTheme.colorScheme.errorContainer,
+                                    iconTint = MaterialTheme.colorScheme.onErrorContainer,
+                                    titleColorOverride = MaterialTheme.colorScheme.error,
                                     onClick = { showCleanup = true }
                                 )
                             }
@@ -296,6 +299,9 @@ fun ServerDetailScreen(
                                 title = stringResource(R.string.server_delete_app),
                                 subtitle = stringResource(R.string.server_delete_app_subtitle),
                                 trailingRes = null,
+                                iconContainer = MaterialTheme.colorScheme.errorContainer,
+                                iconTint = MaterialTheme.colorScheme.onErrorContainer,
+                                titleColorOverride = MaterialTheme.colorScheme.error,
                                 onClick = { showDelete = true }
                             )
                         }
