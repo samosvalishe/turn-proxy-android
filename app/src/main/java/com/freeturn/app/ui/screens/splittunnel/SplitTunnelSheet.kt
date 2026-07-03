@@ -38,10 +38,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.data.config.SplitTunnelMode
+import com.freeturn.app.data.config.splitTunnelSelection
 import com.freeturn.app.data.HapticUtil
 import com.freeturn.app.data.AppChoice
 import com.freeturn.app.data.installedInternetApps
-import com.freeturn.app.data.toPackageSet
 import com.freeturn.app.ui.components.EmptyState
 import com.freeturn.app.ui.theme.Spacing
 
@@ -105,7 +105,8 @@ fun SplitTunnelSheetContent(
         mutableStateOf(if (mode != SplitTunnelMode.ALL) mode else SplitTunnelMode.EXCLUDE)
     }
     var query by remember { mutableStateOf("") }
-    val selected = remember(apps) { apps.toPackageSet() }
+    // Пустой exclude-список показывает рос-сервисы отмеченными (тот же дефолт, что и в WG).
+    val selected = remember(apps, modeChoice) { splitTunnelSelection(modeChoice, apps) }
     // Список приложений нужен только когда сплит включён - выключенным не фетчим.
     val installed by produceState<List<AppChoice>?>(initialValue = null, splitOn) {
         value = if (splitOn) context.installedInternetApps() else null

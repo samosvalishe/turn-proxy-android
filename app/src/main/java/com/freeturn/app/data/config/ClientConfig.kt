@@ -42,9 +42,12 @@ data class ClientConfig(
     val wireGuardTunnelName: String = TunnelTransport.DEFAULT_TUNNEL_NAME,
     /** MTU WG-интерфейса. Инжектится в [Interface] при подъёме (в сыром conf не хранится). */
     val wireGuardMtu: Int = DEFAULT_WG_MTU,
-    /** Режим split-tunneling: all | include | exclude. */
-    val splitTunnelMode: String = SplitTunnelMode.ALL,
-    /** Список package-имён для include/exclude (разделители: запятая/пробел/перенос строки). */
+    /** Режим split-tunneling: all | include | exclude. Дефолт exclude - рос-сервисы мимо туннеля. */
+    val splitTunnelMode: String = SplitTunnelMode.EXCLUDE,
+    /**
+     * Package-имена для include/exclude (разделители: запятая/пробел/перенос строки).
+     * Пустой в exclude-режиме = дефолтный список рос-сервисов (см. [splitTunnelSelection]).
+     */
     val splitTunnelApps: String = "",
     /** Сбор логов ядра в UI. false = ProxyServiceState.addLog глотает строки. */
     val logsEnabled: Boolean = true,

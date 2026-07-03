@@ -14,6 +14,16 @@ data class AppChoice(val label: String, val packageName: String)
 fun String.toPackageSet(): Set<String> =
     split(',', '\n', ' ', ';').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
 
+/** Установлен ли пакет. getPackageInfo кидает NameNotFoundException на отсутствующем -> false. */
+fun Context.isPackageInstalled(pkg: String): Boolean = runCatching {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        packageManager.getPackageInfo(pkg, PackageManager.PackageInfoFlags.of(0))
+    } else {
+        @Suppress("DEPRECATION")
+        packageManager.getPackageInfo(pkg, 0)
+    }
+}.isSuccess
+
 /**
  * Установленные приложения с INTERNET-пермом, кроме самого FreeTurn.
  * PackageManager-вызовы тяжёлые (диск/IPC) - гоним на IO-потоке.

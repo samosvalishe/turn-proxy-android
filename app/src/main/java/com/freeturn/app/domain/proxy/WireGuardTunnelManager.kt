@@ -4,6 +4,8 @@ import android.content.Context
 import com.freeturn.app.data.config.ClientConfig
 import com.freeturn.app.data.config.SplitTunnelMode
 import com.freeturn.app.data.config.TunnelTransport
+import com.freeturn.app.data.config.splitTunnelSelection
+import com.freeturn.app.data.isPackageInstalled
 import com.wireguard.android.backend.GoBackend
 import com.wireguard.android.backend.Tunnel
 import com.wireguard.config.Config
@@ -42,7 +44,9 @@ class WireGuardTunnelManager(context: Context) {
             .withSplitTunnel(
                 appPackage = appContext.packageName,
                 mode = cfg.splitTunnelMode,
-                packages = cfg.splitTunnelApps.toPackageList()
+                // Непоставленные пакеты отсеиваем - addDisallowedApplication валит туннель на них.
+                packages = splitTunnelSelection(cfg.splitTunnelMode, cfg.splitTunnelApps)
+                    .filter { appContext.isPackageInstalled(it) }
             )
         val config = Config.parse(
             ByteArrayInputStream(preparedConfig.toByteArray(StandardCharsets.UTF_8))
@@ -174,9 +178,3 @@ private fun String.withSplitTunnel(
     }
     return if (inserted) lines.joinToString("\n") else this
 }
-
-private fun String.toPackageList(): List<String> =
-    split(',', '\n', ' ', ';')
-        .map { it.trim() }
-        .filter { it.isNotEmpty() }
-        .distinct()

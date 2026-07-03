@@ -36,7 +36,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.freeturn.app.data.config.ONEME_PACKAGE
 import com.freeturn.app.data.config.SplitTunnelMode
+import com.freeturn.app.data.config.splitTunnelSelection
+import com.freeturn.app.data.isPackageInstalled
+import com.freeturn.app.data.toPackageSet
 import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.data.HapticUtil
 import com.freeturn.app.ui.screens.splittunnel.SplitTunnelModal
@@ -67,6 +71,7 @@ fun HomeScreen(
     RequestStartupPermissions(settingsViewModel)
 
     val showSplitSheet = rememberSaveable { mutableStateOf(false) }
+    val showOnemeGate = rememberSaveable { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     // Нижний лист серверов (всегда виден).
@@ -86,6 +91,14 @@ fun HomeScreen(
     }
 
     fun startProxyWithTunnel() {
+        // Гейт только для VPN: пока ru.oneme.app стоит и не добавлен в сплит - не запускаем.
+        if (clientConfig.wireGuardActive &&
+            context.isPackageInstalled(ONEME_PACKAGE) &&
+            ONEME_PACKAGE !in clientConfig.splitTunnelApps.toPackageSet()
+        ) {
+            showOnemeGate.value = true
+            return
+        }
         if (clientConfig.wireGuardActive) {
             val vpnIntent: Intent? = VpnService.prepare(context)
             if (vpnIntent != null) {
@@ -199,6 +212,20 @@ fun HomeScreen(
             onAppsChange = settingsViewModel::setSplitTunnelApps,
             onDismiss = { showSplitSheet.value = false },
             containerColor = sheetColor
+        )
+    }
+
+    if (showOnemeGate.value) {
+        OnemeGateDialog(
+            onAddToSplit = {
+                // Материализуем эффективный набор (дефолты + МАХ), иначе непустая строка
+                // погасит дефолтные рос-сервисы в splitTunnelSelection.
+                val next = (splitTunnelSelection(clientConfig.splitTunnelMode, clientConfig.splitTunnelApps)
+                    + ONEME_PACKAGE).sorted().joinToString("\n")
+                settingsViewModel.setSplitTunnelApps(next)
+                showOnemeGate.value = false
+            },
+            onDismiss = { showOnemeGate.value = false }
         )
     }
 
