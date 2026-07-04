@@ -1,6 +1,10 @@
 # Владеем ТОЛЬКО ft-wg0, чужой WG не трогаем. Сеть /24: .1 сервер, .2 владелец, .3+ гости.
 # Правка conf: wg-quick strip -> wg syncconf (без рестарта, текст==live).
 
+# Интерфейс прошлой версии (без маркера, та же подсеть 10.13.13) - мигрируем в ft-wg0.
+LEGACY_WG_IFACE="wg0"
+LEGACY_WG_CONF="$WG_DIR/$LEGACY_WG_IFACE.conf"
+
 wg_present() { [ -f "$WG_CONF" ]; }
 
 # Conf несёт маркер владения? Защита от чужого файла с тем же именем.
@@ -270,10 +274,105 @@ _wg_ensure_owner_client() {
         || fail peer_add_failed "cannot add owner peer to $WG_CONF"
 }
 
+# В conf есть хоть один пир, выданный приложением (маркер ft-user) -> это наш install.
+_conf_has_guests() { grep -q '^[[:space:]]*# ft-user: ' "$1" 2>/dev/null; }
+
+# server-pubkey conf (из Interface PrivateKey). Код 1 - нет ключа/wg.
+_conf_server_pub() {
+    local sp
+    sp=$(sed -n 's/^[[:space:]]*PrivateKey[[:space:]]*=[[:space:]]*//p' "$1" | head -n1 | tr -d ' \r')
+    [ -n "$sp" ] || return 1
+    printf '%s' "$sp" | wg pubkey 2>/dev/null
+}
+
+_confs_same_server() {  # A B -> 0 если одинаковый server-key
+    local a b
+    a=$(_conf_server_pub "$1") || return 1
+    b=$(_conf_server_pub "$2") || return 1
+    [ -n "$a" ] && [ "$a" = "$b" ]
+}
+
+# wg0.conf - НАШ старый install? Любой из сигналов: пир с ft-user-маркером;
+# server-pub числится Peer-ом в нашем client conf (clean-случай до _wg_create_fresh);
+# Address в нашей дефолтной подсети (10.13.13 - только наша, коллизия = наша).
+_legacy_is_ours() {
+    [ -f "$LEGACY_WG_CONF" ] || return 1
+    _conf_has_guests "$LEGACY_WG_CONF" && return 0
+    if [ -f "$WG_CLIENT_CONF" ] && command -v wg >/dev/null 2>&1; then
+        local lspub cpeer
+        lspub=$(_conf_server_pub "$LEGACY_WG_CONF" || true)
+        cpeer=$(sed -n 's/^[[:space:]]*PublicKey[[:space:]]*=[[:space:]]*//p' "$WG_CLIENT_CONF" | head -n1 | tr -d ' \r')
+        [ -n "$lspub" ] && [ "$lspub" = "$cpeer" ] && return 0
+    fi
+    local addr base
+    addr=$(sed -n 's/^[[:space:]]*Address[[:space:]]*=[[:space:]]*//p' "$LEGACY_WG_CONF" | head -n1 | cut -d, -f1 | cut -d/ -f1 | tr -d ' \r')
+    base=${addr%.*}
+    [ -n "$base" ] && [ "$base" = "$WG_NET" ]
+}
+
+_iface_down() {  # снять интерфейс (conf не трогаем)
+    has_systemd && systemctl disable --now "wg-quick@$1" >/dev/null 2>&1 || true
+    wg-quick down "$1" >/dev/null 2>&1 || ip link delete "$1" >/dev/null 2>&1 || true
+}
+
+# Сделать ft-wg0.conf из wg0.conf (+маркер владения). Сборка/валидация tmp ДО
+# сноса интерфейсов - битый результат не оставит систему без conf. Код 1 - провал.
+_adopt_to_ftwg0() {
+    local tmp="$WG_CONF.mig"
+    if grep -qF "$WG_MARKER" "$LEGACY_WG_CONF"; then
+        cp -f "$LEGACY_WG_CONF" "$tmp" || { rm -f "$tmp"; return 1; }
+    else
+        awk -v m="$WG_MARKER" '{print} !d && /^[[:space:]]*\[Interface\]/{print m; d=1}' \
+            "$LEGACY_WG_CONF" > "$tmp" || { rm -f "$tmp"; return 1; }
+    fi
+    [ -s "$tmp" ] || { rm -f "$tmp"; return 1; }
+    chmod 600 "$tmp"
+    _iface_down "$WG_IFACE"          # мог быть забагованный split-brain ft-wg0
+    _iface_down "$LEGACY_WG_IFACE"
+    mv -f "$tmp" "$WG_CONF"          # _wg_up у вызывающего поднимет ft-wg0 с новым conf
+    rm -f "$LEGACY_WG_CONF"
+}
+
+# Прошлая версия держала интерфейс wg0 на той же подсети, что и ft-wg0 -> два
+# интерфейса на 10.13.13.1/24 = коллизия connected-route (туннель без интернета)
+# + пиры гостей в wg0, невидимы новому app. Конфиги гостей валидны против
+# server-key wg0, поэтому при усыновлении сохраняем ИМЕННО его ключ (owner
+# переген-ся из _wg_ensure_owner_client). Ветки:
+#   - ft-wg0 нет                      -> усыновляем wg0 (clean-апгрейд);
+#   - тот же server-key               -> wg0 дубль, сносим;
+#   - гости в wg0, ft-wg0 пуст        -> wg0 источник правды, заменяем им ft-wg0;
+#   - гости на обоих, ключи разные    -> лоссы неизбежны, НЕ трогаем (админ решит);
+#   - иначе (wg0 без гостей)          -> лишний, сносим.
+# Чужой wg0 не трогаем. До _wg_create_fresh (тот затрёт WG_CLIENT_CONF).
+_wg_migrate_legacy() {
+    [ -f "$LEGACY_WG_CONF" ] || return 0
+    command -v wg >/dev/null 2>&1 || return 0
+    _legacy_is_ours || return 0
+
+    if [ ! -f "$WG_CONF" ]; then
+        log "adopting legacy $LEGACY_WG_IFACE as $WG_IFACE (preserving peers)"
+        _adopt_to_ftwg0 || return 0
+    elif _confs_same_server "$LEGACY_WG_CONF" "$WG_CONF"; then
+        log "removing redundant legacy $LEGACY_WG_IFACE"
+        _iface_down "$LEGACY_WG_IFACE"; rm -f "$LEGACY_WG_CONF"
+    elif _conf_has_guests "$LEGACY_WG_CONF" && ! _conf_has_guests "$WG_CONF"; then
+        log "split-brain: adopting legacy $LEGACY_WG_IFACE peers over empty $WG_IFACE"
+        _adopt_to_ftwg0 || return 0
+    elif _conf_has_guests "$LEGACY_WG_CONF"; then
+        log "split-brain guests on both $LEGACY_WG_IFACE and $WG_IFACE; left as-is"
+        return 0
+    else
+        log "removing redundant legacy $LEGACY_WG_IFACE"
+        _iface_down "$LEGACY_WG_IFACE"; rm -f "$LEGACY_WG_CONF"
+    fi
+    sysctl -qw net.ipv4.ip_forward=1 >/dev/null 2>&1 || true
+}
+
 # Идемпотентный бутстрап ft-wg0. Требует root.
 wg_ensure() {
     _wg_tools_ensure
     mkdir -p "$WG_DIR"
+    _wg_migrate_legacy
     if wg_present; then
         _wg_up || fail wg_up_failed "wg-quick up $WG_IFACE failed; see logs"
         _wg_ensure_owner_client

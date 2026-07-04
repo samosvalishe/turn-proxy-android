@@ -20,6 +20,7 @@ setup() {
 }
 
 _write_conf() { printf '%s\n' "$@" > "$FT_WG_DIR/ft-wg0.conf"; }
+_write_legacy() { printf '%s\n' "$@" > "$FT_WG_DIR/wg0.conf"; }
 
 @test "_wg_alloc_ip: .1 сервер + .2 владелец заняты -> .3" {
     _write_conf "[Interface]" "$WG_MARKER" "Address = 10.13.13.1/24" \
@@ -65,6 +66,54 @@ _write_conf() { printf '%s\n' "$@" > "$FT_WG_DIR/ft-wg0.conf"; }
 @test "wg_port: инлайн-комментарий срезается" {
     _write_conf "[Interface]" "ListenPort = 51820 # default" "Address = 10.13.13.1/24"
     [ "$(wg_port)" = "51820" ]
+}
+
+@test "_conf_has_guests: маркер ft-user -> 0" {
+    _write_legacy "[Interface]" "Address = 10.13.13.1/24" "[Peer]" "# ft-user: dXNlcg==" "PublicKey = k"
+    _conf_has_guests "$FT_WG_DIR/wg0.conf"
+}
+
+@test "_conf_has_guests: без маркера -> 1" {
+    _write_legacy "[Interface]" "Address = 10.13.13.1/24" "[Peer]" "PublicKey = k"
+    run _conf_has_guests "$FT_WG_DIR/wg0.conf"
+    [ "$status" -ne 0 ]
+}
+
+@test "_legacy_is_ours: наша подсеть 10.13.13 -> 0" {
+    rm -f "$FT_PREFIX/wireguard-client.conf"
+    _write_legacy "[Interface]" "Address = 10.13.13.1/24"
+    _legacy_is_ours
+}
+
+@test "_legacy_is_ours: чужая подсеть, без гостей/client conf -> 1" {
+    rm -f "$FT_PREFIX/wireguard-client.conf"
+    _write_legacy "[Interface]" "Address = 10.99.0.1/24"
+    run _legacy_is_ours
+    [ "$status" -ne 0 ]
+}
+
+@test "_legacy_is_ours: гости-маркер при чужой подсети -> 0" {
+    rm -f "$FT_PREFIX/wireguard-client.conf"
+    _write_legacy "[Interface]" "Address = 10.99.0.1/24" "[Peer]" "# ft-user: dXNlcg==" "PublicKey = k"
+    _legacy_is_ours
+}
+
+@test "_adopt_to_ftwg0: ft-wg0.conf с маркером+пирами, wg0.conf удалён" {
+    rm -f "$FT_WG_DIR/ft-wg0.conf"
+    _write_legacy "[Interface]" "Address = 10.13.13.1/24" "ListenPort = 51820" \
+                  "[Peer]" "# ft-user: dXNlcg==" "PublicKey = k" "AllowedIPs = 10.13.13.3/32"
+    _adopt_to_ftwg0
+    [ -f "$FT_WG_DIR/ft-wg0.conf" ]
+    [ ! -f "$FT_WG_DIR/wg0.conf" ]
+    grep -qF "$WG_MARKER" "$FT_WG_DIR/ft-wg0.conf"
+    grep -q '10.13.13.3/32' "$FT_WG_DIR/ft-wg0.conf"
+}
+
+@test "_wg_migrate_legacy: нет legacy wg0 -> no-op" {
+    rm -f "$FT_WG_DIR/ft-wg0.conf" "$FT_WG_DIR/wg0.conf"
+    run _wg_migrate_legacy
+    [ "$status" -eq 0 ]
+    [ ! -f "$FT_WG_DIR/ft-wg0.conf" ]
 }
 
 @test "pkg_mgr: на машине без пакетников -> код 1" {
