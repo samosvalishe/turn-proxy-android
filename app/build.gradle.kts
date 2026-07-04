@@ -21,8 +21,8 @@ android {
         // WireGuard GoBackend (com.wireguard.android:tunnel) требует minSdk 24.
         minSdk = 24
         targetSdk = 37
-        versionCode = 34
-        versionName = "3.3.0"
+        versionCode = 35
+        versionName = "3.3.1"
     }
 
     splits {
