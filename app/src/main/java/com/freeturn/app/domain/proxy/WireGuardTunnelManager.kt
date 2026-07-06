@@ -162,7 +162,7 @@ private fun String.withSplitTunnel(
     val splitLines = when (mode) {
         SplitTunnelMode.INCLUDE -> {
             val included = packages.filter { it != appPackage }.distinct()
-            if (included.isEmpty()) emptyList()
+            if (included.isEmpty()) listOf("ExcludedApplications = $appPackage")
             else listOf("IncludedApplications = ${included.joinToString(",")}")
         }
         SplitTunnelMode.EXCLUDE -> {

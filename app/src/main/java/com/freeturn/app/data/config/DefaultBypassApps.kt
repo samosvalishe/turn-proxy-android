@@ -2,9 +2,6 @@ package com.freeturn.app.data.config
 
 import com.freeturn.app.data.toPackageSet
 
-/** Мессенджер, вокруг которого построен VPN-гейт: намеренно НЕ в [DEFAULT_BYPASS_APPS]. */
-const val ONEME_PACKAGE = "ru.oneme.app"
-
 val DEFAULT_BYPASS_APPS: Set<String> = linkedSetOf(
     // Маркетплейсы и доставка
     "ru.wildberries.buyer",
@@ -21,6 +18,7 @@ val DEFAULT_BYPASS_APPS: Set<String> = linkedSetOf(
     "ru.yandex.music",
     "ru.kinopoisk",
     // VK / соцсети / медиа
+    "ru.oneme.app",
     "ru.vk.store",
     "ru.ok.android",
     "com.vkontakte.android",

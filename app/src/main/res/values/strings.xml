@@ -385,11 +385,6 @@
     <string name="split_tunnel_status_off">Раздельное туннелирование выключено</string>
     <string name="split_tunnel_status_on">Раздельное туннелирование включено</string>
 
-    <!-- VPN-гейт для ru.oneme.app -->
-    <string name="oneme_gate_title">FreeTurn работает лучше без MAX</string>
-    <string name="oneme_gate_body">Пока приложение установлено, VPN не запустится. Либо добавьте его в раздельное туннелирование, либо удалите с устройства</string>
-    <string name="oneme_gate_add">Добавить в список</string>
-
     <!-- Servers sheet -->
     <string name="servers_sheet_title">Серверы</string>
 
