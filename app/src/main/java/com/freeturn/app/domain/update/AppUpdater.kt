@@ -202,11 +202,15 @@ class AppUpdater(private val context: Context) {
 
     private fun findApkUrl(release: JSONObject): String? {
         val assets = release.getJSONArray("assets")
-        for (i in 0 until assets.length()) {
-            val asset = assets.getJSONObject(i)
-            if (asset.getString("name").endsWith(".apk")) {
-                return asset.getString("browser_download_url")
+        val apkUrlsByName = buildMap {
+            for (i in 0 until assets.length()) {
+                val asset = assets.getJSONObject(i)
+                val name = asset.getString("name")
+                if (name.endsWith(".apk")) put(name, asset.getString("browser_download_url"))
             }
+        }
+        for (abi in Build.SUPPORTED_ABIS) {
+            apkUrlsByName.entries.firstOrNull { it.key.contains(abi) }?.let { return it.value }
         }
         return null
     }
