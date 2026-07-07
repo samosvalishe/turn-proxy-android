@@ -41,6 +41,7 @@ android {
 
     buildFeatures {
         compose = true
+        resValues = true
     }
 
     signingConfigs {
@@ -55,7 +56,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            resValue("string", "app_name", "FreeTurn Debug")
+        }
         release {
+            resValue("string", "app_name", "FreeTurn")
             signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
