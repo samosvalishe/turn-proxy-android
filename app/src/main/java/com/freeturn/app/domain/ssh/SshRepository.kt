@@ -257,6 +257,10 @@ class SshRepository(
         _serverState.value = state
     }
 
+    fun logNote(line: String) {
+        appendSshLog("", "--- $line [${timestamp()}]")
+    }
+
     fun clearSshLog() {
         _sshLog.value = emptyList()
     }

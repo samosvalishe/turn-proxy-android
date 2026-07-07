@@ -39,7 +39,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withTimeoutOrNull
 import java.io.IOException
 
 /** Состояние очистки сервера от FreeTurn (snapshot для диалога). */
@@ -245,13 +244,7 @@ class SettingsViewModel(
                 }
             }
 
-            if (ProxyServiceState.isRunning.value) {
-                proxyManager.stopProxy()
-                withTimeoutOrNull(2_000) {
-                    ProxyServiceState.isRunning.first { !it }
-                }
-                proxyManager.startProxy(target.client)
-            }
+            orchestrator.restartProxyIfRunning()
         }
     }
 
@@ -372,7 +365,11 @@ class SettingsViewModel(
                 )
             }
             if (changed) {
-                if (sync) orchestrator.restartServerIfRunning()
+                if (sync) {
+                    orchestrator.restartServerIfRunning()
+                } else {
+                    sshRepository.logNote("рестарт сервера пропущен: синхронизация выключена")
+                }
                 orchestrator.restartProxyIfRunning()
             }
         }

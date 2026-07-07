@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.freeturn.app.data.AppPreferences
+import com.freeturn.app.data.config.HostPort
 import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.data.server.ServerOpts
 import com.freeturn.app.data.config.SshConfig
@@ -115,7 +116,7 @@ class ServerViewModel(
         viewModelScope.launch {
             val l = prefs.proxyListenFlow.first()
             val c = prefs.proxyConnectFlow.first()
-            if (!l.matches(Regex("""^[\w.\-]+:\d{1,5}$""")) || !c.matches(Regex("""^[\w.\-]+:\d{1,5}$"""))) {
+            if (!HostPort.isValid(l) || !HostPort.isValid(c)) {
                 sshRepository.updateServerState(ServerState.Error("Неверный формат адреса (ожидается host:port)"))
                 return@launch
             }

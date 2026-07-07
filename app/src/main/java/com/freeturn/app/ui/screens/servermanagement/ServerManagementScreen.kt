@@ -54,6 +54,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
+import com.freeturn.app.data.config.HostPort
 import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.domain.ServerState
 import com.freeturn.app.domain.SshConnectionState
@@ -124,10 +125,11 @@ fun ServerManagementScreen(
     // Ключ валиден: обфускация выкл, 64 hex, или пусто.
     val keyOkForApply = obfDraft == ObfProfile.NONE || keyDraft.isBlank() ||
         ObfProfile.isValidKey(keyDraft)
+    val addressesOk = HostPort.isValid(listenFull) && HostPort.isValid(proxyConnect)
 
     // FAB "Применить": только при изменениях и валидном состоянии.
     val canApply = serverSettingsAvailable(isConnected, syncOn) &&
-        configDirty && keyOkForApply && !isWorking
+        configDirty && keyOkForApply && addressesOk && !isWorking
     fun applyConfig() {
         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
         // Активный - apply в живой рантайм (один рестарт). Неактивный - пишем только снимок сервера.

@@ -42,6 +42,14 @@ object ObfProfile {
         ByteArray(32).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
 }
 
+/** host:port для -listen/-connect ядра (IPv6-скобки ядро не принимает). Единая проверка для UI и оркестратора. */
+object HostPort {
+    private val REGEX = Regex("""^[\w.\-]+:\d{1,5}$""")
+
+    fun isValid(value: String): Boolean =
+        value.matches(REGEX) && value.substringAfterLast(":").toInt() in 1..65535
+}
+
 /** Client ID (флаг -client-id ядра): авторизация по allowlist clients.json на сервере. */
 object ClientId {
     private val ID_REGEX = Regex("^[0-9a-f]{32}$")
