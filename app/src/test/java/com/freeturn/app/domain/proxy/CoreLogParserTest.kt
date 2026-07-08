@@ -1,4 +1,4 @@
-package com.freeturn.app.domain
+package com.freeturn.app.domain.proxy
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
