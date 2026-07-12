@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.4.1](https://github.com/samosvalishe/turn-proxy-android/compare/v3.4.0...v3.4.1) (2026-07-12)
+
+
+### Fixes
+
+* **captcha:** адаптировать авторешение под SPA-капчу VK, обновление бинарника ([8c06c7e](https://github.com/samosvalishe/turn-proxy-android/commit/8c06c7ef99a530d8cccbea57e3e51ed7180357cb))
+* формат телеграм поста ([bc9e459](https://github.com/samosvalishe/turn-proxy-android/commit/bc9e459b08cae003d6694c8e5d9eb39420c11cbf))
+
 ## [3.4.0](https://github.com/samosvalishe/turn-proxy-android/compare/v3.3.2...v3.4.0) (2026-07-08)
 
 
