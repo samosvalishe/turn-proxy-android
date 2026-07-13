@@ -44,6 +44,8 @@ CoreArgs {
         // -browser: профиль VK-auth, только vk. firefox - дефолт ядра (не шлём).
         val browser = cfg.browser.takeIf { it in Browser.VALUES } ?: Browser.DEFAULT
         if (cfg.provider == Provider.VK && browser != Browser.FIREFOX) { add("-browser"); add(browser) }
+        // Персона VK-auth всегда мобильная: UA/device/client-hints согласованы с телефоном.
+        if (cfg.provider == Provider.VK) { add("-platform"); add("mobile") }
         if (cfg.debugMode) add("-debug")
         // Ручной список DNS имеет приоритет над DNS оператора.
         val manualDns = DnsList.normalize(cfg.customDns)

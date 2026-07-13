@@ -7,8 +7,6 @@ import android.os.SystemClock
 import com.freeturn.app.R
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.CoreArgs
-import com.freeturn.app.data.config.Browser
-import com.freeturn.app.data.config.ClientConfig
 import com.freeturn.app.domain.CaptchaSession
 import com.freeturn.app.domain.ConnectionStats
 import com.freeturn.app.domain.proxy.CoreConnectionTracker
@@ -169,8 +167,9 @@ class CoreProcessController(
             ProxyServiceState.addLog("Команда: ${CoreArgs.redactForLog(cmdArgs)}")
 
             val proc = withContext(Dispatchers.IO) {
+                // Легаси: сносим осиротевшие профили захвата (сам механизм захвата удалён).
+                context.filesDir.listFiles { f -> f.name.startsWith("vk_profile") }?.forEach { it.delete() }
                 val pb = ProcessBuilder(cmdArgs).redirectErrorStream(true)
-                pb.environment()["VK_PROFILE_PATH"] = vkProfileFile(cfg, executableFile).absolutePath
                 // CWD подменяем на writeable dir для логов кэша tls-client и т.п.
                 pb.directory(context.filesDir)
                 pb.start()
@@ -366,15 +365,5 @@ class CoreProcessController(
         }, delayMs)
     }
 
-    private fun vkProfileFile(cfg: ClientConfig, executable: File): File {
-        val browser = cfg.browser.takeIf { it in Browser.VALUES } ?: Browser.DEFAULT
-        val stamp = executable.lastModified().takeIf { it > 0L } ?: 0L
-        val currentName = "vk_profile_${browser}_$stamp.json"
-        context.filesDir.listFiles { file ->
-            file.name == "vk_profile.json" ||
-                (file.name.startsWith("vk_profile_${browser}_") && file.name != currentName)
-        }?.forEach { it.delete() }
-        return File(context.filesDir, currentName)
-    }
 }
 
