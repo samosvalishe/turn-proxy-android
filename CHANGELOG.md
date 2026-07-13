@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.4.2](https://github.com/samosvalishe/turn-proxy-android/compare/v3.4.1...v3.4.2) (2026-07-13)
+
+
+### Fixes
+
+* **captcha:** -platform mobile и WebView для ручной капчи ([e3ca640](https://github.com/samosvalishe/turn-proxy-android/commit/e3ca6407396f9c137a3ed9e357e63fec3cd6cd2c))
+
 ## [3.4.1](https://github.com/samosvalishe/turn-proxy-android/compare/v3.4.0...v3.4.1) (2026-07-12)
 
 
