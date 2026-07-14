@@ -127,18 +127,24 @@ class LocalProxyManager(private val launcher: ProxyServiceLauncher) {
         ProxyServiceState.setStartupResult(null)
         ProxyServiceState.setConnectionStats(ConnectionStats.IDLE)
         ProxyServiceState.clearConnectedSince()
-        launcher.start()
 
-        // Ждём StartupResult или остановки сервиса.
-        // Верхняя граница в 5 минут - страховка от зависания.
+        try {
+            launcher.start()
+        } catch (e: Exception) {
+            setErrorWithAutoReset(e.message ?: "Не удалось запустить сервис")
+            return
+        }
+
         val result = withTimeoutOrNull(5 * 60_000L) {
-            // Дождаться, что сервис фактически поднялся (onStartCommand).
-            ProxyServiceState.isRunning.first { it }
+            var everRunning = false
             combine(
                 ProxyServiceState.startupResult,
                 ProxyServiceState.isRunning
             ) { sr, running -> sr to running }
-                .first { (sr, running) -> sr != null || !running }
+                .first { (sr, running) ->
+                    if (running) everRunning = true
+                    sr != null || (everRunning && !running)
+                }
                 .first
         }
 

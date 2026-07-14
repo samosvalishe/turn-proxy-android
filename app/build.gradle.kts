@@ -125,6 +125,7 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.org.json)
+    testImplementation(libs.kotlinxCoroutinesTest)
 }
 
 abstract class AssembleControlScript : DefaultTask() {
