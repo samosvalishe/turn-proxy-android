@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.4.3](https://github.com/samosvalishe/turn-proxy-android/compare/v3.4.2...v3.4.3) (2026-07-14)
+
+
+### Fixes
+
+* **proxy:** не ждать 5 минут при падении старта FGS ([bd48667](https://github.com/samosvalishe/turn-proxy-android/commit/bd486671ac1082975c6d52b19243dc565ffd69f1))
+* **ssh:** StrictHostKeyChecking=yes для блокировки MITM ([ece9090](https://github.com/samosvalishe/turn-proxy-android/commit/ece90902f731a2db2efda676d33ee209cd36237e))
+
 ## [3.4.2](https://github.com/samosvalishe/turn-proxy-android/compare/v3.4.1...v3.4.2) (2026-07-13)
 
 
