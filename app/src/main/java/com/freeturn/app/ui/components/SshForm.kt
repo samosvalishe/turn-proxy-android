@@ -31,12 +31,6 @@ import com.freeturn.app.R
 import com.freeturn.app.data.config.SshConfig
 import com.freeturn.app.data.HapticUtil
 
-/**
- * Поля SSH-формы: адрес/порт + аутентификация (логин, способ входа, секрет).
- * Вставляется в Column с вертикальным spacedBy - собственной обёртки нет,
- * секции и карточки ложатся в общий ритм экрана. [showErrors] подсвечивает
- * незаполненные обязательные поля (включается по тапу на невалидный submit).
- */
 @Composable
 fun SshFormFields(
     ip: String, onIpChange: (String) -> Unit,
@@ -56,7 +50,6 @@ fun SshFormFields(
     var showSudoPw by remember { mutableStateOf(false) }
     val portInvalid = port.toIntOrNull()?.let { it in 1..65535 } != true
 
-    // --- Сервер: адрес и порт ---
     SectionLabel(stringResource(R.string.server_data))
     SettingsCard {
         SettingsFieldSlot {
@@ -89,7 +82,6 @@ fun SshFormFields(
         }
     }
 
-    // --- Аутентификация: логин, способ входа, секрет ---
     SectionLabel(stringResource(R.string.authentication))
     SettingsCard {
         SettingsFieldSlot {
@@ -186,7 +178,6 @@ fun SshFormFields(
     }
 }
 
-/** Селект способа входа: пароль / приватный ключ (сегменты не влезали по ширине). */
 @Composable
 private fun AuthMethodDropdown(
     authType: String,

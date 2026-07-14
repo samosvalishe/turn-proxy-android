@@ -51,11 +51,9 @@ androidx-camera-core = { group = "androidx.camera", name = "camera-core", versio
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "camerax" }
 androidx-camera-lifecycle = { group = "androidx.camera", name = "camera-lifecycle", version.ref = "camerax" }
 androidx-camera-view = { group = "androidx.camera", name = "camera-view", version.ref = "camerax" }
-# bundled-модель: сканер работает без Google Play Services (+~2.4MB к APK).
 mlkit-barcode-scanning = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkitBarcode" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxingCore" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
-# org.json в android.jar замокан — реальная реализация для JVM-юнит-тестов.
 org-json = { group = "org.json", name = "json", version.ref = "orgJson" }
 
 [plugins]

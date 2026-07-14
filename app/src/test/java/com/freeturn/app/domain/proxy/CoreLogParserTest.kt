@@ -143,7 +143,7 @@ class CoreConnectionTrackerTest {
 
     @Test
     fun `duplicate stream id counts as increments`() {
-        // Особенность ядра: id=1 дублируется при -n N — пара Established/Closed
+        // Особенность ядра: id=1 дублируется при -n N, пара Established/Closed
         // на каждый инкремент, счётчик сходится в ноль.
         val t = CoreConnectionTracker(udpTotal = 2, tcpMode = false)
         t.apply(CoreLogEvent.StreamEstablished)

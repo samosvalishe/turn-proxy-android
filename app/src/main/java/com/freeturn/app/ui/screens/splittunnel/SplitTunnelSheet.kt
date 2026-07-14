@@ -53,12 +53,6 @@ import com.freeturn.app.data.toPackageSet
 import com.freeturn.app.ui.components.EmptyState
 import com.freeturn.app.ui.theme.Spacing
 
-/**
- * Общий модальный лист split-tunneling. Один источник для главного экрана и экрана
- * "Режим подключения" - обёртка [ModalBottomSheet] вокруг [SplitTunnelSheetContent].
- * Лист открывается сразу на полную высоту (skipPartiallyExpanded) и держит инсеты сам
- * (contentWindowInsets = 0), чтобы не "вырастать" над клавиатурой при фокусе поиска.
- */
 @Composable
 fun SplitTunnelModal(
     mode: String,
@@ -113,14 +107,6 @@ private suspend fun loadRussianPreset(context: Context): String? = withContext(D
     }
 }
 
-/**
- * Лист split-tunneling с главного экрана. Один общий sheet: свитч вкл/выкл,
- * выбор режима (include/exclude), поиск и список приложений с иконками/чекбоксами.
- * Всё пишется сразу в активный сервер через ViewModel - без буфера и "сохранить".
- *
- * Свитч выкл == режим [SplitTunnelMode.ALL] (весь трафик в туннель): режим/поиск/список
- * остаются на месте, но disabled. Пока прокси активен (`locked`), контролы тоже disabled.
- */
 @Composable
 fun SplitTunnelSheetContent(
     mode: String,
@@ -139,7 +125,6 @@ fun SplitTunnelSheetContent(
     var query by remember { mutableStateOf("") }
     // Пустой exclude-список показывает рос-сервисы отмеченными (тот же дефолт, что и в WG).
     val selected = remember(apps, modeChoice) { splitTunnelSelection(modeChoice, apps) }
-    // Список приложений нужен только когда сплит включён - выключенным не фетчим.
     val installed by produceState<List<AppChoice>?>(initialValue = null, splitOn) {
         value = if (splitOn) context.installedInternetApps() else null
     }
@@ -265,10 +250,8 @@ fun SplitTunnelSheetContent(
     }
 }
 
-/** Горизонтальный отступ контента листа. Совпадает с внутренним паддингом ListItem (M3). */
 private val HorizontalPadding = 16.dp
 
-/** Фиксированная высота области списка - стабильна при загрузке/поиске (нет ресайза листа). */
 private val ListHeight = 360.dp
 
 @Composable

@@ -59,10 +59,6 @@ import com.freeturn.app.viewmodel.server.ServerViewModel
 import com.freeturn.app.viewmodel.server.serverSettingsAvailable
 import com.freeturn.app.viewmodel.settings.SettingsViewModel
 
-/**
- * Детальный экран сервера - плоский хаб: шапка-сводка, вход в настройки провайдера
- * (подключение / сервер), удаление через меню в TopAppBar.
- */
 @Composable
 fun ServerDetailScreen(
     serverId: String,
@@ -91,22 +87,17 @@ fun ServerDetailScreen(
         return
     }
 
-    // Единая статус-модель хаба: core-статус от VM (активный сервер) + server-контекст.
-    // Порядок гарантирует отсутствие мигания: пока снапшот не загружен - skeleton, а не Offline.
+    // До загрузки снимка показывается skeleton, а не ложный Offline.
     val status: ServerHubState = when {
         !snapshot.loaded -> ServerHubState.Connecting
         !isActive -> ServerHubState.Offline
         server?.ssh?.ip.isNullOrBlank() -> ServerHubState.NotPaired
         else -> coreStatus
     }
-    // Вход в "Настройки сервера" доступен только при живом ядре (Online).
     val online = status as? ServerHubState.Online
     val connected = online != null
 
-    // Best-effort авто-сопряжение активного сервера при входе (не дублируем на других экранах).
-    // Откладываем старт на длительность nav-перехода: иначе reconnect мгновенно дёргает
-    // sshState -> Connecting, и hub-карточка запускает AnimatedContent size-spring + wavy-индикатор
-    // одновременно со slide-переходом - это и есть пролаг при заходе. После перехода - плавно.
+    // SSH-загрузка после enter-перехода не конкурирует с анимацией экрана.
     LaunchedEffect(isActive, sshConfig.ip, sshState) {
         if (isActive && sshConfig.ip.isNotBlank() && sshState is SshConnectionState.Disconnected) {
             kotlinx.coroutines.delay(NAV_SLIDE_MS + 50L)
@@ -119,7 +110,6 @@ fun ServerDetailScreen(
     var showRename by rememberSaveable { mutableStateOf(false) }
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
-    // Подзаголовок hero-шапки: адрес сервера либо SSH-ip (что есть).
     val headerSubtitle = server?.let { p ->
         p.client.serverAddress.takeIf { it.isNotBlank() }?.redact(privacyMode)
             ?: p.ssh.ip.takeIf { it.isNotBlank() }?.let { "SSH ${it.redact(privacyMode)}" }
@@ -140,8 +130,6 @@ fun ServerDetailScreen(
             )
         },
         floatingActionButton = {
-            // Действия сервера - expressive FAB-меню (как в логах), а не overflow ⋮.
-            // Удаление/очистка живут в разделе "Управление" внизу хаба, не здесь.
             if (server != null) {
                 ServerHubActionsFab(
                     online = online,
@@ -165,7 +153,6 @@ fun ServerDetailScreen(
                 )
             }
         },
-        // Экран всегда внутри NavigationSuite - нижний бар сам держит навбар-инсет.
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Column(
@@ -183,7 +170,6 @@ fun ServerDetailScreen(
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg)
             ) {
                 if (server != null) {
-                    // SSH не настроен -> синхронизировать нечего: тоггл гасим и держим OFF.
                     val sshConfigured = server.ssh.ip.isNotBlank()
                     ServerStatusCard(
                         status = status,
@@ -198,10 +184,6 @@ fun ServerDetailScreen(
                         }
                     )
 
-                    // Мастер-свитч синхронизации - перенесён из "Настроек сервера" в хаб.
-                    // Без подзаголовка: описание раздувало карточку, предупреждение при выкл
-                    // даёт баннер на экране настроек сервера. Без SSH синхронизировать нечего -
-                    // тоггл недоступен и показан выключенным.
                     SettingsCard {
                         SettingsSwitchRow(
                             title = stringResource(R.string.sync_server_switches),
@@ -260,8 +242,6 @@ fun ServerDetailScreen(
                     }
                 }
 
-                // "Отладочная информация" - отдельный экран, вход гейтится глобальным
-                // nerdMode (Продвинутые -> Режим отладки).
                 if (nerdMode && server != null) {
                     SettingsCard {
                         SettingsEntryRow(
@@ -275,7 +255,6 @@ fun ServerDetailScreen(
 
                 if (server != null) {
                     SectionLabel(stringResource(R.string.server_management))
-                    // Очистка - только при SSH-доступе (есть что сносить с удалённого хоста).
                     val canCleanup = server.ssh.ip.isNotBlank()
                     val mgmtCount = if (canCleanup) 2 else 1
                     SettingsGroup {
@@ -308,7 +287,6 @@ fun ServerDetailScreen(
                     }
                 }
 
-                // Клиренс под плавающее FAB-меню, чтобы оно не перекрывало нижний контент.
                 Spacer(Modifier.height(88.dp))
             }
         }
@@ -320,7 +298,6 @@ fun ServerDetailScreen(
             onConfirm = {
                 settingsViewModel.deleteServer(serverId)
                 showDelete = false
-                // Навигацию назад делает null-guard выше (server станет null).
             },
             onDismiss = { showDelete = false }
         )
@@ -350,10 +327,6 @@ fun ServerDetailScreen(
     }
 }
 
-/**
- * Expressive FAB-меню действий хаба: по тапу раскрывает управление ядром (установка/старт/стоп)
- * и общие действия (переименовать/клонировать). Пункты ядра видны только при живом сервере (Online).
- */
 @Composable
 private fun ServerHubActionsFab(
     online: ServerHubState.Online?,
@@ -383,8 +356,6 @@ private fun ServerHubActionsFab(
             }
         }
     ) {
-        // Управление ядром - только при Online. Во время действия статус уходит в Working ->
-        // online == null -> пункты сами исчезают.
         if (online != null) {
             FloatingActionButtonMenuItem(
                 onClick = { expanded = false; onInstall() },

@@ -1,45 +1,31 @@
 package com.freeturn.app.domain.proxy
 
-/** Событие, распознанное в строке лога клиентского ядра. */
 sealed interface CoreLogEvent {
-    /** Ядро просит ручную капчу - открыть [url]. */
     data class CaptchaUrl(val url: String) : CoreLogEvent
-    /** Auth-чейн завершился (успех/провал) - текущая капча-сессия больше не нужна. */
     data object CaptchaResolved : CoreLogEvent
-    /** UDP-релей: поток установил DTLS-соединение. */
     data object StreamEstablished : CoreLogEvent
-    /** UDP-релей: поток закрыл DTLS-соединение. */
     data object StreamClosed : CoreLogEvent
-    /** TCP-режим: целевое число сессий из waiting-строки. */
     data class TcpTotal(val total: Int) : CoreLogEvent
-    /** TCP-режим: агрегированное число активных сессий. */
     data class TcpActive(val active: Int) : CoreLogEvent
-    /** Фатальная ошибка старта (panic/fatal/окончательный отказ creds). */
     data class FatalStartup(val line: String) : CoreLogEvent
-    /** Quota-ошибка - сигнал на сброс сессии. */
     data object QuotaError : CoreLogEvent
 }
 
-/** Парсер логов клиентского ядра (чистая логика без Android-зависимостей). */
 object CoreLogParser {
 
     // Жесткая привязка к формату капчи (старое и новое ядро).
     private val CAPTCHA_URL_REGEX =
         Regex("""(?:manually open this URL|Open this URL in your browser):\s*(https?://\S+)""")
 
-    // Жизненный цикл соединений (UDP-релей: [STREAM N] Established/Closed).
     private val STREAM_ESTABLISHED_REGEX =
         Regex("""\[STREAM (\d+)\] Established DTLS connection""")
     private val STREAM_CLOSED_REGEX =
         Regex("""\[STREAM (\d+)\] Closed DTLS connection""")
-    // TCP-режим: агрегированное число сессий.
     private val TCP_ACTIVE_REGEX =
         Regex("""\[session \d+\] (?:connected|disconnected) \(active: (\d+)\)""")
-    // TCP-режим: ожидание сессий.
     private val TCP_TOTAL_REGEX =
         Regex("""TCP mode: waiting for sessions to connect \(total: (\d+)\)""")
 
-    /** Все события одной строки (может быть несколько). */
     fun parse(line: String): List<CoreLogEvent> {
         val events = mutableListOf<CoreLogEvent>()
 
@@ -47,7 +33,6 @@ object CoreLogParser {
             events += CoreLogEvent.CaptchaUrl(it.groupValues[1])
         }
 
-        // Капча-сессия закончилась (Failed/Success/timeout).
         if (line.contains("[VK Auth] Failed") ||
             line.contains("[VK Auth] Success") ||
             (line.contains("[Captcha]") && line.contains("failed"))
@@ -80,12 +65,7 @@ object CoreLogParser {
     }
 }
 
-/**
- * Счётчик активных соединений по [CoreLogEvent].
- * Режим (udp/tcp) уточняется по факту.
- */
 class CoreConnectionTracker(
-    /** Целевое число потоков UDP (threads == 0 -> 1 поток, raw-режим -> 0). */
     private val udpTotal: Int,
     tcpMode: Boolean
 ) {
@@ -98,10 +78,8 @@ class CoreConnectionTracker(
     val active: Int get() = if (isTcp) tcpActive else udpActive
     val total: Int get() = if (isTcp) tcpTotal else udpTotal
 
-    /** Хотя бы один живой канал - сигнал успешного старта. */
     val hasConnection: Boolean get() = active > 0
 
-    /** Применяет событие; true - статистика изменилась и её надо опубликовать. */
     fun apply(event: CoreLogEvent): Boolean = when (event) {
         CoreLogEvent.StreamEstablished -> {
             udpActive += 1

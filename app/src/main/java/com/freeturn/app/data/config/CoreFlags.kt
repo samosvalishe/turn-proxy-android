@@ -9,13 +9,11 @@ object DnsMode {
     val VALUES = listOf(AUTO, PLAIN, DOH)
 }
 
-/** Источник TURN-creds (флаг -provider ядра). Client-only. */
 object Provider {
     const val VK = "vk"
     val VALUES = listOf(VK)
 }
 
-/** Браузерный профиль VK-авторизации (флаг -browser ядра): TLS JA3 + User-Agent. Client-only, в freeturn:// не передаётся. */
 object Browser {
     const val FIREFOX = "firefox"
     const val CHROME = "chrome"
@@ -24,7 +22,6 @@ object Browser {
     val VALUES = listOf(FIREFOX, CHROME, SAFARI)
 }
 
-/** Wire-профиль обфускации payload (флаг -obf-profile ядра). Должен совпадать с сервером. */
 object ObfProfile {
     const val NONE = "none"
     const val RTPOPUS = "rtpopus"
@@ -34,15 +31,13 @@ object ObfProfile {
 
     private val KEY_REGEX = Regex("^[0-9a-fA-F]{64}$")
 
-    /** Ключ -obf-key, который примет ядро (DecodeKey). Единая проверка для argv, UI и regen. */
     fun isValidKey(key: String): Boolean = key.matches(KEY_REGEX)
 
-    /** Новый случайный obf-ключ (32 байта -> 64-hex). Ядру важен только формат. */
     fun generateKey(): String =
         ByteArray(32).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
 }
 
-/** host:port для -listen/-connect ядра (IPv6-скобки ядро не принимает). Единая проверка для UI и оркестратора. */
+// Ядро не принимает IPv6-адреса в скобках.
 object HostPort {
     private val REGEX = Regex("""^[\w.\-]+:\d{1,5}$""")
 
@@ -50,18 +45,15 @@ object HostPort {
         value.matches(REGEX) && value.substringAfterLast(":").toInt() in 1..65535
 }
 
-/** Client ID (флаг -client-id ядра): авторизация по allowlist clients.json на сервере. */
 object ClientId {
     private val ID_REGEX = Regex("^[0-9a-f]{32}$")
 
-    /** Формат, который генерирует и валидирует приложение (16 байт -> 32-hex, как автоген ядра). */
     fun isValid(id: String): Boolean = id.matches(ID_REGEX)
 
     fun generate(): String =
         ByteArray(16).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
 }
 
-/** Транспорт VPN-туннеля (пока только WireGuard) поверх локального прокси. */
 object TunnelTransport {
     const val NONE = "none"
     const val WIREGUARD = "wireguard"
@@ -69,13 +61,9 @@ object TunnelTransport {
     val VALUES = listOf(NONE, WIREGUARD)
 }
 
-/** Режим split-tunneling для WireGuard-интерфейса. */
 object SplitTunnelMode {
-    /** Весь трафик в туннель (только сам прокси исключён). */
     const val ALL = "all"
-    /** Только перечисленные приложения идут в туннель (IncludedApplications). */
     const val INCLUDE = "include"
-    /** Перечисленные приложения исключены из туннеля (ExcludedApplications). */
     const val EXCLUDE = "exclude"
     val VALUES = listOf(ALL, INCLUDE, EXCLUDE)
 }

@@ -55,11 +55,6 @@ import com.freeturn.app.ui.theme.Spacing
 /** Пир считается онлайн, если хендшейк был не позже 3 минут назад (WG re-key ~2 мин). */
 private const val ONLINE_WINDOW_SEC = 180L
 
-/**
- * Суб-вкладка "Пользователи": WG-пиры выбранного сервера + allowlist-гости без
- * пира (прокси-доступ при tcp/Xray-бэкенде). Повторная выдача ссылки - для пиров
- * с сохранённым conf и для всех cid-гостей; пир владельца защищён от отзыва.
- */
 @Composable
 fun ShareUsersTab(
     state: ShareUiState,
@@ -94,7 +89,6 @@ fun ShareUsersTab(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Обёртка 48dp = размер IconButton: смена кнопки на лоадер не дёргает ряд.
                 if (state.peersLoading) {
                     Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
                         LoadingIndicator(modifier = Modifier.size(24.dp))
@@ -168,8 +162,6 @@ fun ShareUsersTab(
     }
 }
 
-/** Строка пользователя: WG-пир и allowlist-гость рендерятся одинаково,
- *  различаются только доступными действиями. */
 @Composable
 private fun UserRow(
     name: String,
@@ -221,7 +213,6 @@ private fun UserRow(
     }
 }
 
-/** Overflow-меню действий над пользователем: показать ссылку / отозвать. */
 @Composable
 private fun UserRowMenu(
     canReshare: Boolean,
@@ -276,8 +267,6 @@ private fun UserRowMenu(
     }
 }
 
-/** Точка "в сети" на углу аватара. Кольцо цвета карточки отделяет её от фона
- *  иконки. При reduced-motion не пульсирует. */
 @Composable
 private fun OnlineDot(modifier: Modifier = Modifier) {
     val pulse = if (LocalReducedMotion.current) 1f else {

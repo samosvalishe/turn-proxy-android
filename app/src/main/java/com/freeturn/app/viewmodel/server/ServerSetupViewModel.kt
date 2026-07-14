@@ -26,10 +26,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.random.Random
 
-/** Шаги мастера добавления self-hosted сервера. */
 enum class SetupStep { Ssh, Config, Install }
 
-/** Задачи фазы установки; названия маппит UI (strings.xml). */
 enum class SetupTaskKind { InstallCore, WireGuard, StartServer, Persist }
 
 data class SetupSshDraft(
@@ -39,9 +37,7 @@ data class SetupSshDraft(
     val password: String = "",
     val authType: String = SshConfig.AUTH_PASSWORD,
     val sshKey: String = "",
-    /** Определяется preflight'ом в submitSsh; ROOT до проверки. */
     val rootMode: String = SshConfig.ROOT,
-    /** Пароль sudo для key-auth (password-auth переиспользует [password]). */
     val sudoPassword: String = ""
 ) {
     val valid: Boolean
@@ -65,47 +61,32 @@ data class SetupSshDraft(
 }
 
 data class SetupConfigDraft(
-    /** Имя сервера; пустое - дефолт подставит submitConfig. */
     val name: String = "",
-    /** true - VPN (WireGuard-бэкенд); false - proxy на свой бэкенд (Xray/sing-box/WG). */
     val vpnMode: Boolean = true,
-    /** Wire-профиль обфускации ([ObfProfile]); по умолчанию rtpopus (включена). */
     val obfProfile: String = ObfProfile.RTPOPUS,
-    /** Внешний UDP-порт turn-прокси (56000-56999 по умолчанию). */
     val listenPort: String = "",
-    /** Порт WG-бэкенда для бутстрапа (когда WG на сервере не найден). */
     val wgPort: String = "",
-    /** VPN: true - вставить готовый клиентский conf, WG на сервере не настраиваем. */
     val wgCustomConf: Boolean = false,
-    /** VPN: текст клиентского .conf при [wgCustomConf]. */
     val wgConfText: String = "",
-    /** Proxy-режим: порт существующего бэкенда на 127.0.0.1. */
     val backendPort: String = "",
-    /** Proxy-режим: бэкенд по TCP (Xray/sing-box) вместо UDP-релея. */
     val backendTcp: Boolean = false,
     val vkLink: String = ""
 )
 
 data class SetupInstallState(
     val tasks: List<SetupTaskKind>,
-    /** Индекс выполняемой задачи; == tasks.size - все выполнены. */
     val current: Int = 0,
-    /** Ошибка задачи [current]; null - выполняется. */
     val error: String? = null,
     val done: Boolean = false,
     val summary: SetupSummary? = null
 )
 
 data class SetupSummary(
-    /** Имя до уникализации хранилищем (занятое получит " (2)"). */
     val serverName: String,
     val serverAddress: String,
     val vpnMode: Boolean,
-    /** Wire-профиль обфускации ([ObfProfile]); NONE - выключена. */
     val obfProfile: String,
-    /** Клиентский WG-конфиг получен с сервера и сохранён в сервер. */
     val wgConfImported: Boolean,
-    /** Использован существующий WireGuard - свой клиентский .conf импортируется вручную. */
     val usedExistingWg: Boolean
 )
 
@@ -114,9 +95,7 @@ data class SetupUiState(
     val ssh: SetupSshDraft = SetupSshDraft(),
     val checkingSsh: Boolean = false,
     val sshError: String? = null,
-    /** Порт найденного на сервере WireGuard (probe); null - не обнаружен. */
     val wgDetectedPort: Int? = null,
-    /** Сервер с таким же IP уже есть в списке - мастер создаст дубликат. */
     val duplicateHost: Boolean = false,
     val config: SetupConfigDraft = SetupConfigDraft(),
     val install: SetupInstallState? = null
@@ -138,7 +117,6 @@ data class SetupUiState(
             return backend != null && backend == listen
         }
 
-    /** Гейт кнопки "Установить": порты и conf, нужные текущему режиму, валидны. */
     val configValid: Boolean
         get() {
             fun ok(p: String) = p.toIntOrNull()?.let { it in 1..65535 } == true
@@ -153,11 +131,7 @@ data class SetupUiState(
         }
 }
 
-/**
- * Состояние мастера "Свой сервер": SSH-черновик -> опросник -> установка. Сервер
- * персистится только после успешного прохождения всех серверных шагов - выход из
- * мастера до финала не оставляет пустых записей в списке.
- */
+// Сервер сохраняется только после успешного завершения удалённых шагов.
 class ServerSetupViewModel(
     private val repo: ServerSetupRepository,
     private val prefs: AppPreferences,
@@ -165,7 +139,6 @@ class ServerSetupViewModel(
     context: Context
 ) : ViewModel() {
 
-    // applicationContext: ViewModel переживает Activity - иначе утечка.
     private val appContext = context.applicationContext
 
     private val _uiState = MutableStateFlow(
@@ -198,7 +171,6 @@ class ServerSetupViewModel(
 
     fun backToSsh() = _uiState.update { it.copy(step = SetupStep.Ssh) }
 
-    /** Возврат к опроснику: прерывает идущую установку либо закрывает проваленную. */
     fun backToConfig() {
         // Гонка с диалогом прерывания: установка успела завершиться - не сбрасываем.
         if (_uiState.value.install?.done == true) return
@@ -206,7 +178,6 @@ class ServerSetupViewModel(
         _uiState.update { it.copy(step = SetupStep.Config, install = null) }
     }
 
-    /** Шаг 1 -> 2: проверка SSH-доступа одной probe-командой + WG-детект. */
     fun submitSsh() {
         val s = _uiState.value
         if (s.checkingSsh || !s.ssh.valid) return
@@ -230,8 +201,7 @@ class ServerSetupViewModel(
                             step = SetupStep.Config,
                             wgDetectedPort = probe.wgPort,
                             duplicateHost = duplicate,
-                            // Префилл только пустого поля: ручной ввод пользователя
-                            // повторная проверка SSH не перетирает.
+                            // Повторный probe не перетирает ручной ввод.
                             config = it.config.copy(
                                 backendPort = it.config.backendPort.ifBlank {
                                     (probe.wgPort ?: DEFAULT_WG_PORT).toString()
@@ -249,15 +219,12 @@ class ServerSetupViewModel(
         }
     }
 
-    /** Шаг 2 -> 3: фиксируем план задач и запускаем установку. [fallbackName] - для пустого имени. */
     fun submitConfig(fallbackName: String) {
         val s = _uiState.value
         if (s.step != SetupStep.Config || !s.configValid) return
         serverName = s.config.name.trim().ifBlank { fallbackName }
         val tasks = buildList {
             add(SetupTaskKind.InstallCore)
-            // Бутстрап нового WG либо отдельный пир в существующем; свой conf -
-            // сервер не трогаем, шага нет.
             if (s.config.vpnMode && !s.config.wgCustomConf) add(SetupTaskKind.WireGuard)
             add(SetupTaskKind.StartServer)
             add(SetupTaskKind.Persist)
@@ -266,7 +233,6 @@ class ServerSetupViewModel(
         runInstall()
     }
 
-    /** Повтор всей установки. Серверные шаги идемпотентны (install cached, wg-setup не перетирает). */
     fun retryInstall() {
         val st = _uiState.value.install ?: return
         if (st.error == null) return
@@ -278,7 +244,6 @@ class ServerSetupViewModel(
         _uiState.update { s ->
             s.copy(install = s.install?.let { it.copy(current = it.current + 1) })
         }
-        // Тик на выполненную задачу; финальную закрывает SUCCESS - не дублируем.
         val st = _uiState.value.install
         if (st != null && st.current < st.tasks.size) {
             HapticUtil.perform(appContext, HapticUtil.Pattern.SELECTION)
@@ -309,7 +274,6 @@ class ServerSetupViewModel(
                 else -> c.backendPort.toIntOrNull() ?: DEFAULT_WG_PORT
             }
             if (c.vpnMode && c.wgCustomConf) {
-                // Готовый клиентский conf - серверный WG не трогаем.
                 wgClientConf = c.wgConfText.trim()
             } else if (c.vpnMode) {
                 // Endpoint клиентского конфига = локальный прокси устройства; рантайм
@@ -360,7 +324,6 @@ class ServerSetupViewModel(
                             serverAddress = "${cfg.ip}:${c.listenPort}",
                             vpnMode = c.vpnMode,
                             obfProfile = c.obfProfile,
-                            // Хинты только про авто-путь: свой conf пользователь дал сам.
                             wgConfImported = !c.wgCustomConf && wgClientConf != null,
                             usedExistingWg = c.vpnMode && !c.wgCustomConf && s.wgDetectedPort != null
                         )
@@ -382,7 +345,6 @@ class ServerSetupViewModel(
             serverAddress = "${cfg.ip}:${c.listenPort}",
             vkLink = c.vkLink.trim(),
             tcpForward = !c.vpnMode && c.backendTcp,
-            // WIREGUARD только с реальным конфигом: пустой нормализуется в NONE при чтении.
             tunnelTransport = if (c.vpnMode && !wgClientConf.isNullOrBlank())
                 TunnelTransport.WIREGUARD else TunnelTransport.NONE,
             wireGuardConfig = wgClientConf.orEmpty()

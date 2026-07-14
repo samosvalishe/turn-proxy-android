@@ -30,12 +30,6 @@ import com.freeturn.app.ui.theme.Spacing
 import com.freeturn.app.data.HapticUtil
 import com.freeturn.app.ui.util.hapticClickable
 
-/**
- * Строка-свитч в стиле [SettingsEntryRow]: тональная иконка (опц.), заголовок/подзаголовок,
- * trailing Switch с галкой в thumb (M3 expressive). Семантику несёт вся строка -
- * toggleable + [Role.Switch], TalkBack озвучивает как переключатель с состоянием.
- * Haptic встроен; [onCheckedChange] - чистое действие.
- */
 @Composable
 fun SettingsSwitchRow(
     title: String,
@@ -46,7 +40,6 @@ fun SettingsSwitchRow(
     enabled: Boolean = true
 ) {
     val context = LocalContext.current
-    // MD3 disabled content = 0.38 альфы; заголовок и подзаголовок гаснут синхронно.
     val titleColor = if (enabled) MaterialTheme.colorScheme.onSurface
     else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
     val subtitleColor = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant
@@ -82,10 +75,6 @@ fun SettingsSwitchRow(
     }
 }
 
-/**
- * Тональная иконка-кружок (Sunny) строки настроек. Один источник формы/размера.
- * Цвета параметризованы под особые строки (danger -> errorContainer).
- */
 @Composable
 fun SettingsRowIcon(
     iconRes: Int,
@@ -93,7 +82,6 @@ fun SettingsRowIcon(
     container: Color = MaterialTheme.colorScheme.secondaryContainer,
     tint: Color = MaterialTheme.colorScheme.onSecondaryContainer
 ) {
-    // Disabled: гасим контейнер и тинт вместе с заголовком - строка не выглядит наполовину живой.
     val alpha = if (enabled) 1f else 0.38f
     Box(
         modifier = Modifier
@@ -110,11 +98,6 @@ fun SettingsRowIcon(
     }
 }
 
-/**
- * Строка-вход: тональная иконка, заголовок/подзаголовок, опциональный трейлинг.
- * По умолчанию трейлинг - шеврон (навигация). Передай null, чтобы убрать, или другой
- * ресурс (напр. галочку статуса). Haptic-клик встроен; [onClick] - чистое действие.
- */
 @Composable
 fun SettingsEntryRow(
     iconRes: Int,

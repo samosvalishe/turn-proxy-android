@@ -41,11 +41,6 @@ import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.ui.theme.Spacing
 
-/**
- * Единый SSH-лог: весь вывод команд сопряжения/управления + server.log (тянется кнопкой
- * "Журнал сервера") - всё идёт сюда через runCmd. Раскладка трёхэтажная, чтобы ничего
- * не толкалось в одной строке: шапка (заголовок + счётчик строк), терминал, ряд действий.
- */
 @Composable
 internal fun SshLogCard(
     lines: List<String>,
@@ -94,7 +89,6 @@ internal fun SshLogCard(
 
             SshTerminalPane(lines)
 
-            // Действия отдельным рядом во всю ширину - в шапке им тесно на узких экранах.
             if (canFetchJournal || lines.isNotEmpty()) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
@@ -128,7 +122,6 @@ internal fun SshLogCard(
                                 )
                             }
                         } else {
-                            // Оффлайн: журнал не потянуть, очистка - единственное действие.
                             FilledTonalButton(onClick = onClear, modifier = Modifier.weight(1f)) {
                                 Icon(
                                     painterResource(R.drawable.delete_24px),
@@ -146,13 +139,8 @@ internal fun SshLogCard(
     }
 }
 
-/**
- * Консоль SSH-лога: моноширинная панель с выводом команд. Автопрокрутка к свежим строкам.
- */
 @Composable
 private fun SshTerminalPane(lines: List<String>) {
-    // Тональные роли M3, как у LogPane соседних карточек: панель живёт в теме
-    // (light/dark/dynamic color), консольность несёт моно-шрифт.
     val fg = MaterialTheme.colorScheme.onSurfaceVariant
     Surface(
         shape = MaterialTheme.shapes.medium,

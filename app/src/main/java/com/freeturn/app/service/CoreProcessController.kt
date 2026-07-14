@@ -33,10 +33,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 
-/**
- * Управляет нативным процессом ядра: запуск, чтение лога, события и watchdog.
- * Сообщает [ProxyService] об остановке через [onStopRequested].
- */
 class CoreProcessController(
     private val context: Context,
     private val prefs: AppPreferences,
@@ -69,7 +65,6 @@ class CoreProcessController(
         scope.launch { startBinaryProcess() }
     }
 
-    /** Сменилась физическая сеть - рвём процесс, watchdog поднимет на новой сети. */
     fun onNetworkHandover() {
         if (userStopped.get() || process.get() == null) return
         ProxyServiceState.addLog("Смена сети - переподключение")
@@ -78,16 +73,11 @@ class CoreProcessController(
         process.get()?.destroyCompat()
     }
 
-    /** onDestroy, шаг 1: помечаем стоп и снимаем отложенные перезапуски/quota-kill. */
     fun beginShutdown() {
         userStopped.set(true)
         handler.removeCallbacksAndMessages(null)
     }
 
-    /**
-     * onDestroy, шаг 2: гасим процесс и WG-туннель.
-     * Teardown WG уводим на отдельный поток без ожидания (защита от ANR).
-     */
     fun destroyProcessAndTunnel() {
         process.get()?.destroyCompat()
         val wg = wireGuard
@@ -109,10 +99,8 @@ class CoreProcessController(
 
         val cfg = prefs.clientConfigFlow.first()
         ProxyServiceState.setLogsEnabled(cfg.logsEnabled)
-        // Obf-ключ должен совпадать с сервером для DTLS-handshake.
         val srv = prefs.serverOptsFlow.first()
 
-        // Ищем ядро (libfreeturn*.so) в nativeLibraryDir (лексикографически старшее).
         val libDir = File(context.applicationInfo.nativeLibraryDir)
         val executableFile = libDir.listFiles { f ->
             f.name.startsWith("libfreeturn") && f.name.endsWith(".so")
@@ -138,7 +126,6 @@ class CoreProcessController(
             cmdArgs.addAll(parts.drop(1))
         } else {
             cmdArgs.add(executable)
-            // Резолвим DNS активной сети и строим аргументы запуска.
             val carrierDnsValue = if (cfg.useCarrierDns) carrierDns() else null
             cmdArgs.addAll(CoreArgs.client(cfg, srv, carrierDnsValue, prefs.ownClientId()))
         }
@@ -150,8 +137,6 @@ class CoreProcessController(
         var wireGuardStarted = false
         var captchaSessionCounter = 0L
 
-        // Трекинг соединений: для UDP-релея целевое число известно (-n).
-        // Если threads == 0, считаем total = 1.
         val tracker = CoreConnectionTracker(
             udpTotal = if (cfg.isRawMode) 0 else if (cfg.threads > 0) cfg.threads else 1,
             tcpMode = cfg.tcpForward
@@ -161,7 +146,6 @@ class CoreProcessController(
             ProxyServiceState.setConnectionStats(ConnectionStats(tracker.active, tracker.total))
             notifier.refreshStats()
         }
-        // Сброс на старте сессии (в том числе на watchdog-рестарте).
         publishStats()
         try {
             ProxyServiceState.addLog("Команда: ${CoreArgs.redactForLog(cmdArgs)}")
@@ -201,11 +185,9 @@ class CoreProcessController(
                     val l = line
                     ProxyServiceState.addLog(l)
 
-                    // Реакция на события из CoreLogParser.
                     val events = CoreLogParser.parse(l)
                     var statsChanged = false
                     for (event in events) when (event) {
-                        // Новый sessionId заставляет диалог пересоздать WebView.
                         is CoreLogEvent.CaptchaUrl -> {
                             captchaSessionCounter += 1
                             ProxyServiceState.setCaptchaSession(
@@ -213,7 +195,6 @@ class CoreProcessController(
                             )
                             notifier.showCaptcha()
                         }
-                        // Капча решена, закрываем диалог.
                         CoreLogEvent.CaptchaResolved -> {
                             if (ProxyServiceState.captchaSession.value != null) {
                                 ProxyServiceState.setCaptchaSession(null)
@@ -224,7 +205,6 @@ class CoreProcessController(
                     }
                     if (statsChanged) publishStats()
 
-                    // Провал старта, если ядро упало или не получило creds до подключения.
                     if (!startupEmitted) {
                         val hasFatal = events.any { it is CoreLogEvent.FatalStartup }
                         val hasConnection = tracker.hasConnection
@@ -297,7 +277,6 @@ class CoreProcessController(
             }
 
         } catch (e: CancellationException) {
-            // Штатная остановка из UI (CancellationException).
             throw e
         } catch (e: Exception) {
             // Исключения при пользовательской остановке - следствие закрытия пайпов.
@@ -316,9 +295,7 @@ class CoreProcessController(
         } finally {
             ProxyServiceState.setCaptchaSession(null)
             notifier.cancelCaptcha()
-            // WG-туннель живёт только поверх работающего прокси - гасим вместе с ядром.
             if (wireGuardStarted) wireGuard.stop()
-            // Сброс статистики соединений.
             ProxyServiceState.setConnectionStats(ConnectionStats.IDLE)
             process.set(null)
             when {

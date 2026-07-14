@@ -8,37 +8,24 @@ import com.freeturn.app.data.control.WgSetupData
 import com.freeturn.app.data.control.decodeBase64
 import com.freeturn.app.domain.ssh.SSHManager
 
-/**
- * SSH-операции мастера добавления self-hosted сервера. Собственный [SSHManager] и
- * [ServerControl]: мастер работает с черновиком конфига и не трогает живую сессию
- * активного сервера ([com.freeturn.app.domain.ssh.SshRepository]). Состояния не
- * держит - каждая операция самостоятельный вызов, ошибки приходят [Result].
- */
 class ServerSetupRepository(context: Context, private val ssh: SSHManager) {
 
     private val control = ServerControl(context, ssh)
 
-    /** Отпечаток хоста, увиденный последней командой (TOFU) - сохраняется в сервер. */
     val lastSeenFingerprint: String? get() = ssh.lastSeenFingerprint
 
-    /** Preflight: определяет rootMode (ROOT/SUDO_NOPASS/SUDO_PASS). null - SSH-ошибка. */
     suspend fun detectRootMode(cfg: SshConfig): String? = control.detectRootMode(cfg)
 
-    /** Снимок состояния хоста после probe. */
     data class ProbeResult(
-        /** Порт активного/сконфигурированного НАШЕГО WireGuard; null - бэкенда нет. */
         val wgPort: Int?
     )
 
-    /** Итог wg-setup: фактический порт бэкенда + клиентский .conf (если сервер вернул). */
     data class WgSetupResult(
         val port: Int,
         val clientConf: String?,
-        /** true - наш ft-wg0 уже существовал, бутстрап не выполнялся. */
         val existed: Boolean
     )
 
-    /** Проверка SSH-доступа + probe. Ошибка SSH/скрипта - failure с текстом. */
     suspend fun probe(cfg: SshConfig): Result<ProbeResult> =
         control.run(cfg, ServerCommand.Probe)
             .requireData<ProbeData>()

@@ -64,7 +64,6 @@ import com.freeturn.app.ui.util.pasteFromClipboard
 import com.freeturn.app.ui.util.redact
 import com.freeturn.app.ui.theme.Spacing
 
-/** Нижний лист серверов: шапка активного сервера, бейдж и список. */
 @Composable
 internal fun ServersSheetContent(
     snapshot: ServersSnapshot,
@@ -93,7 +92,6 @@ internal fun ServersSheetContent(
                 .padding(horizontal = Spacing.xxl, vertical = Spacing.xs),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Активный сервер может быть не выбран.
             val serverName = active?.name ?: stringResource(R.string.server_unsaved_label)
             TooltipBox(
                 positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
@@ -110,12 +108,10 @@ internal fun ServersSheetContent(
                     modifier = Modifier.fillMaxWidth()
                 )
             }
-            // Только адрес: провайдера несёт чип-бейдж ниже, дублировать его тут - шум.
             val sub = active?.let {
                 (it.client.serverAddress.takeIf { a -> a.isNotBlank() }
                     ?: it.ssh.ip.takeIf { a -> a.isNotBlank() })?.redact(privacyMode)
             }
-            // Подзаголовок всегда, чтобы удержать высоту peek-зоны.
             Spacer(Modifier.height(4.dp))
             Text(
                 sub.orEmpty(),
@@ -161,7 +157,6 @@ internal fun ServersSheetContent(
                     subtitle = sub,
                     isActive = isActive,
                     shape = settingsItemShape(index, snapshot.list.size),
-                    // Лист сам на surfaceContainerLow - строкам нужен контраст повыше.
                     inactiveContainer = MaterialTheme.colorScheme.surfaceContainerHigh,
                     onClick = { if (!isActive) onApplyServer(p.id) },
                     trailing = {
@@ -188,10 +183,6 @@ internal fun ServersSheetContent(
     }
 }
 
-/**
- * Бейдж провайдера TURN-creds. При [editable] - expressive-кнопка правки ссылки на звонок
- * (форма морфит при нажатии); иначе статичный бейдж.
- */
 @Composable
 private fun ProviderChip(
     current: String,
@@ -201,7 +192,6 @@ private fun ProviderChip(
 ) {
     val chipPadding = PaddingValues(start = Spacing.sm, end = Spacing.lg, top = Spacing.sm, bottom = Spacing.sm)
     if (editable) {
-        // Expressive shape-morph: форма скругляется/сжимается при нажатии (ButtonDefaults.shapes).
         Button(
             onClick = onClick,
             shapes = ButtonDefaults.shapes(),
@@ -228,7 +218,6 @@ private fun ProviderChip(
     }
 }
 
-/** Содержимое бейджа провайдера: brand-иконка + лейбл + (опц.) edit-карандаш. */
 @Composable
 private fun RowScope.ProviderChipContent(current: String, showEdit: Boolean) {
     Box(
@@ -262,10 +251,6 @@ private fun RowScope.ProviderChipContent(current: String, showEdit: Boolean) {
     }
 }
 
-/**
- * Expressive-диалог правки ссылки на звонок: иконка-бейдж в шапке, поле с вставкой
- * из буфера. Сохранение заблокировано при пустом поле.
- */
 @Composable
 private fun CallLinkDialog(
     initial: String,

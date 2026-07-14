@@ -22,17 +22,11 @@ import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.ui.theme.Spacing
 
-// Каркас экранов настроек (Settings-флоу и "Режим подключения"): ширина колонки,
-// заголовок секции, карточка-контейнер, слот контрола, разделитель, кнопка "назад".
-// Один источник - чтобы экраны выглядели одинаково и не дублировали верстку.
-
-/** Макс. ширина контента - читаемая колонка на планшетах/foldable (MD3 large+). */
 val SettingsContentMaxWidth = 840.dp
 
 // Левый отступ inset-разделителя = иконка(40) + отступ слева(16) + зазор(16).
 private val RowDividerIndent = 72.dp
 
-/** Заголовок секции - мелкий акцентный лейбл над карточкой-группой. */
 @Composable
 fun SectionLabel(text: String) {
     Text(
@@ -46,7 +40,6 @@ fun SectionLabel(text: String) {
     )
 }
 
-/** Карточка-группа: тональный контейнер со скруглением, строки внутри. */
 @Composable
 fun SettingsCard(
     modifier: Modifier = Modifier,
@@ -61,11 +54,6 @@ fun SettingsCard(
     }
 }
 
-/**
- * Слот для произвольного контрола внутри [SettingsCard] - текстовое поле, слайдер,
- * сегменты, метка. Единый внутренний отступ (как у строк) + вертикальный зазор между
- * вложенными элементами. Несколько слотов в одной карточке разделяй [SettingsRowDivider].
- */
 @Composable
 fun SettingsFieldSlot(
     verticalSpacing: Dp = Spacing.md,
@@ -80,7 +68,6 @@ fun SettingsFieldSlot(
     )
 }
 
-/** Заголовок + пояснение над контролом (сегменты/слайдер): пара с плотным зазором. */
 @Composable
 fun SettingsControlLabel(title: String, desc: String? = null) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
@@ -91,7 +78,6 @@ fun SettingsControlLabel(title: String, desc: String? = null) {
     }
 }
 
-/** Кнопка "назад" в шапке экранов настроек - один источник для всего settings-флоу. */
 @Composable
 fun SettingsBackButton(onBack: () -> Unit) {
     IconButton(onClick = onBack) {
@@ -102,7 +88,6 @@ fun SettingsBackButton(onBack: () -> Unit) {
     }
 }
 
-/** Inset-разделитель между строками карточки (отступ под иконку). */
 @Composable
 fun SettingsRowDivider() {
     HorizontalDivider(

@@ -24,32 +24,20 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class ImportUiState(
-    /** Распарсенная ссылка; null - sheet скрыт. */
     val link: FreeturnLink? = null,
     val serverName: String = "",
-    /** Звонок получателя - обязателен (в ссылку не входит, уникален на клиента). */
     val vkLink: String = "",
-    /** Сервер с таким же адресом уже есть - предупреждение, не блокировка. */
     val duplicateAddress: Boolean = false,
-    /** Точное совпадение WG-conf - этот доступ уже импортирован. */
     val duplicateConf: Boolean = false,
-    /** Ссылка не распарсилась (показывается отдельным диалогом). */
     val parseError: Boolean = false,
     val saving: Boolean = false,
-    /** Сохранение упало (например, битый DataStore) - sheet остаётся открытым. */
     val saveError: Boolean = false,
-    /** Импорт завершён - success-состояние sheet. */
     val saved: Boolean = false
 ) {
     val canConfirm: Boolean
         get() = link != null && !saving && !saved && vkLink.isNotBlank()
 }
 
-/**
- * Импорт сервера по freeturn://-ссылке. Слушает [LinkImportBus] (deep link,
- * QR, вставка) - sheet всплывает из любого места приложения. Импортированный
- * сервер не управляется (пустой SSH) - только клиентское подключение.
- */
 class ImportViewModel(
     private val prefs: AppPreferences,
     bus: LinkImportBus,
@@ -61,7 +49,6 @@ class ImportViewModel(
     private val _uiState = MutableStateFlow(ImportUiState())
     val uiState: StateFlow<ImportUiState> = _uiState.asStateFlow()
 
-    // Отдельно от uiState: offer()/dismiss() пересоздают uiState и затёрли бы флаг.
     val privacyMode: StateFlow<Boolean> = prefs.privacyModeFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
@@ -128,7 +115,6 @@ class ImportViewModel(
         val wgConf = link.wgConf.trim()
         return Server(
             name = st.serverName.trim().ifBlank { fallbackName },
-            // Пустой SSH = неуправляемый сервер: хаб скрывает серверные операции.
             ssh = SshConfig(),
             client = ClientConfig(
                 serverAddress = link.peer,
@@ -144,7 +130,6 @@ class ImportViewModel(
                 else TunnelTransport.NONE,
                 wireGuardConfig = wgConf,
                 wireGuardMtu = link.mtu,
-                // cid из ссылки - владелец уже посадил его в allowlist сервера.
                 clientId = link.clientId.trim()
             ),
             opts = ServerOpts(

@@ -79,7 +79,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-        // WireGuard tunnel-либа тянет java.time/desugar-зависимый код — нужно desugaring.
+        // WireGuard tunnel-либа использует java.time, поэтому нужен desugaring.
         isCoreLibraryDesugaringEnabled = true
     }
 }

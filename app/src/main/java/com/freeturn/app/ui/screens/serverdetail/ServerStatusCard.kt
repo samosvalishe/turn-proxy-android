@@ -50,11 +50,6 @@ import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.viewmodel.server.ServerHubState
 import com.freeturn.app.ui.theme.Spacing
 
-/**
- * Карточка статуса сервера в хабе. Один источник истины - [ServerHubState] (собран в VM).
- * Тело меняется одним [AnimatedContent]; фазы холодного захода
- * (disconnected/connecting/checking) свёрнуты в Connecting - один переход в Online.
- */
 @Composable
 internal fun ServerStatusCard(
     status: ServerHubState,
@@ -67,7 +62,6 @@ internal fun ServerStatusCard(
     // сервером не общается. Схлопываем их в нейтральную заглушку. Actionable-состояния
     // (Offline/NotPaired) остаются - это setup, а не live-статус.
     val effective = if (!syncOn && status.isLivePhase()) ServerHubState.SyncOff else status
-    // Спеки из MotionScheme (не сырые spring/tween) - единый источник с SetupInstallStep.
     val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
     Surface(
@@ -77,7 +71,6 @@ internal fun ServerStatusCard(
     ) {
         AnimatedContent(
             targetState = effective,
-            // Переход только при смене фазы; правки данных внутри Online обновляют тело на месте.
             contentKey = { it.phaseKey() },
             transitionSpec = {
                 if (reducedMotion) {
@@ -114,7 +107,6 @@ internal fun ServerStatusCard(
     }
 }
 
-/** Стабильный ключ фазы - AnimatedContent анимирует только при его смене. */
 private fun ServerHubState.phaseKey(): Int = when (this) {
     ServerHubState.Offline -> 0
     ServerHubState.NotPaired -> 1
@@ -125,17 +117,12 @@ private fun ServerHubState.phaseKey(): Int = when (this) {
     ServerHubState.SyncOff -> 6
 }
 
-/** Live-фазы зависят от живого SSH/ядра - при sync OFF схлопываются в [ServerHubState.SyncOff]. */
 private fun ServerHubState.isLivePhase(): Boolean = when (this) {
     is ServerHubState.Online, ServerHubState.Connecting,
     is ServerHubState.Working, ServerHubState.Failed -> true
     else -> false
 }
 
-/**
- * Hero-строка статуса: индикатор слева + заголовок фазы и опц. подзаголовок.
- * [liveRegion] - TalkBack объявляет смену фазы.
- */
 @Composable
 private fun StatusHero(
     color: Color,
@@ -168,7 +155,6 @@ private fun StatusHero(
     }
 }
 
-/** Цветная точка-индикатор статуса. В busy-фазах пульсирует (reduced-motion -> статично). */
 @Composable
 private fun StatusIndicator(color: Color, pulsing: Boolean) {
     val reducedMotion = LocalReducedMotion.current
@@ -193,7 +179,6 @@ private fun StatusIndicator(color: Color, pulsing: Boolean) {
     }
 }
 
-/** Busy-фаза (подключение/серверное действие): hero с пульсом + wavy-индикатор. */
 @Composable
 private fun BusyContent(title: String) {
     StatusHero(
@@ -204,11 +189,6 @@ private fun BusyContent(title: String) {
     BusyProgressIndicator()
 }
 
-/**
- * Живое ядро: hero несёт главный статус (работает/остановлен/не установлено).
- * Детальные теги (SSH, режим, обфускация, версия) тут не дублируем - они в
- * "Отладочной информации" (NerdScreen).
- */
 @Composable
 private fun OnlineContent(status: ServerHubState.Online) {
     val ext = MaterialTheme.extendedColorScheme
@@ -220,10 +200,6 @@ private fun OnlineContent(status: ServerHubState.Online) {
     StatusHero(color = color, title = title)
 }
 
-/**
- * Ошибка подключения/команды - hero + "Переподключиться". Конкретную причину не показываем:
- * это внутренняя java/SSH-ошибка, а не серверная - юзеру бесполезна.
- */
 @Composable
 private fun FailedContent(onRetry: () -> Unit) {
     StatusHero(
@@ -235,7 +211,6 @@ private fun FailedContent(onRetry: () -> Unit) {
     }
 }
 
-/** Неактивный сервер - hero + "Сделать активным". Адреса не дублируем: они в шапке хаба. */
 @Composable
 private fun OfflineContent(onActivate: () -> Unit) {
     StatusHero(
@@ -248,11 +223,6 @@ private fun OfflineContent(onActivate: () -> Unit) {
     }
 }
 
-/**
- * SSH не настроен - только hero-статус. Штатное состояние ручной настройки
- * (вкладка "+" -> "Ручная настройка"): клиентские настройки доступны, серверное
- * управление - нет. SSH задаётся только мастером, дозавести его нельзя.
- */
 @Composable
 private fun NotPairedContent() {
     StatusHero(

@@ -56,9 +56,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import org.koin.androidx.compose.koinViewModel
 
-// MD3 emphasized-кривая + длительности навигационных переходов (единый источник).
 private val EmphasizedEasing = CubicBezierEasing(0.2f, 0f, 0f, 1f)
-// internal: экраны откладывают тяжёлую работу на время перехода (ServerDetailScreen).
 internal const val NAV_SLIDE_MS = 300
 private const val NAV_FADE_IN_MS = 180
 private const val NAV_FADE_OUT_MS = 120
@@ -80,13 +78,11 @@ fun AppNavigation(
     val initialSuppressTgPrompt by settingsViewModel.initialSuppressTgPrompt.collectAsStateWithLifecycle()
     val nerdMode by settingsViewModel.nerdMode.collectAsStateWithLifecycle()
     val clientConfig by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
-    // Вкладка логов видна только в режиме отладки при включённых логах.
     val logsTabVisible = nerdMode && clientConfig.logsEnabled
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
     val destination = backStackEntry?.destination
 
-    // Логи выключили на их же вкладке - уводим на главную (иначе экран без подсветки).
     LaunchedEffect(logsTabVisible) {
         if (!logsTabVisible && destination?.hierarchy?.any { it.hasRoute(LogsGraph::class) } == true) {
             navController.navigateToTab(HomeGraph)
@@ -108,9 +104,6 @@ fun AppNavigation(
         mutableStateOf(!initialTgSubscribeShown && !initialSuppressTgPrompt)
     }
 
-    // Все маршруты живут внутри графов-вкладок - бар виден всегда.
-    // navigationSuiteType (а не layoutType) - expressive-дефолт: на телефоне компактный
-    // ShortNavigationBar (64dp вместо 80dp), бар без подписей не выглядит пустым.
     val suiteType = NavigationSuiteScaffoldDefaults
         .navigationSuiteType(currentWindowAdaptiveInfo())
 
@@ -128,7 +121,6 @@ fun AppNavigation(
                     selected = selected,
                     onClick = {
                         if (selected) {
-                            // Повторный тап по активной вкладке - назад в её корень.
                             navController.popBackStack(item.startRoute, inclusive = false)
                         } else {
                             HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
@@ -158,8 +150,6 @@ fun AppNavigation(
         )
     }
 
-    // Импорт по freeturn://-ссылке поверх любого экрана (deep link / QR / вставка):
-    // sheet управляется ImportViewModel через LinkImportBus, NavController не участвует.
     ImportSheet(
         onImported = { navController.navigateToTab(HomeGraph) }
     )
@@ -200,9 +190,7 @@ private fun AppNavHost(
     proxyViewModel: ProxyViewModel,
     serverViewModel: ServerViewModel
 ) {
-    // Reduced-motion (системная "Убрать анимации"): мгновенные переходы без слайда.
-    // MotionScheme.expressive() в теме рулит моушеном самих m3-компонентов; здесь -
-    // только навигационные shared-axis X переходы, единый источник длительностей выше.
+    // Системная настройка reduced motion отключает shared-axis переходы.
     val reducedMotion = LocalReducedMotion.current
     NavHost(
         navController = navController,
@@ -210,9 +198,6 @@ private fun AppNavHost(
         modifier = Modifier
             .fillMaxSize()
             .statusBarsPadding(),
-        // Быстрый emphasized shared-axis X вместо дефолтного медленного 700ms-fade.
-        // Переход между вкладками латеральный - направление слайда по их порядку в баре
-        // (уход на левую вкладку едет вправо, как back), внутри вкладки push всегда forward.
         enterTransition = {
             if (reducedMotion) EnterTransition.None
             else {
@@ -252,19 +237,15 @@ private fun AppNavHost(
     }
 }
 
-// Порядок вкладок в баре (Logs вставляется вторым при видимости - см. logsNavItem).
 private val tabOrder = listOf(
     HomeGraph::class, LogsGraph::class, ShareGraph::class, SettingsGraph::class, AddGraph::class
 )
 
-// Индекс вкладки, которой принадлежит назначение, либо null для не-вкладочного (сюда не попадает).
 private fun NavDestination.tabRank(): Int? =
     hierarchy.firstNotNullOfOrNull { d ->
         tabOrder.indexOfFirst { d.hasRoute(it) }.takeIf { it >= 0 }
     }
 
-// Латеральный переход между вкладками "вперёд" = целевая вкладка правее исходной.
-// Внутри одной вкладки (from == to или null) push всегда forward.
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.isForwardNav(): Boolean {
     val from = initialState.destination.tabRank()
     val to = targetState.destination.tabRank()
@@ -299,7 +280,6 @@ private fun TelegramSubscribeDialog(onSubscribe: () -> Unit, onDismiss: () -> Un
     )
 }
 
-// Вставляется вторым пунктом, когда вкладка логов видна (см. logsTabVisible).
 private val logsNavItem =
     NavItem(LogsGraph, Logs, R.string.nav_logs, R.drawable.terminal_24px, R.drawable.terminal_24px)
 

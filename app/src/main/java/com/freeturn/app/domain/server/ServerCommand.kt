@@ -1,11 +1,9 @@
 package com.freeturn.app.domain.server
 
-/** Команда для сервера (аргументы `free-turn-control.sh`, см. [ServerControl]). */
 sealed class ServerCommand {
     data object Probe : ServerCommand()
     data object Install : ServerCommand()
 
-    /** Идемпотентный бутстрап НАШЕГО ft-wg0 (создание или докрутка). */
     data class WgSetup(
         val port: Int,
         val endpoint: String
@@ -14,26 +12,21 @@ sealed class ServerCommand {
     data object Stop : ServerCommand()
     data class FetchLogs(val lines: Int = 80) : ServerCommand()
 
-    /** Снос free-turn-proxy и установленного им WG. [dryRun] - вернуть план без мутаций. */
     data class Uninstall(
         val withWgPkg: Boolean = false,
         val dryRun: Boolean = false
     ) : ServerCommand()
 
-    /** Фактические параметры запущенного сервера (run.args) - для share-ссылки. */
     data object ShareInfo : ServerCommand()
 
-    /** Новый WG-пир для доступа. [clientId] добавляется в allowlist. */
     data class PeerAdd(
         val nameB64: String,
         val endpoint: String,
         val clientId: String
     ) : ServerCommand()
 
-    /** WG-пиры + allowlist-гости одним вызовом (одна SSH-сессия на вкладку). */
     data object ShareList : ServerCommand()
 
-    /** Сохранённый conf пира (повторная выдача ссылки). */
     data class PeerConf(
         val pubkey: String,
         val clientId: String,
@@ -41,7 +34,6 @@ sealed class ServerCommand {
     ) : ServerCommand()
     data class PeerRemove(val pubkey: String) : ServerCommand()
 
-    /** Гость без WG-пира (tcp/Xray-бэкенд): только Client ID в allowlist. */
     data class ClientAdd(val nameB64: String, val clientId: String) : ServerCommand()
     data class ClientRemove(val clientId: String) : ServerCommand()
 
@@ -57,14 +49,11 @@ sealed class ServerCommand {
             add("start")
             add("--listen=${opts.listen}")
             add("--connect=${opts.connect}")
-            // Режим работы (tcp/udp). Bond детектится сервером автоматически.
             if (opts.tcpMode) add("--mode=tcp")
-            // Обфускация (profile != none).
             if (opts.obfProfile != "none" && opts.obfKey.isNotBlank()) {
                 add("--obf-profile=${opts.obfProfile}")
                 add("--obf-key=${opts.obfKey}")
             }
-            // cid владельца для allowlist.
             if (opts.clientId.isNotBlank()) add("--client-id=${opts.clientId}")
         }
         is Stop -> listOf("stop")
@@ -97,12 +86,8 @@ sealed class ServerCommand {
 data class ServerStartOptions(
     val listen: String,
     val connect: String,
-    /** true -> -mode tcp (TCP-форвард). false -> udp-релей (дефолт ядра). */
     val tcpMode: Boolean = false,
-    /** Wire-профиль обфускации: none | rtpopus | rtpopus2 | rtpopus3. */
     val obfProfile: String = "none",
-    /** 64-hex obf-ключ. Пустая строка -> запуск без обфускации. */
     val obfKey: String = "",
-    /** Client ID владельца (добавляется в clients.json). */
     val clientId: String = ""
 )

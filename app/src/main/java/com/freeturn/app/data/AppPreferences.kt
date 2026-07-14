@@ -46,13 +46,11 @@ class AppPreferences(context: Context) {
         val HOTSPOT_PROXY_ENABLED = booleanPreferencesKey("hotspot_proxy_enabled")
     }
 
-    /** DataStore-флоу: IOException (битый файл) -> дефолты, остальное пробрасываем. */
     private fun <T> prefFlow(transform: (Preferences) -> T): Flow<T> =
         context.dataStore.data
             .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
             .map(transform)
 
-    /** Снимок серверов (источник истины конфигурации). Один Flow для консистентности. */
     val serversSnapshot: Flow<ServersSnapshot> = prefFlow { prefs ->
         ServersSnapshot(
             list = ServerJson.decodeList(prefs[SERVERS_JSON]),
@@ -61,7 +59,6 @@ class AppPreferences(context: Context) {
         )
     }
 
-    // --- Конфиг активного сервера ---
     // Производные от serversSnapshot: их читает рантайм (ProxyService, оркестратор,
     // SSH). Без активного сервера отдают дефолты - запускать в этом случае нечего.
 
@@ -85,36 +82,28 @@ class AppPreferences(context: Context) {
 
     val dynamicThemeFlow: Flow<Boolean> = prefFlow { prefs -> prefs[DYNAMIC_THEME] ?: true }
 
-    /** "Режим отладки" - открывает отладочные секции (журнал, verbose, экран логов). */
     val nerdModeFlow: Flow<Boolean> = prefFlow { prefs -> prefs[NERD_MODE] ?: true }
 
-    /** Приватный режим - маскирует чувствительные поля в UI. */
     val privacyModeFlow: Flow<Boolean> = prefFlow { prefs -> prefs[PRIVACY_MODE] ?: false }
 
-    /** При смене активного профиля перезапускать его удалённый сервер под параметры профиля. */
     val restartServerOnSwitchFlow: Flow<Boolean> =
         prefFlow { prefs -> prefs[RESTART_SERVER_ON_SWITCH] ?: false }
 
     val tgSubscribeShownFlow: Flow<Boolean> = prefFlow { prefs -> prefs[TG_SUBSCRIBE_SHOWN] ?: false }
 
-    /** Не показывать диалог "Доступно обновление" на главной. */
     val suppressUpdatePromptFlow: Flow<Boolean> = prefFlow { prefs -> prefs[SUPPRESS_UPDATE_PROMPT] ?: false }
 
-    /** Не показывать диалог с предложением подписаться на Telegram. */
     val suppressTgPromptFlow: Flow<Boolean> = prefFlow { prefs -> prefs[SUPPRESS_TG_PROMPT] ?: false }
 
     // Один раз за установку: на MIUI/HyperOS isIgnoringBatteryOptimizations остаётся false
     // даже после "не ограничивать" - без флага диалог всплывал бы каждый запуск.
     val batteryPromptShownFlow: Flow<Boolean> = prefFlow { prefs -> prefs[BATTERY_PROMPT_SHOWN] ?: false }
 
-    /** Разрешает запуск SOCKS5 сервера на 0.0.0.0:1080 для раздачи интернета. */
     val hotspotProxyEnabledFlow: Flow<Boolean> = prefFlow { prefs -> prefs[HOTSPOT_PROXY_ENABLED] ?: false }
 
-    // --- CRUD серверов ---
     // Каждая операция - одна транзакция dataStore.edit: атомарный read-modify-write,
     // параллельные записи не теряются и не оставляют активный id без сервера.
 
-    /** Атомарно правит сервер по id. true - сервер найден и изменился. */
     suspend fun updateServer(id: String, transform: (Server) -> Server): Boolean {
         var changed = false
         context.dataStore.edit { prefs ->
@@ -126,7 +115,6 @@ class AppPreferences(context: Context) {
         return changed
     }
 
-    /** Атомарно правит активный сервер. true - активный есть и изменился. */
     suspend fun updateActiveServer(transform: (Server) -> Server): Boolean {
         var changed = false
         context.dataStore.edit { prefs ->
@@ -139,7 +127,6 @@ class AppPreferences(context: Context) {
         return changed
     }
 
-    /** Добавляет сервер, уникализируя имя. [activate] делает его активным. */
     suspend fun addServer(server: Server, activate: Boolean = false): String {
         context.dataStore.edit { prefs ->
             val list = ServerJson.decodeList(prefs[SERVERS_JSON])
@@ -151,7 +138,6 @@ class AppPreferences(context: Context) {
         return server.id
     }
 
-    /** Клонирует сервер по id: копия с новым id и уникальным именем. Возвращает id копии. */
     suspend fun cloneServer(id: String): String? {
         var newId: String? = null
         context.dataStore.edit { prefs ->
@@ -167,7 +153,6 @@ class AppPreferences(context: Context) {
         return newId
     }
 
-    /** Переименовывает сервер. Пустое имя оставляет текущее; занятое получает " (2)". */
     suspend fun renameServer(id: String, name: String) {
         context.dataStore.edit { prefs ->
             val list = ServerJson.decodeList(prefs[SERVERS_JSON])
@@ -179,7 +164,6 @@ class AppPreferences(context: Context) {
         }
     }
 
-    /** Удаляет сервер; если он был активным - активным становится первый из оставшихся. */
     suspend fun deleteServer(id: String) {
         context.dataStore.edit { prefs ->
             val list = ServerJson.decodeList(prefs[SERVERS_JSON])
@@ -212,7 +196,6 @@ class AppPreferences(context: Context) {
         return "$base ($i)"
     }
 
-    /** SSH-конфиг активного сервера. */
     suspend fun saveSshConfig(config: SshConfig) {
         updateActiveServer { it.copy(ssh = config) }
     }
@@ -261,9 +244,7 @@ class AppPreferences(context: Context) {
         context.dataStore.edit { prefs -> prefs[BATTERY_PROMPT_SHOWN] = true }
     }
 
-    /** Постоянный Client ID владельца. Генерируется один раз. */
     suspend fun ownClientId(): String {
-        // Write-транзакция нужна один раз за жизнь установки.
         val cur = prefFlow { it[OWN_CLIENT_ID] }.first()
         if (cur != null && ClientId.isValid(cur)) return cur
         var id = ""
@@ -275,12 +256,10 @@ class AppPreferences(context: Context) {
         return id
     }
 
-    /** Полный сброс настроек. */
     suspend fun resetAll() {
         context.dataStore.edit { it.clear() }
     }
 
-    /** Снимок для бэкапа: все серверы, активный и интерфейсные тоггл-настройки. */
     suspend fun exportData(): BackupData {
         val snap = serversSnapshot.first()
         return BackupData(

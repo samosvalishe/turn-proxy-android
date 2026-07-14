@@ -15,20 +15,13 @@ import java.util.Properties
 
 class SSHManager {
 
-    /** Отпечаток, полученный при последнем вызове executeSilentCommand */
     @Volatile var lastSeenFingerprint: String? = null
         private set
 
-    /**
-     * Выполняет команду по SSH и возвращает вывод.
-     * @param knownFingerprint SHA-256 отпечаток (null для первого подключения, строка для TOFU/MITM проверки).
-     * @param sshKey PEM-строка приватного ключа (RSA/EC/Ed25519).
-     */
     suspend fun executeSilentCommand(
         ip: String, port: Int, user: String, pass: String, command: String,
         knownFingerprint: String? = null,
         sshKey: String = "",
-        /** Таймаут I/O из канала (мс). */
         execTimeoutMs: Int = 30_000
     ): String = withContext(Dispatchers.IO) {
         val tofu = TofuHostKeyRepository(knownFingerprint)
@@ -43,7 +36,6 @@ class SSHManager {
             tempSession.hostKeyRepository = tofu
 
             val config = Properties()
-            // StrictHostKeyChecking="no" отключает known_hosts. Проверка идёт через TofuHostKeyRepository.
             config["StrictHostKeyChecking"] = "no"
             tempSession.setConfig(config)
             tempSession.connect(5000)
@@ -54,11 +46,11 @@ class SSHManager {
 
             val channel = tempSession.openChannel("exec") as ChannelExec
 
-            // "exec 2>&1" сливает stderr в stdout. Вырезаем \r (CRLF -> LF).
+            // stderr объединяется с stdout для единого ответа управляющего скрипта.
             val sanitized = command.replace("\r\n", "\n").replace("\r", "\n")
             channel.setCommand("exec 2>&1\n$sanitized")
 
-            // Получаем stdout-поток ДО connect() - после уже нельзя.
+            // JSch требует получить поток до connect().
             val inStream = channel.inputStream
             channel.connect(execTimeoutMs)
 
@@ -73,7 +65,6 @@ class SSHManager {
             channel.disconnect()
             output.trim()
         } catch (e: Exception) {
-            // Если отпечаток изменился, показываем предупреждение MITM.
             val isMitm = tofu.capturedFingerprint != null
                 && knownFingerprint != null
                 && tofu.capturedFingerprint != knownFingerprint
@@ -89,16 +80,11 @@ class SSHManager {
         }
     }
 
-    /**
-     * Выполняет команду по SSH, передавая [stdin] через ввод процесса (стриминг скрипта).
-     * Возвращает stdout+stderr.
-     */
     suspend fun executeWithStdin(
         ip: String, port: Int, user: String, pass: String,
         command: String, stdin: String,
         knownFingerprint: String? = null,
         sshKey: String = "",
-        /** Таймаут чтения (мс). Увеличен для загрузок (GitHub). */
         execTimeoutMs: Int = 180_000
     ): String = withContext(Dispatchers.IO) {
         val tofu = TofuHostKeyRepository(knownFingerprint)
@@ -120,7 +106,6 @@ class SSHManager {
             val channel = tempSession.openChannel("exec") as ChannelExec
             val sanitized = command.replace("\r\n", "\n").replace("\r", "\n")
             channel.setCommand("exec 2>&1\n$sanitized")
-            // Нормализация переносов CRLF -> LF для bash.
             val stdinLf = stdin.replace("\r\n", "\n").replace("\r", "\n")
             channel.inputStream = ByteArrayInputStream(stdinLf.toByteArray(Charsets.UTF_8))
 

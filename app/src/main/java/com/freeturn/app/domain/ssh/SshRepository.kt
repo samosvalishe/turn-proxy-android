@@ -45,8 +45,6 @@ class SshRepository(
     private val _sshLog = MutableStateFlow<List<String>>(emptyList())
     val sshLog: StateFlow<List<String>> = _sshLog.asStateFlow()
 
-    // Идёт ли запрос server.log. Сам вывод уходит в sshLog (через runCmd -> logCmdResult),
-    // отдельного состояния журнала нет - он часть единого SSH-лога.
     private val _logsLoading = MutableStateFlow(false)
     val logsLoading: StateFlow<Boolean> = _logsLoading.asStateFlow()
 
@@ -93,7 +91,6 @@ class SshRepository(
         return result
     }
 
-    /** Простая SSH-команда (используется только для healthcheck при подключении). */
     private suspend fun runEcho(cfg: SshConfig): String {
         logHeader("Подключение", "${cfg.username}@${cfg.ip}:${cfg.port}")
         val result = sshManager.executeSilentCommand(
@@ -112,8 +109,7 @@ class SshRepository(
         // из .bashrc могут попасть в stdout перед "OK" и сломать строгое равенство.
         if (result.lines().any { it.trim() == "OK" }) {
             val fp = sshManager.lastSeenFingerprint ?: config.hostFingerprint
-            // Preflight rootMode для сессии (сохранённый мог устареть/быть дефолтным).
-            // sudoPassword не трогаем - он из сохранённого конфига.
+            // Сохранённый rootMode мог устареть между SSH-сессиями.
             val mode = serverControl.detectRootMode(config) ?: config.rootMode
             activeSshConfig = config.copy(hostFingerprint = fp, rootMode = mode)
             _sshState.value = SshConnectionState.Connected(config.ip)
@@ -153,7 +149,6 @@ class SshRepository(
                 _serverState.value = ServerState.Known(
                     installed = d.installed,
                     running = d.running,
-                    // tcpMode/obfProfile значимы только когда сервер запущен.
                     tcpMode = if (d.running) d.mode == "tcp" else null,
                     obfProfile = if (d.running) d.obf else null,
                     version = d.version
@@ -162,7 +157,6 @@ class SshRepository(
             .onFailure { e -> _serverState.value = ServerState.Error(e.message ?: r.errorText()) }
     }
 
-    /** Идемпотентная установка: скрипт сам решает, скачивать или нет (по sha256). */
     suspend fun installServer(): InstallResult = mutex.withLock {
         val cfg = activeSshConfig ?: return@withLock InstallResult.Failed("not connected")
         if (cfg.ip.isEmpty()) return@withLock InstallResult.Failed("no SSH config")
@@ -171,14 +165,10 @@ class SshRepository(
         val result = runCmd(cfg, "Установка", ServerCommand.Install)
         result.requireData<InstallData>().fold(
             onSuccess = { d ->
-                // Если при update сервер был запущен, скрипт перезаписал бинарь,
-                // но процесс всё ещё крутит старую версию. Перезапускаем сами,
-                // иначе пользователь думает что обновился, а live-running старый.
+                // Работающий процесс остаётся на старом бинарнике до перезапуска.
                 if (d.needsRestart) {
                     appendSshLog("  needs_restart -> авто-рестарт сервера")
                     runCmd(cfg, "Авто-остановка перед рестартом", ServerCommand.Stop)
-                    // start вызвать без аргументов нельзя - нужны listen/connect.
-                    // Их знает только VM. Сигнализируем через outcome.
                 }
                 delay(300)
                 checkServerStateLocked(cfg, silent = true)
@@ -240,7 +230,6 @@ class SshRepository(
         checkServerStateLocked(cfg, silent = true)
     }
 
-    /** Тянет server.log по SSH. Вывод (и ошибки) пишутся в общий sshLog через runCmd. */
     suspend fun fetchServerLogs(lines: Int = 200) = mutex.withLock {
         val cfg = activeSshConfig ?: return@withLock
         if (cfg.ip.isEmpty()) return@withLock

@@ -71,7 +71,6 @@ import kotlinx.coroutines.delay
 fun ServerManagementScreen(
     serverViewModel: ServerViewModel,
     settingsViewModel: SettingsViewModel,
-    // Кнопка смены сервера (overflow ⋮).
     onEditConnection: (() -> Unit)? = null,
     // null = активный сервер; не-null = настройки конкретного сервера по id (Settings).
     serverId: String? = null,
@@ -94,7 +93,6 @@ fun ServerManagementScreen(
     val effClient = if (isActive) clientCfg else (server?.client ?: clientCfg)
     val effServer = if (isActive) serverOpts else (server?.opts ?: serverOpts)
 
-    // --- Черновики конфигурации (без авто-сохранения) ---
     var proxyListenIp by rememberSaveable(savedListen) {
         mutableStateOf(savedListen.substringBeforeLast(":", "0.0.0.0").ifBlank { "0.0.0.0" })
     }
@@ -104,30 +102,25 @@ fun ServerManagementScreen(
     var obfDraft by rememberSaveable(effServer.obfProfile) { mutableStateOf(effServer.obfProfile) }
     var keyDraft by rememberSaveable(effServer.obfKey) { mutableStateOf(effServer.obfKey) }
 
-    // SSH-сессию держит хаб (свой реконнект не нужен).
 
     val context = LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     var showServerMenu by rememberSaveable { mutableStateOf(false) }
-    // "Подключено" - только для активного сервера.
     val isConnected = isActive && sshState is SshConnectionState.Connected
     val syncOn = effClient.syncServerSwitches
     val isWorking = serverState is ServerState.Working || serverState is ServerState.Checking
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
-    // --- Dirty-детект для apply-модели ---
     val listenFull = "${proxyListenIp.ifBlank { "0.0.0.0" }}:$proxyListenPort"
     val proxyDirty = listenFull != savedListen || proxyConnect != savedConnect
     val configDirty = proxyDirty ||
         tcpDraft != effClient.tcpForward ||
         obfDraft != effServer.obfProfile ||
         keyDraft != effServer.obfKey
-    // Ключ валиден: обфускация выкл, 64 hex, или пусто.
     val keyOkForApply = obfDraft == ObfProfile.NONE || keyDraft.isBlank() ||
         ObfProfile.isValidKey(keyDraft)
     val addressesOk = HostPort.isValid(listenFull) && HostPort.isValid(proxyConnect)
 
-    // FAB "Применить": только при изменениях и валидном состоянии.
     val canApply = serverSettingsAvailable(isConnected, syncOn) &&
         configDirty && keyOkForApply && addressesOk && !isWorking
     fun applyConfig() {
@@ -157,7 +150,6 @@ fun ServerManagementScreen(
                 },
                 scrollBehavior = scrollBehavior,
                 actions = {
-                    // Смена сервера спрятана в overflow ⋮ - заголовок остаётся чистым.
                     if (isActive && onEditConnection != null) {
                         Box {
                             IconButton(onClick = { showServerMenu = true }) {
@@ -201,7 +193,6 @@ fun ServerManagementScreen(
                 )
             }
         },
-        // Экран внутри NavigationSuite - нижний бар сам держит навбар-инсет.
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Column(
@@ -219,7 +210,6 @@ fun ServerManagementScreen(
                     .padding(horizontal = Spacing.lg, vertical = Spacing.md),
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg)
             ) {
-                // Неактивный + sync ON: предлагаем сделать сервер активным.
                 if (!isActive && syncOn) {
                     HeroCard(
                         iconRes = R.drawable.host_24px,
@@ -235,7 +225,6 @@ fun ServerManagementScreen(
                     return@Column
                 }
 
-                // SSH-сессия не активна: показываем ошибку (дебаунс 400мс на старте).
                 var lostVisible by remember { mutableStateOf(false) }
                 LaunchedEffect(isConnected) {
                     if (isConnected) lostVisible = false else { delay(400); lostVisible = true }
@@ -279,7 +268,6 @@ fun ServerManagementScreen(
                     }
                 }
 
-                // --- Серверный конфиг (listen/connect) - SSH-only, скрыт без подключения ---
                 if (isConnected) {
                     ServerConfigCard(
                         listenIp = proxyListenIp,
@@ -291,7 +279,6 @@ fun ServerManagementScreen(
                     )
                 }
 
-                // --- Синхронные настройки (apply-модель) ---
                 // Гейт общий со входом в экран (ServerDetailScreen) - serverSettingsAvailable.
                 if (serverSettingsAvailable(isConnected, syncOn)) {
                     ServerSyncCard(
@@ -314,7 +301,6 @@ fun ServerManagementScreen(
                     )
                 }
 
-                // Клиренс под плавающую кнопку, чтобы FAB не перекрывал нижний контент.
                 Spacer(Modifier.height(if (canApply) 88.dp else 24.dp))
             }
         }

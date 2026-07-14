@@ -65,7 +65,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** Экран "Режим подключения" (Proxy / VPN). */
 @Composable
 fun ConnectionModeScreen(
     settingsViewModel: SettingsViewModel,
@@ -101,7 +100,6 @@ fun ConnectionModeScreen(
     var wgName by remember(saved.wireGuardTunnelName) { mutableStateOf(saved.wireGuardTunnelName) }
     var wgMtu by remember(saved.wireGuardMtu) { mutableStateOf(saved.wireGuardMtu.toString()) }
 
-    // Запись WG-настроек: транспорт всегда выставляется вместе с конфигом.
     fun persistWg(vpn: Boolean = isVpn) {
         clientEdit {
             it.copy(
@@ -116,10 +114,8 @@ fun ConnectionModeScreen(
     }
 
     var showSplitSheet by rememberSaveable { mutableStateOf(false) }
-    // Лист только для активного сервера - при потере активности скрываем.
     LaunchedEffect(isActive) { if (!isActive) showSplitSheet = false }
 
-    // Дебаунс 600 мс для WG-полей.
     var wgDirty by remember(serverId) { mutableStateOf(false) }
     var pendingSave by remember(serverId) { mutableStateOf(false) }
     LaunchedEffect(wgConfig, wgName, wgMtu) {
@@ -149,7 +145,6 @@ fun ConnectionModeScreen(
                 }
                 if (!text.isNullOrBlank()) {
                     wgConfig = text
-                    // Префилл поля MTU из загруженного conf - поле = единственный источник.
                     extractMtu(text)?.let { wgMtu = it.toString() }
                     HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                 }
@@ -176,7 +171,6 @@ fun ConnectionModeScreen(
                 scrollBehavior = scrollBehavior
             )
         },
-        // Всегда внутри NavigationSuite - нижний бар держит навбар-инсет сам.
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Column(
@@ -233,7 +227,6 @@ fun ConnectionModeScreen(
                         onLoadFile = { filePicker.launch("*/*") }
                     )
 
-                    // --- Раздельное туннелирование (модалка как на главном) ---
                     SectionLabel(stringResource(R.string.split_tunnel_title))
                     SettingsCard {
                         SettingsEntryRow(
@@ -251,7 +244,6 @@ fun ConnectionModeScreen(
         }
     }
 
-    // Split-tunnel (только для активного сервера).
     if (showSplitSheet && isActive) {
         SplitTunnelModal(
             mode = saved.splitTunnelMode,
@@ -260,13 +252,11 @@ fun ConnectionModeScreen(
             onModeChange = settingsViewModel::setSplitTunnelMode,
             onAppsChange = settingsViewModel::setSplitTunnelApps,
             onDismiss = { showSplitSheet = false },
-            // Тот же фон листа, что на главном экране (HomeScreen.sheetColor).
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )
     }
 }
 
-/** Достаёт MTU из строки `[Interface]` загруженного conf; null - нет валидной строки. */
 private fun extractMtu(conf: String): Int? {
     var inInterface = false
     conf.lineSequence().forEach { line ->

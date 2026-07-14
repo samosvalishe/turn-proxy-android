@@ -53,10 +53,6 @@ import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.viewmodel.server.SetupConfigDraft
 import com.freeturn.app.ui.theme.Spacing
 
-/**
- * Шаг 2 мастера - опросник: режим (VPN/Proxy), бэкенд (WG-детект/порт), внешний порт
- * turn-прокси, профиль обфускации и ссылка на звонок. Чистый компонент: state+колбэки.
- */
 @Composable
 fun SetupConfigStep(
     draft: SetupConfigDraft,
@@ -71,14 +67,12 @@ fun SetupConfigStep(
 ) {
     val context = LocalContext.current
     val reducedMotion = LocalReducedMotion.current
-    // Высота карточки режима меняется при переключениях - сглаживаем expressive-спеком.
     val resizeSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
     val cardModifier =
         if (reducedMotion) Modifier else Modifier.animateContentSize(resizeSpec)
 
     if (duplicateHost) DuplicateHostPanel()
 
-    // --- Название сервера ---
     SectionLabel(stringResource(R.string.server_name_label))
     SettingsCard {
         SettingsFieldSlot {
@@ -94,7 +88,6 @@ fun SetupConfigStep(
         }
     }
 
-    // --- Режим работы + бэкенд ---
     SectionLabel(stringResource(R.string.setup_mode_section))
     SettingsCard(modifier = cardModifier) {
         SettingsFieldSlot {
@@ -132,7 +125,6 @@ fun SetupConfigStep(
         SettingsRowDivider()
         if (draft.vpnMode) {
             SettingsFieldSlot {
-                // Источник конфига: настроить WG на сервере либо вставить готовый .conf.
                 SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                     SegmentedButton(
                         selected = !draft.wgCustomConf,
@@ -162,7 +154,6 @@ fun SetupConfigStep(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else if (wgDetectedPort != null) {
-                    // WG уже стоит - используем как бэкенд, ничего не ставим.
                     WgStatusPanel(
                         found = true,
                         title = stringResource(R.string.setup_wg_found),
@@ -187,7 +178,6 @@ fun SetupConfigStep(
             }
             if (draft.wgCustomConf) {
                 SettingsRowDivider()
-                // Та же строка загрузки .conf, что в "Режиме подключения".
                 SettingsEntryRow(
                     iconRes = R.drawable.cloud_download_24px,
                     title = stringResource(R.string.load_wg_conf),
@@ -248,7 +238,6 @@ fun SetupConfigStep(
         }
     }
 
-    // --- Внешний порт turn-прокси ---
     SectionLabel(stringResource(R.string.setup_turn_section))
     SettingsCard {
         SettingsFieldSlot {
@@ -269,7 +258,6 @@ fun SetupConfigStep(
         }
     }
 
-    // --- Обфускация ---
     SectionLabel(stringResource(R.string.obf_profile_title))
     SettingsCard {
         SettingsFieldSlot {
@@ -290,7 +278,6 @@ fun SetupConfigStep(
         }
     }
 
-    // --- Ссылка на звонок ---
     SectionLabel(stringResource(R.string.provider_vk_calls))
     SettingsCard {
         SettingsFieldSlot {
@@ -313,7 +300,6 @@ fun SetupConfigStep(
 
 private fun portOk(p: String): Boolean = p.toIntOrNull()?.let { it in 1..65535 } == true
 
-/** Порт существующего бэкенда (127.0.0.1) - общее поле VPN-custom и proxy-режима. */
 @Composable
 private fun BackendPortField(
     draft: SetupConfigDraft,
@@ -340,7 +326,6 @@ private fun BackendPortField(
     )
 }
 
-/** Предупреждение: сервер с таким IP уже есть - мастер добавит вторую запись. */
 @Composable
 private fun DuplicateHostPanel() {
     Surface(
@@ -367,10 +352,6 @@ private fun DuplicateHostPanel() {
     }
 }
 
-/**
- * Итог WG-детекта - внутренняя тональная панель (surfaceContainerHighest поверх
- * карточки): статусная иконка + заголовок и пояснение.
- */
 @Composable
 private fun WgStatusPanel(found: Boolean, title: String, desc: String) {
     Surface(
@@ -405,7 +386,6 @@ private fun WgStatusPanel(found: Boolean, title: String, desc: String) {
     }
 }
 
-/** Числовое поле порта с кнопкой "перегенерировать" (случайный из пула). */
 @Composable
 private fun PortField(
     value: String,
@@ -442,7 +422,6 @@ private fun PortField(
     )
 }
 
-/** Подпись сегмента профиля: NONE - "Выкл", новые профили показываются именем. */
 @Composable
 private fun obfProfileLabel(value: String): String = when (value) {
     ObfProfile.NONE -> stringResource(R.string.obf_none)

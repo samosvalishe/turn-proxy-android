@@ -66,11 +66,6 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import com.freeturn.app.ui.theme.Spacing
 
-/**
- * QR-сканер импорта freeturn://-ссылки. Валидная ссылка уходит в [LinkImportBus]
- * (ImportSheet всплывёт поверх любого экрана), экран закрывается. Чужие QR
- * игнорируются - сканер продолжает работать.
- */
 @Composable
 fun QrScannerScreen(onBack: () -> Unit) {
     val context = LocalContext.current
@@ -97,7 +92,6 @@ fun QrScannerScreen(onBack: () -> Unit) {
         if (!granted) launcher.launch(Manifest.permission.CAMERA)
     }
 
-    // Разрешение могли выдать в настройках системы - перечитываем по возврату.
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -256,7 +250,6 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     else -> null
 }
 
-/** Экран без разрешения камеры: запрос либо переход в настройки приложения. */
 @Composable
 private fun CameraPermissionGate(
     permanentlyDenied: Boolean,

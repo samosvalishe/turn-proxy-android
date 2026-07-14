@@ -9,12 +9,6 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.atomic.AtomicBoolean
 
-/**
- * Легковесный SOCKS5 прокси-сервер для раздачи Wi-Fi без root.
- * Принимает подключения на 0.0.0.0 и проксирует трафик через себя.
- * Поскольку он работает внутри приложения с включенным VpnService,
- * его исходящий трафик автоматически маршрутизируется в туннель.
- */
 class Socks5Server(private val port: Int = 1080) {
     private var serverSocket: ServerSocket? = null
     private var scope: CoroutineScope? = null
@@ -68,7 +62,6 @@ class Socks5Server(private val port: Int = 1080) {
             val input = clientSocket.getInputStream()
             val output = clientSocket.getOutputStream()
 
-            // 1. Handshake
             val version = input.readByte()
             if (version != 5) return@withContext
             val numMethods = input.readByte()
@@ -76,11 +69,9 @@ class Socks5Server(private val port: Int = 1080) {
             val methods = ByteArray(numMethods)
             input.readFully(methods)
 
-            // Отвечаем: 0x05 (SOCKS5), 0x00 (No authentication)
             output.write(byteArrayOf(5, 0))
             output.flush()
 
-            // 2. Request
             val reqVersion = input.readByte()
             val reqCmd = input.readByte()
             input.readByte() // RSV (reserved, игнорируем)
@@ -120,8 +111,6 @@ class Socks5Server(private val port: Int = 1080) {
             input.readFully(portBytes)
             val targetPort = ((portBytes[0].toInt() and 0xFF) shl 8) or (portBytes[1].toInt() and 0xFF)
 
-            // 3. Устанавливаем соединение с целью.
-            // Трафик этого сокета перехватит VpnService, так как мы внутри приложения.
             try {
                 targetSocket = Socket(host, targetPort)
             } catch (e: java.net.ConnectException) {
@@ -140,33 +129,25 @@ class Socks5Server(private val port: Int = 1080) {
 
             sendReply(output, REPLY_SUCCESS)
 
-            // 4. Двунаправленное копирование
             val clientToServer = launch { pipe(input, targetSocket.getOutputStream()) }
             val serverToClient = launch { pipe(targetSocket.getInputStream(), output) }
 
             clientToServer.join()
             serverToClient.join()
         } catch (_: EOFException) {
-            // Клиент разорвал соединение посреди handshake — штатная ситуация
         } catch (_: Exception) {
-            // Игнорируем сетевые ошибки отдельных клиентов
         } finally {
             try { clientSocket.close() } catch (_: Exception) {}
             try { targetSocket?.close() } catch (_: Exception) {}
         }
     }
 
-    /** Отправляет SOCKS5 reply с указанным кодом результата. */
     private fun sendReply(output: OutputStream, replyCode: Byte) {
         // VER(1) REP(1) RSV(1) ATYP(1)=IPv4 BND.ADDR(4) BND.PORT(2)
         output.write(byteArrayOf(5, replyCode, 0, 1, 0, 0, 0, 0, 0, 0))
         output.flush()
     }
 
-    /**
-     * Читает один байт, бросает [EOFException] при EOF.
-     * Возвращает значение 0..255 как Int для удобства сравнений.
-     */
     private fun InputStream.readByte(): Int {
         val b = this.read()
         if (b == -1) throw EOFException()
@@ -192,7 +173,6 @@ class Socks5Server(private val port: Int = 1080) {
                 outputStream.flush()
             }
         } catch (_: Exception) {
-            // Соединение закрыто другой стороной — штатное завершение pipe
         }
     }
 }

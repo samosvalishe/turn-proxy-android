@@ -35,7 +35,7 @@ class FreeturnLinkTest {
 
     @Test
     fun `golden typical - encode matches Go field order and omitempty`() {
-        // Эталон — байт-в-байт вывод Go json.Marshal(wire) для типового конфига.
+        // Эталон: байт-в-байт вывод Go json.Marshal(wire) для типового конфига.
         val goldenJson = """{"v":1,"provider":"vk","peer":"1.2.3.4:56000","mode":"udp",""" +
             """"obf":"rtpopus","key":"d823fa01cb3e0609b67322f7cf984c4ee2e4ce2e294936fc24ef38c9e59f4799","name":"Papa"}"""
         val golden = "freeturn://" + Base64.getUrlEncoder().withoutPadding()

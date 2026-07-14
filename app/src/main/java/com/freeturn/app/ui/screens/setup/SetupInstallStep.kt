@@ -55,10 +55,6 @@ import com.freeturn.app.viewmodel.server.SetupSummary
 import com.freeturn.app.viewmodel.server.SetupTaskKind
 import com.freeturn.app.ui.theme.Spacing
 
-/**
- * Шаг 3 мастера: чек-лист установки -> итог. Ошибка показывает карточку с текстом
- * и действиями "Повторить" / "К настройкам".
- */
 @Composable
 fun SetupInstallStep(
     install: SetupInstallState?,
@@ -101,7 +97,6 @@ fun SetupInstallStep(
     }
 }
 
-/** Чек-лист задач установки: выполнено -> активная -> ожидание, wavy-индикатор сверху. */
 @Composable
 private fun TaskChecklistCard(install: SetupInstallState) {
     val failed = install.error != null
@@ -155,7 +150,6 @@ private fun TaskRow(label: String, isDone: Boolean, isActive: Boolean, isFailed:
         ) { s ->
             Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) {
                 if (s == TaskVisual.Active && !reducedMotion) {
-                    // Живой expressive-индикатор на выполняемой задаче.
                     LoadingIndicator(modifier = Modifier.size(20.dp))
                 } else {
                     Icon(
@@ -181,7 +175,6 @@ private fun TaskRow(label: String, isDone: Boolean, isActive: Boolean, isFailed:
         Text(
             label,
             style = MaterialTheme.typography.bodyMedium,
-            // Ожидающие задачи - onSurfaceVariant: это контент, не disabled-состояние.
             color = if (isDone || isActive) MaterialTheme.colorScheme.onSurface
                     else MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -195,7 +188,6 @@ private enum class TaskVisual(val descRes: Int) {
     Pending(R.string.setup_task_state_pending)
 }
 
-/** Итог установки: тональный success-бейдж + сводка (адрес/режим/обфускация) + WG-подсказка. */
 @Composable
 private fun SetupDoneCard(summary: SetupSummary) {
     val reducedMotion = LocalReducedMotion.current
@@ -209,8 +201,6 @@ private fun SetupDoneCard(summary: SetupSummary) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(Spacing.lg)
         ) {
-            // Бейдж в форме Sunny - та же форма, что у иконок строк настроек.
-            // Появляется expressive-пружиной (момент успеха).
             val badgeVisible = remember {
                 MutableTransitionState(reducedMotion).apply { targetState = true }
             }

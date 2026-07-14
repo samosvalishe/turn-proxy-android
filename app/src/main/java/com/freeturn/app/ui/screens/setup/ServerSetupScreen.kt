@@ -82,7 +82,6 @@ import kotlinx.coroutines.withContext
 import org.koin.androidx.compose.koinViewModel
 import com.freeturn.app.ui.theme.Spacing
 
-/** Мастер "Свой сервер": SSH -> опросник -> установка (анимация через AnimatedContent). */
 @Composable
 fun ServerSetupScreen(
     onClose: () -> Unit,
@@ -97,10 +96,8 @@ fun ServerSetupScreen(
     val defaultName = stringResource(R.string.add_default_server_name)
 
     var showAbortDialog by rememberSaveable { mutableStateOf(false) }
-    // Подсветка незаполненных полей (включается тапом по FAB).
     var highlightErrors by rememberSaveable { mutableStateOf(false) }
 
-    // "Назад" по шагам (во время установки - диалог прерывания).
     val backAction: () -> Unit = when {
         state.step == SetupStep.Ssh -> onClose
         state.step == SetupStep.Config -> viewModel::backToSsh
@@ -131,7 +128,6 @@ fun ServerSetupScreen(
         )
     }
 
-    // Импорт WG-конфига из файла.
     val scope = rememberCoroutineScope()
     val wgFilePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
@@ -149,7 +145,6 @@ fun ServerSetupScreen(
         }
     }
 
-    // FAB ("Продолжить" -> "Установить" -> "На главную").
     val fab: SetupFab? = when {
         state.step == SetupStep.Ssh && !state.checkingSsh ->
             SetupFab(R.string.setup_continue, R.drawable.chevron_right_24px) {
@@ -181,7 +176,6 @@ fun ServerSetupScreen(
     }
 
     val scrollState = rememberScrollState()
-    // Новый шаг начинается с верха, подсветка ошибок не тянется между шагами.
     LaunchedEffect(state.step) {
         scrollState.scrollTo(0)
         highlightErrors = false
@@ -225,7 +219,6 @@ fun ServerSetupScreen(
                 }
             }
         },
-        // Экран внутри NavigationSuite - нижний бар сам держит навбар-инсет.
         contentWindowInsets = WindowInsets(0, 0, 0, 0)
     ) { padding ->
         Column(
@@ -236,7 +229,6 @@ fun ServerSetupScreen(
                 .verticalScroll(scrollState),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Спеки переходов шагов - из expressive MotionScheme темы.
             val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
             val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
             AnimatedContent(
@@ -292,7 +284,6 @@ fun ServerSetupScreen(
                     }
                 }
             }
-            // Клиренс под FAB. Анимация гасит скачок контента при появлении кнопки.
             val clearance by animateDpAsState(
                 targetValue = if (fab != null) 88.dp else 12.dp,
                 animationSpec = if (reducedMotion) snap() else spring(),
@@ -303,7 +294,6 @@ fun ServerSetupScreen(
     }
 }
 
-/** Прогресс мастера в subtitle-слоте: капсулы шагов, заполнение анимируется. */
 @Composable
 private fun StepProgressCapsules(current: Int, total: Int = 3) {
     val description = stringResource(R.string.setup_step_counter, current + 1, total)

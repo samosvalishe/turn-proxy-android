@@ -20,20 +20,12 @@ import com.freeturn.app.domain.server.requireData
 import com.freeturn.app.domain.ssh.SSHManager
 import java.util.Base64
 
-/**
- * SSH-операции шаринга доступа (вкладка "Поделиться"). Собственный [SSHManager]
- * и [ServerControl] - как у [com.freeturn.app.domain.server.ServerSetupRepository]:
- * не трогаем живую сессию активного сервера. Состояния не держит, ошибки - [Result].
- */
 class ShareRepository(context: Context, ssh: SSHManager) {
 
     private val control = ServerControl(context, ssh)
 
-    /** Свежесозданный пир: клиентский conf для ссылки + pubkey/ip для локального
-     *  аппенда в уже загруженный список "Пользователей". */
     data class NewPeer(val pubkey: String, val ip: String, val clientConf: String)
 
-    /** Сохранённый доступ пира для повторной выдачи: conf + его cid из allowlist. */
     data class PeerAccess(val clientConf: String, val clientId: String)
 
     suspend fun shareInfo(cfg: SshConfig): Result<ShareInfo> =
@@ -41,7 +33,6 @@ class ShareRepository(context: Context, ssh: SSHManager) {
             .requireData<ShareInfoData>()
             .map { ShareInfo(it.mode, it.obfProfile, it.obfKey, it.wgBackend) }
 
-    /** [clientId] - свежий cid гостя: скрипт сажает его в allowlist (comment = имя). */
     suspend fun addPeer(
         cfg: SshConfig,
         name: String,
@@ -58,7 +49,6 @@ class ShareRepository(context: Context, ssh: SSHManager) {
                 NewPeer(d.peer.pub, d.peer.ip, conf)
             }
 
-    /** WG-пиры + allowlist-гости одной SSH-сессией (вкладка "Пользователи"). */
     suspend fun listShared(cfg: SshConfig): Result<Pair<List<WgPeer>, List<SharedClient>>> =
         control.run(cfg, ServerCommand.ShareList)
             .requireData<ShareListData>()
@@ -85,7 +75,6 @@ class ShareRepository(context: Context, ssh: SSHManager) {
     suspend fun removePeer(cfg: SshConfig, pubkey: String): Result<Unit> =
         control.run(cfg, ServerCommand.PeerRemove(pubkey)).asUnit()
 
-    /** Гость без WG-пира (tcp/Xray-бэкенд): только cid в allowlist. */
     suspend fun addClient(cfg: SshConfig, name: String, clientId: String): Result<Unit> =
         control.run(cfg, ServerCommand.ClientAdd(nameB64(name), clientId)).asUnit()
 

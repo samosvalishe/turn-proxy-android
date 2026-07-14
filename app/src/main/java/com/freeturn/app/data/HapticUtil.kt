@@ -6,23 +6,15 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.provider.Settings
 
-/** Тактильные вибро-паттерны для UI-событий: выбор, клик, тоггл, успех/ошибка, старт. */
 object HapticUtil {
 
     enum class Pattern {
-        /** Мягкое касание - смена выбора, тап по вкладке */
         SELECTION,
-        /** Обычный клик - кнопки, действия */
         CLICK,
-        /** Включение - тяжёлый удар + послезвук */
         TOGGLE_ON,
-        /** Выключение - средний удар */
         TOGGLE_OFF,
-        /** Успех - тройной каскад (восходящий) */
         SUCCESS,
-        /** Ошибка - двойной тяжёлый buzz */
         ERROR,
-        /** Старт приложения - двойной мягкий удар */
         LAUNCH,
     }
 

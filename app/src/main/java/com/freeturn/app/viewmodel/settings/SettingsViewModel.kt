@@ -41,7 +41,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.IOException
 
-/** Состояние очистки сервера от FreeTurn (snapshot для диалога). */
 sealed interface ServerCleanupState {
     data object Idle : ServerCleanupState
     data object Running : ServerCleanupState
@@ -60,8 +59,6 @@ class SettingsViewModel(
     context: Context
 ) : ViewModel() {
 
-    // ViewModel переживает пересоздание Activity - храним applicationContext,
-    // чтобы не утекала Activity.
     private val appContext = context.applicationContext
 
     val clientConfig: StateFlow<ClientConfig> = prefs.clientConfigFlow
@@ -93,8 +90,7 @@ class SettingsViewModel(
     private val _initialTgSubscribeShown = MutableStateFlow(false)
     val initialTgSubscribeShown: StateFlow<Boolean> = _initialTgSubscribeShown.asStateFlow()
 
-    // Снимок на старте (как initialTgSubscribeShown): гейт диалога читается один раз при
-    // построении UI - живой StateFlow с дефолтом false мигнул бы диалогом до первого emit.
+    // Снимок не даёт диалогу мигнуть на дефолтном значении до первого emit.
     private val _initialSuppressTgPrompt = MutableStateFlow(false)
     val initialSuppressTgPrompt: StateFlow<Boolean> = _initialSuppressTgPrompt.asStateFlow()
 
@@ -110,12 +106,10 @@ class SettingsViewModel(
     val restartServerOnSwitch: StateFlow<Boolean> = prefs.restartServerOnSwitchFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-    // Не StateFlow: .value мог бы вернуть дефолт до первого emit DataStore и скипнуть
-    // диалог в первую сессию - тут ждём реальное значение.
+    // Ожидаем DataStore, чтобы дефолт StateFlow не пропустил диалог первой сессии.
     suspend fun batteryPromptShownOnce(): Boolean = prefs.batteryPromptShownFlow.first()
 
-    // Дебаунс быстрых тыков тоггла синка: persist мгновенный, а дорогой сетевой
-    // side-effect (SSH stop+start + рестарт прокси) откладывается и коалесцируется.
+    // Persist мгновенный; сетевые рестарты коалесцируются.
     private val syncSideEffectMutex = Mutex()
     private var syncSideEffectJob: Job? = null
     private val syncSideEffectDebounceMs = 600L
@@ -124,7 +118,6 @@ class SettingsViewModel(
         viewModelScope.launch {
             _initialTgSubscribeShown.value = prefs.tgSubscribeShownFlow.first()
             _initialSuppressTgPrompt.value = prefs.suppressTgPromptFlow.first()
-            // Восстанавливаем сохранённое состояние тоггла логов при старте.
             ProxyServiceState.setLogsEnabled(prefs.clientConfigFlow.first().logsEnabled)
             _isInitialized.value = true
         }
@@ -169,11 +162,7 @@ class SettingsViewModel(
         viewModelScope.launch { prefs.setSuppressTgPrompt(enabled) }
     }
 
-    /**
-     * Сохраняет client-конфиг сервера, который редактировал экран. expectedActiveId -
-     * id на момент начала правки (null - активный сейчас): дебаунс-сейв после смены
-     * активного уходит в свой сервер, а не затирает новый активный.
-     */
+    // expectedActiveId не даёт отложенной записи затереть новый активный сервер.
     fun saveClientConfig(config: ClientConfig, expectedActiveId: String? = null) {
         viewModelScope.launch {
             val targetId = expectedActiveId
@@ -202,15 +191,7 @@ class SettingsViewModel(
         }
     }
 
-    // --- Servers ---
-
-    /**
-     * Создаёт пустой сервер (ручная настройка): только имя, остальное - дефолты.
-     * Не активирует (кроме первого - правило addServer): пустая запись не должна
-     * перебивать рабочий активный сервер. [onAdded] получает id для перехода в хаб.
-     * Sync OFF: без SSH пушить нечего, а sync ON прятал бы "Настройки сервера"
-     * (serverSettingsAvailable) - пользователь не смог бы донастроить сервер.
-     */
+    // Ручной сервер создаётся неактивным и с sync OFF, чтобы его можно было донастроить без SSH.
     fun addManualServer(name: String, onAdded: (String) -> Unit) {
         viewModelScope.launch {
             val server = Server(name = name, client = ClientConfig(syncServerSwitches = false))
@@ -222,7 +203,6 @@ class SettingsViewModel(
         viewModelScope.launch { prefs.renameServer(id, name) }
     }
 
-    /** Клонирует сервер; [onCloned] получает id копии для перехода в её хаб. */
     fun cloneServer(id: String, onCloned: (String) -> Unit) {
         viewModelScope.launch { prefs.cloneServer(id)?.let(onCloned) }
     }
@@ -233,7 +213,6 @@ class SettingsViewModel(
                 ?: return@launch
             prefs.setActiveServerId(target.id)
 
-            // Сервер - до прокси: no-op, если сервер не запущен или SSH на другом хосте.
             if (prefs.restartServerOnSwitchFlow.first()) {
                 orchestrator.restartServerIfRunning()
             }
@@ -249,26 +228,19 @@ class SettingsViewModel(
     }
 
     private val _cleanupState = MutableStateFlow<ServerCleanupState>(ServerCleanupState.Idle)
-    /** Прогресс очистки сервера от FreeTurn (диалог в разделе "Управление"). */
     val cleanupState: StateFlow<ServerCleanupState> = _cleanupState.asStateFlow()
 
     fun resetCleanupState() { _cleanupState.value = ServerCleanupState.Idle }
 
-    /** Удаление сервера из приложения (локально, без серверной очистки). */
     fun deleteServer(id: String) {
         viewModelScope.launch { prefs.deleteServer(id) }
     }
 
-    /**
-     * Снос free-turn-proxy с удалённого сервера по SSH. Сервер из приложения НЕ
-     * удаляет - это отдельное действие. Результат/ошибка - в [cleanupState].
-     */
     fun cleanupServer(id: String) {
         viewModelScope.launch {
             val cfg = serversSnapshot.value.list.firstOrNull { it.id == id }?.ssh ?: return@launch
             _cleanupState.value = ServerCleanupState.Running
-            // Деструктив под верной эскалацией: сохранённый rootMode мог устареть/быть
-            // дефолтным ROOT (сервер ни разу не подключали) -> preflight перед сносом.
+            // Перед удалением обновляем rootMode: сохранённое значение могло устареть.
             val mode = serverSetup.detectRootMode(cfg) ?: cfg.rootMode
             serverSetup.uninstall(cfg.copy(rootMode = mode), withWgPkg = true)
                 .onSuccess { _cleanupState.value = ServerCleanupState.Done(it) }
@@ -276,8 +248,6 @@ class SettingsViewModel(
         }
     }
 
-    // Правит client-конфиг сервера по id, НЕ требуя его активации. Для активного
-    // дополнительно обновляет глобальный флаг логов (его читает рантайм).
     fun updateServerClient(id: String, transform: (ClientConfig) -> ClientConfig) {
         viewModelScope.launch {
             if (!prefs.updateServer(id) { it.copy(client = transform(it.client)) }) return@launch
@@ -288,7 +258,6 @@ class SettingsViewModel(
         }
     }
 
-    // --- Server & Proxy Switches (TcpForward, Bond, Obf, Sync) ---
     fun setBond(enabled: Boolean) {
         viewModelScope.launch {
             val changed = prefs.updateActiveServer {
@@ -298,7 +267,6 @@ class SettingsViewModel(
         }
     }
 
-    // UI пускает сюда только при остановленном прокси - рестарт не нужен.
     fun setActiveVkLink(link: String) {
         viewModelScope.launch {
             prefs.updateActiveServer {
@@ -313,14 +281,7 @@ class SettingsViewModel(
                 it.copy(client = it.client.copy(syncServerSwitches = enabled))
             }
             if (!changed) return@launch
-            // Дебаунс: отменяем отложенный side-effect, перепланируем. delay - окно
-            // отмены (гасит спам ON/OFF/ON -> один рестарт). Сам рестарт под mutex
-            // (две последовательности не интерливятся) и NonCancellable (новый тык не
-            // рвёт SSH-команду на полпути). Читаем ФИНАЛЬНОЕ состояние после дебаунса -
-            // рестартим только если синк в итоге включён (...->OFF -> ноль рестартов).
-            // Смерть процесса в окне дебаунса оставит сервер на старом конфиге при
-            // новом тоггле - принято: probe хаба покажет live-режим, любой следующий
-            // apply/старт приводит сервер в соответствие.
+            // NonCancellable не даёт новому переключению оборвать SSH-команду на полпути.
             syncSideEffectJob?.cancel()
             syncSideEffectJob = viewModelScope.launch {
                 delay(syncSideEffectDebounceMs)
@@ -335,12 +296,7 @@ class SettingsViewModel(
         }
     }
 
-    /**
-     * Атомарно применяет конфиг сервера (proxy-адреса + tcp-проброс + профиль обфускации
-     * + obf-ключ) одной транзакцией и перезапускает сервер/прокси РОВНО один раз - для
-     * apply-модели "Настроек сервера" (натыкали черновик -> Применить). Если включается
-     * обфускация без ключа, ключ генерируется локально.
-     */
+    // Одна транзакция и один рестарт сохраняют атомарность apply-модели.
     fun applyServerConfig(
         listen: String,
         connect: String,
@@ -375,12 +331,7 @@ class SettingsViewModel(
         }
     }
 
-    /**
-     * Apply-модель "Настроек сервера" для НЕактивного сервера (sync OFF): серверные
-     * параметры тут клиент-локальны, поэтому пишем только снимок сервера по id -
-     * рантайм (SSH/прокси активного сервера) не трогаем. Пустой obf-ключ при
-     * включённой обфускации генерируется локально.
-     */
+    // Неактивный сервер обновляется без вмешательства в рантайм активного.
     fun updateServerConfig(
         id: String,
         listen: String,
@@ -406,7 +357,6 @@ class SettingsViewModel(
         }
     }
 
-    // --- Updates ---
     fun checkForUpdate() {
         viewModelScope.launch { appUpdater.checkForUpdate(silent = false) }
     }
@@ -423,8 +373,7 @@ class SettingsViewModel(
         appUpdater.resetState()
     }
 
-    // --- Экспорт / импорт ---
-    // Одноразовые события для снекбара (буфер 1 - не теряем при отсутствии подписчика).
+    // Буфер сохраняет событие, пока экран не подписан.
     private val _backupEvents = MutableSharedFlow<BackupEvent>(extraBufferCapacity = 1)
     val backupEvents: SharedFlow<BackupEvent> = _backupEvents.asSharedFlow()
 
@@ -486,10 +435,8 @@ class SettingsViewModel(
     }
 }
 
-/** Причина провала импорта - текст для UI выбирает экран. */
 enum class BackupFailReason { BAD_PASSWORD, BAD_FILE, IO }
 
-/** Одноразовые результаты экспорта/импорта для снекбара. */
 sealed interface BackupEvent {
     data object ExportSuccess : BackupEvent
     data object ExportFailed : BackupEvent
