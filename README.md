@@ -33,7 +33,7 @@
 
 ## Благодарности
 
-- **[@Moroka8](https://github.com/Moroka8)** — форк ядра [vk-turn-proxy](https://github.com/Moroka8/vk-turn-proxy)
-- **[@alexmac6574](https://github.com/alexmac6574)** — форк ядра [vk-turn-proxy](https://github.com/alexmac6574/vk-turn-proxy)
-- **[@cacggghp](https://github.com/cacggghp)** — оригинальное [vk-turn-proxy](https://github.com/cacggghp/vk-turn-proxy)
-- **[@MYSOREZ](https://github.com/MYSOREZ)** — оригинальный Android-клиент [vk-turn-proxy-android](https://github.com/MYSOREZ/vk-turn-proxy-android)
+- **[@Moroka8](https://github.com/Moroka8)** - форк ядра [vk-turn-proxy](https://github.com/Moroka8/vk-turn-proxy)
+- **[@alexmac6574](https://github.com/alexmac6574)** - форк ядра [vk-turn-proxy](https://github.com/alexmac6574/vk-turn-proxy)
+- **[@cacggghp](https://github.com/cacggghp)** - оригинальное [vk-turn-proxy](https://github.com/cacggghp/vk-turn-proxy)
+- **[@MYSOREZ](https://github.com/MYSOREZ)** - оригинальный Android-клиент [vk-turn-proxy-android](https://github.com/MYSOREZ/vk-turn-proxy-android)
