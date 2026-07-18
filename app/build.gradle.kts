@@ -18,7 +18,7 @@ android {
 
     defaultConfig {
         applicationId = "com.freeturn.app"
-        // WireGuard GoBackend (com.wireguard.android:tunnel) требует minSdk 24.
+        // WireGuard GoBackend (com.zaneschepke:amneziawg-android) требует minSdk 24.
         minSdk = 24
         targetSdk = 37
         versionName = "3.4.2" // x-release-please-version
@@ -79,7 +79,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-        // WireGuard tunnel-либа использует java.time, поэтому нужен desugaring.
+        // amneziawg-android либа использует java.time, поэтому нужен desugaring.
         isCoreLibraryDesugaringEnabled = true
     }
 }
@@ -96,7 +96,7 @@ dependencies {
     implementation(libs.bouncycastle)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
-    implementation(libs.wireguard.tunnel)
+    implementation(libs.amneziawg.android)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

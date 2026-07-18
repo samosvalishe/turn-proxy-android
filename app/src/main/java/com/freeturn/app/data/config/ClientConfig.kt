@@ -25,6 +25,8 @@ data class ClientConfig(
     val wireGuardConfig: String = "",
     val wireGuardTunnelName: String = TunnelTransport.DEFAULT_TUNNEL_NAME,
     val wireGuardMtu: Int = DEFAULT_WG_MTU,
+    val wireGuardMetered: Boolean = false,
+    val wireGuardPreferIpv4: Boolean = false,
     val splitTunnelMode: String = SplitTunnelMode.EXCLUDE,
     /**
      * Package-имена для include/exclude (разделители: запятая/пробел/перенос строки).

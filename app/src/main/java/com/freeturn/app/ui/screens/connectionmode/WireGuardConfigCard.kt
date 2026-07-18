@@ -17,6 +17,7 @@ import com.freeturn.app.ui.components.SettingsCard
 import com.freeturn.app.ui.components.SettingsEntryRow
 import com.freeturn.app.ui.components.SettingsFieldSlot
 import com.freeturn.app.ui.components.SettingsRowDivider
+import com.freeturn.app.ui.components.SettingsSwitchRow
 import com.freeturn.app.ui.theme.extendedColorScheme
 import com.freeturn.app.ui.util.redact
 
@@ -29,6 +30,10 @@ internal fun WireGuardConfigCard(
     onWgName: (String) -> Unit,
     mtu: String,
     onMtu: (String) -> Unit,
+    metered: Boolean,
+    onMetered: (Boolean) -> Unit,
+    preferIpv4: Boolean,
+    onPreferIpv4: (Boolean) -> Unit,
     privacyMode: Boolean,
     onLoadFile: () -> Unit
 ) {
@@ -76,5 +81,19 @@ internal fun WireGuardConfigCard(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
         }
+        SettingsRowDivider()
+        SettingsSwitchRow(
+            title = stringResource(R.string.wireguard_metered),
+            subtitle = stringResource(R.string.wireguard_metered_hint),
+            checked = metered,
+            onCheckedChange = onMetered
+        )
+        SettingsRowDivider()
+        SettingsSwitchRow(
+            title = stringResource(R.string.wireguard_prefer_ipv4),
+            subtitle = stringResource(R.string.wireguard_prefer_ipv4_hint),
+            checked = preferIpv4,
+            onCheckedChange = onPreferIpv4
+        )
     }
 }

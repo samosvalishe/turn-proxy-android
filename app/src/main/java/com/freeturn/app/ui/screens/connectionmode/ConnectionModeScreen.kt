@@ -99,6 +99,8 @@ fun ConnectionModeScreen(
     var wgConfig by remember(saved.wireGuardConfig) { mutableStateOf(saved.wireGuardConfig) }
     var wgName by remember(saved.wireGuardTunnelName) { mutableStateOf(saved.wireGuardTunnelName) }
     var wgMtu by remember(saved.wireGuardMtu) { mutableStateOf(saved.wireGuardMtu.toString()) }
+    var wgMetered by remember(saved.wireGuardMetered) { mutableStateOf(saved.wireGuardMetered) }
+    var wgPreferIpv4 by remember(saved.wireGuardPreferIpv4) { mutableStateOf(saved.wireGuardPreferIpv4) }
 
     fun persistWg(vpn: Boolean = isVpn) {
         clientEdit {
@@ -108,7 +110,9 @@ fun ConnectionModeScreen(
                 wireGuardTunnelName = wgName.trim().ifBlank { TunnelTransport.DEFAULT_TUNNEL_NAME },
                 wireGuardMtu = wgMtu.toIntOrNull()
                     ?.coerceIn(ClientConfig.MIN_WG_MTU, ClientConfig.MAX_WG_MTU)
-                    ?: ClientConfig.DEFAULT_WG_MTU
+                    ?: ClientConfig.DEFAULT_WG_MTU,
+                wireGuardMetered = wgMetered,
+                wireGuardPreferIpv4 = wgPreferIpv4
             )
         }
     }
@@ -118,7 +122,7 @@ fun ConnectionModeScreen(
 
     var wgDirty by remember(serverId) { mutableStateOf(false) }
     var pendingSave by remember(serverId) { mutableStateOf(false) }
-    LaunchedEffect(wgConfig, wgName, wgMtu) {
+    LaunchedEffect(wgConfig, wgName, wgMtu, wgMetered, wgPreferIpv4) {
         if (!wgDirty) { wgDirty = true; return@LaunchedEffect }
         pendingSave = true
         delay(600)
@@ -223,6 +227,10 @@ fun ConnectionModeScreen(
                         onWgName = { wgName = it },
                         mtu = wgMtu,
                         onMtu = { wgMtu = it },
+                        metered = wgMetered,
+                        onMetered = { wgMetered = it },
+                        preferIpv4 = wgPreferIpv4,
+                        onPreferIpv4 = { wgPreferIpv4 = it },
                         privacyMode = privacyMode,
                         onLoadFile = { filePicker.launch("*/*") }
                     )
