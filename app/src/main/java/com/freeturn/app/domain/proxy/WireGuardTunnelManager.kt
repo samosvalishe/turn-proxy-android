@@ -6,9 +6,10 @@ import com.freeturn.app.data.config.SplitTunnelMode
 import com.freeturn.app.data.config.TunnelTransport
 import com.freeturn.app.data.config.splitTunnelSelection
 import com.freeturn.app.data.isPackageInstalled
-import com.wireguard.android.backend.GoBackend
-import com.wireguard.android.backend.Tunnel
-import com.wireguard.config.Config
+import org.amnezia.awg.backend.GoBackend
+import org.amnezia.awg.backend.NoopTunnelActionHandler
+import org.amnezia.awg.backend.Tunnel
+import org.amnezia.awg.config.Config
 import java.io.ByteArrayInputStream
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicReference
@@ -22,7 +23,8 @@ import kotlinx.coroutines.sync.withLock
 class WireGuardTunnelManager(context: Context) {
 
     private val appContext = context.applicationContext
-    private val backend by lazy { GoBackend(appContext) }
+    // PreUp/PostUp-скрипты не используются - конфиг всегда без них.
+    private val backend by lazy { GoBackend(appContext, NoopTunnelActionHandler()) }
     private val tunnelRef = AtomicReference<NamedTunnel?>(null)
     // Без сериализации stop во время старта оставлял туннель поднятым (no-op до tunnelRef.set).
     private val mutex = Mutex()
@@ -54,7 +56,7 @@ class WireGuardTunnelManager(context: Context) {
 
         mutex.withLock {
             stopLocked()
-            val tunnel = NamedTunnel(name)
+            val tunnel = NamedTunnel(name, metered = cfg.wireGuardMetered, preferIpv4 = cfg.wireGuardPreferIpv4)
             // Ссылка ДО setState: при провале откат/stop опустит частично поднятый туннель.
             tunnelRef.set(tunnel)
             try {
@@ -79,12 +81,20 @@ class WireGuardTunnelManager(context: Context) {
         }
     }
 
-    private class NamedTunnel(private val tunnelName: String) : Tunnel {
+    private class NamedTunnel(
+        private val tunnelName: String,
+        private val metered: Boolean,
+        private val preferIpv4: Boolean
+    ) : Tunnel {
         override fun getName(): String = tunnelName
 
         override fun onStateChange(newState: Tunnel.State) {
             ProxyServiceState.addLog("WireGuard: состояние $tunnelName -> $newState")
         }
+
+        override fun isIpv4ResolutionPreferred(): Boolean = preferIpv4
+
+        override fun isMetered(): Boolean = metered
     }
 }
 
