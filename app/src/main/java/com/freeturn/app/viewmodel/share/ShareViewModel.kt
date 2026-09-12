@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.freeturn.app.data.AppPreferences
+import com.freeturn.app.data.config.AccessProtocol
 import com.freeturn.app.data.config.ClientConfig
 import com.freeturn.app.data.config.ClientId
 import com.freeturn.app.data.server.Server
@@ -20,7 +21,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-data class ShareResult(val userName: String, val link: String, val isWg: Boolean)
+data class ShareResult(val userName: String, val link: String, val protocol: AccessProtocol)
 
 data class RevokeTarget(
     val name: String,
@@ -241,7 +242,7 @@ class ShareViewModel(
                 link = ShareLinkBuilder.build(
                     server, info, userName, null, st.manualClientId.trim(), st.sharedVkLink
                 ),
-                wg = false
+                wgConf = null
             )
             return
         }
@@ -258,7 +259,7 @@ class ShareViewModel(
                             link = ShareLinkBuilder.build(
                                 server, info, userName, peer.clientConf, cid, st.sharedVkLink
                             ),
-                            wg = true,
+                            wgConf = peer.clientConf,
                             newPeer = WgPeer(
                                 pubkey = peer.pubkey,
                                 name = userName,
@@ -279,7 +280,7 @@ class ShareViewModel(
                             link = ShareLinkBuilder.build(
                                 server, info, userName, null, cid, st.sharedVkLink
                             ),
-                            wg = false,
+                            wgConf = null,
                             newClient = SharedClient(clientId = cid, name = userName)
                         )
                     }
@@ -292,7 +293,7 @@ class ShareViewModel(
         serverId: String,
         userName: String,
         link: String,
-        wg: Boolean,
+        wgConf: String?,
         newPeer: WgPeer? = null,
         newClient: SharedClient? = null
     ) {
@@ -302,7 +303,7 @@ class ShareViewModel(
             cur.copy(
                 creating = false,
                 userName = "",
-                result = ShareResult(userName, link, wg),
+                result = ShareResult(userName, link, AccessProtocol.of(wgConf)),
                 peers = if (appendable && newPeer != null) cur.peers + newPeer else cur.peers,
                 clients = if (appendable && newClient != null) cur.clients + newClient else cur.clients
             )
@@ -365,7 +366,7 @@ class ShareViewModel(
                                     server, info, peer.name, access.clientConf,
                                     access.clientId, st.sharedVkLink
                                 ),
-                                isWg = true
+                                protocol = AccessProtocol.of(access.clientConf)
                             )
                         )
                     }
@@ -390,7 +391,7 @@ class ShareViewModel(
                     link = ShareLinkBuilder.build(
                         server, info, client.name, null, client.clientId, it.sharedVkLink
                     ),
-                    isWg = false
+                    protocol = AccessProtocol.PROXY
                 )
             )
         }

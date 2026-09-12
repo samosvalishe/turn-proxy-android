@@ -28,9 +28,10 @@
     <string name="share_info_loading">Проверка сервера…</string>
     <string name="share_info_error">Сервер недоступен</string>
     <string name="share_info_retry">Повторить</string>
-    <string name="share_protocol_wg">WireGuard</string>
-    <string name="share_protocol_wg_desc">Пользователь подключается по WireGuard</string>
-    <string name="share_protocol_proxy">Прокси</string>
+    <string name="protocol_wg">WireGuard</string>
+    <string name="protocol_awg">AmneziaWG</string>
+    <string name="protocol_proxy">Прокси</string>
+    <string name="share_protocol_wg_desc">Пользователь подключается по VPN - WireGuard или AmneziaWG</string>
     <string name="share_protocol_proxy_desc">Пользователь подключается через прокси</string>
     <string name="share_chip_obf">Обфускация</string>
     <string name="share_access_type">Тип доступа</string>

@@ -5,6 +5,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -42,15 +43,54 @@ class CoreConfigJsonTest {
         assertTrue(own.contains("ffffffffffffffffffffffffffffffff"))
     }
 
+    // Режим всегда awg: на чистом WG-конфиге ядро ведёт себя как в wg,
+    // а wg молча срезал бы amnezia-параметры.
     @Test
-    fun tunnelCarriesWgConfig() {
-        val wg = base.copy(
+    fun tunnelCarriesAwgModeForAnyConfig() {
+        val plain = base.copy(
             tunnelTransport = TunnelTransport.WIREGUARD,
             wireGuardConfig = "[Interface]\nAddress = 10.8.0.2/32\n",
         )
-        val tunnel = parse(wg)["tunnel"]!!.jsonObject
-        assertEquals("wg", tunnel["mode"]!!.jsonPrimitive.content)
+        val tunnel = parse(plain)["tunnel"]!!.jsonObject
+        assertEquals("awg", tunnel["mode"]!!.jsonPrimitive.content)
         assertEquals(ClientConfig.WG_MTU, tunnel["mtu"]!!.jsonPrimitive.content.toInt())
+
+        val awg = plain.copy(wireGuardConfig = "[Interface]\nAddress = 10.8.0.2/32\nJc = 4\n")
+        val awgTunnel = parse(awg)["tunnel"]!!.jsonObject
+        assertEquals("awg", awgTunnel["mode"]!!.jsonPrimitive.content)
+        assertTrue(awgTunnel["config"]!!.jsonPrimitive.content.contains("Jc = 4"))
+    }
+
+    // Набор ключей - зеркало парсера ядра (internal/tunnel/wgconf).
+    @Test
+    fun detectsAmneziaConfigKeys() {
+        assertFalse(CoreConfigJson.isAmneziaConfig("[Interface]\nAddress = 10.8.0.2/32\nPrivateKey = xxx\n"))
+        assertFalse(CoreConfigJson.isAmneziaConfig("# Jc = 4\n[Interface]\nAddress = 10.8.0.2/32\n"))
+        assertFalse(CoreConfigJson.isAmneziaConfig("; S1 = 15\n[Interface]\nAddress = 10.8.0.2/32\n"))
+        assertTrue(CoreConfigJson.isAmneziaConfig("[Interface]\nAddress = 10.8.0.2/32\nJc = 4\n"))
+        assertTrue(CoreConfigJson.isAmneziaConfig("[Interface]\nheaderprotectionkey = 0x12345678\n"))
+        assertTrue(CoreConfigJson.isAmneziaConfig("[Interface]\ns1 = 50\n"))
+        assertTrue(CoreConfigJson.isAmneziaConfig("[Interface]\nH4 = 9999 ; inline comment\n"))
+        assertTrue(CoreConfigJson.isAmneziaConfig("[Interface]\nJmin = 50\nJmax = 100\n"))
+    }
+
+    @Test
+    fun tunnelModeNoneWhenInactive() {
+        val disabled = base.copy(
+            tunnelTransport = TunnelTransport.NONE,
+            wireGuardConfig = "Jc = 4",
+        )
+        val tunnel = parse(disabled)["tunnel"]!!.jsonObject
+        assertEquals("none", tunnel["mode"]!!.jsonPrimitive.content)
+        assertEquals("", tunnel["config"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun accessProtocolFollowsConf() {
+        assertEquals(AccessProtocol.PROXY, AccessProtocol.of(""))
+        assertEquals(AccessProtocol.PROXY, AccessProtocol.of(null))
+        assertEquals(AccessProtocol.WG, AccessProtocol.of("[Interface]\nAddress = 10.8.0.2/32\n"))
+        assertEquals(AccessProtocol.AWG, AccessProtocol.of("[Interface]\nJc = 4\n"))
     }
 
     // Лишний ключ в proxy валит старт ядра (DisallowUnknownFields), а не тест схемы.

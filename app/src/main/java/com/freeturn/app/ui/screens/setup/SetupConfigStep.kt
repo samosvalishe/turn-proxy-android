@@ -42,6 +42,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
+import com.freeturn.app.data.config.AccessProtocol
 import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.data.HapticUtil
 import com.freeturn.app.ui.components.SectionLabel
@@ -179,11 +180,19 @@ fun SetupConfigStep(
                 }
             }
             if (draft.wgCustomConf) {
+                val hasConf = draft.wgConfText.isNotBlank()
+                val protocol = remember(draft.wgConfText) { AccessProtocol.of(draft.wgConfText) }
                 SettingsRowDivider()
                 SettingsEntryRow(
                     iconRes = R.drawable.cloud_download_24px,
                     title = stringResource(R.string.load_wg_conf),
-                    trailingRes = if (draft.wgConfText.isNotBlank()) R.drawable.check_circle_24px else null,
+                    subtitle = if (hasConf) {
+                        stringResource(
+                            if (protocol == AccessProtocol.AWG) R.string.protocol_awg
+                            else R.string.protocol_wg
+                        )
+                    } else null,
+                    trailingRes = if (hasConf) R.drawable.check_circle_24px else null,
                     trailingTint = MaterialTheme.extendedColorScheme.success,
                     onClick = onLoadWgFile
                 )

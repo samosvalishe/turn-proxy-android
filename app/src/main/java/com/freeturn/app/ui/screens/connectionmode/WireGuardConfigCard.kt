@@ -6,10 +6,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
+import com.freeturn.app.data.config.AccessProtocol
 import com.freeturn.app.ui.components.SectionLabel
 import com.freeturn.app.ui.components.SettingsCard
 import com.freeturn.app.ui.components.SettingsEntryRow
@@ -29,11 +31,18 @@ internal fun WireGuardConfigCard(
     onLoadFile: () -> Unit
 ) {
     val configLoaded = wgConfig.isNotBlank()
+    val protocol = remember(wgConfig) { AccessProtocol.of(wgConfig) }
     SectionLabel(stringResource(R.string.connection_config_section))
     SettingsCard {
         SettingsEntryRow(
             iconRes = R.drawable.cloud_download_24px,
             title = stringResource(R.string.load_wg_conf),
+            subtitle = if (configLoaded) {
+                stringResource(
+                    if (protocol == AccessProtocol.AWG) R.string.protocol_awg
+                    else R.string.protocol_wg
+                )
+            } else null,
             trailingRes = if (configLoaded) R.drawable.check_circle_24px else null,
             trailingTint = MaterialTheme.extendedColorScheme.success,
             enabled = !privacyMode,

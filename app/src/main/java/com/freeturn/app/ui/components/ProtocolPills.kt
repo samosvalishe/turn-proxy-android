@@ -17,18 +17,26 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
+import com.freeturn.app.data.config.AccessProtocol
 import com.freeturn.app.ui.theme.Spacing
 
 /**
- * Чипы доступа: протокол (WireGuard/прокси) + признак обфускации. Общий вид для
- * sheet выдачи доступа и sheet импорта.
+ * Чипы доступа: протокол (WireGuard/AmneziaWG/прокси) + признак обфускации.
+ * Общий вид для sheet выдачи доступа и sheet импорта.
  */
 @Composable
-fun ProtocolPills(wg: Boolean, obfOn: Boolean) {
+fun ProtocolPills(protocol: AccessProtocol, obfOn: Boolean) {
     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Pill(
-            iconRes = if (wg) R.drawable.vpn_key_24px else R.drawable.public_24px,
-            text = stringResource(if (wg) R.string.share_protocol_wg else R.string.share_protocol_proxy),
+            iconRes = if (protocol == AccessProtocol.PROXY) R.drawable.public_24px
+            else R.drawable.vpn_key_24px,
+            text = stringResource(
+                when (protocol) {
+                    AccessProtocol.AWG -> R.string.protocol_awg
+                    AccessProtocol.WG -> R.string.protocol_wg
+                    AccessProtocol.PROXY -> R.string.protocol_proxy
+                }
+            ),
             container = MaterialTheme.colorScheme.secondaryContainer,
             content = MaterialTheme.colorScheme.onSecondaryContainer
         )

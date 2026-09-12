@@ -121,7 +121,7 @@ fun ShareConnectionTab(
                             onSetMode(false)
                         },
                         shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                    ) { Text(stringResource(R.string.share_protocol_wg)) }
+                    ) { Text(stringResource(R.string.protocol_wg)) }
                     SegmentedButton(
                         selected = !state.useWg,
                         onClick = {
@@ -129,7 +129,7 @@ fun ShareConnectionTab(
                             onSetMode(true)
                         },
                         shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                    ) { Text(stringResource(R.string.share_protocol_proxy)) }
+                    ) { Text(stringResource(R.string.protocol_proxy)) }
                 }
             }
             ShareProtocolCard(state = state, onRetryInfo = onRetryInfo)
@@ -243,8 +243,8 @@ private fun ShareProtocolCard(state: ShareUiState, onRetryInfo: () -> Unit) {
                             )
                             Text(
                                 stringResource(
-                                    if (wg) R.string.share_protocol_wg
-                                    else R.string.share_protocol_proxy
+                                    if (wg) R.string.protocol_wg
+                                    else R.string.protocol_proxy
                                 ),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.onSurface,

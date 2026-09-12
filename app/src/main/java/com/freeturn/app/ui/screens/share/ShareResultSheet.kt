@@ -92,11 +92,11 @@ fun ShareResultSheet(result: ShareResult, shareInfo: ShareInfo?, onDismiss: () -
                 textAlign = TextAlign.Center
             )
 
-            // Протокол - по факту выданного доступа (result.isWg), обфускация - из share-info.
+            // Протокол - по факту выданного доступа (result.protocol), обфускация - из share-info.
             val obfOn = shareInfo?.let {
                 it.obfProfile.isNotEmpty() && it.obfProfile != ObfProfile.NONE
             } ?: false
-            ProtocolPills(wg = result.isWg, obfOn = obfOn)
+            ProtocolPills(protocol = result.protocol, obfOn = obfOn)
 
             Text(
                 stringResource(R.string.share_result_desc),

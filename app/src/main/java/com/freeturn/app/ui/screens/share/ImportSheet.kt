@@ -32,6 +32,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
@@ -41,6 +42,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
+import com.freeturn.app.data.config.AccessProtocol
 import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.ui.components.EmptyState
 import com.freeturn.app.ui.components.InlineErrorCard
@@ -124,7 +126,7 @@ fun ImportSheet(
             )
 
             ProtocolPills(
-                wg = link.wgConf.isNotBlank(),
+                protocol = remember(link.wgConf) { AccessProtocol.of(link.wgConf) },
                 obfOn = link.obfProfile.isNotEmpty() && link.obfProfile != ObfProfile.NONE
             )
 

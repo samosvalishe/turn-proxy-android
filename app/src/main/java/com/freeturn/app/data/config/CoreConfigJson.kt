@@ -75,8 +75,26 @@ data class CoreConfigJson(
         const val PROXY_MODE_TCP = "tcp"
         const val PROXY_MODE_UDP = "udp"
         const val TUNNEL_MODE_NONE = "none"
-        const val TUNNEL_MODE_WG = "wg"
+        const val TUNNEL_MODE_AWG = "awg"
         const val PLATFORM_MOBILE = "mobile"
+
+        // Зеркало amnezia-ключей парсера ядра (internal/tunnel/wgconf). Только для
+        // подписи в UI: ядру всегда уходит awg, так что расхождение не рвёт связь.
+        private val AMNEZIA_CONFIG_KEYS = setOf(
+            "jc", "jmin", "jmax", "s1", "s2", "s3", "s4",
+            "h1", "h2", "h3", "h4", "headerprotectionkey",
+            "i1", "i2", "i3", "i4", "i5",
+            "contentpaddingaddition", "rekeyaftertime", "rekeytimeout",
+            "rejectaftertime", "keepalivetimeout", "maxhandshakeattempts",
+            "randomtrailers", "disablecookies"
+        )
+
+        fun isAmneziaConfig(conf: String): Boolean =
+            conf.lineSequence().any { rawLine ->
+                val line = rawLine.substringBefore('#').substringBefore(';').trim()
+                val key = line.substringBefore('=').trim().lowercase()
+                key in AMNEZIA_CONFIG_KEYS
+            }
 
         fun encode(cfg: CoreConfigJson): String = json.encodeToString(cfg)
     }
@@ -143,7 +161,9 @@ fun ClientConfig.toCoreJson(
             log = CoreConfigJson.Log(debug = debugMode),
             kcp = if (tcpMode) srv.kcp.toCoreJson() else null,
             tunnel = CoreConfigJson.Tunnel(
-                mode = if (wireGuardActive) CoreConfigJson.TUNNEL_MODE_WG
+                // Бэкенд туннеля один: awg лишь не глушит маскировку, на чистом
+                // WG-конфиге равен wg - а wg молча срезал бы amnezia-параметры.
+                mode = if (wireGuardActive) CoreConfigJson.TUNNEL_MODE_AWG
                 else CoreConfigJson.TUNNEL_MODE_NONE,
                 config = if (wireGuardActive) wireGuardConfig else "",
                 mtu = ClientConfig.WG_MTU,
