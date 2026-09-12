@@ -174,7 +174,8 @@ class ProxyService : VpnService() {
         // Лог рестарта не чистим: строка "Процесс запущен" от App - единственный след того,
         // что процесс убивали, и после clearLogs от неё ничего бы не осталось.
         if (fresh) ProxyStore.clearLogs()
-        ProxyStore.log(if (fresh) "Запуск прокси" else "Восстановление после перезапуска процесса")
+        val startReason = if (fresh) "команда START" else "возврат сервиса"
+        ProxyStore.log("Сессия $session: запуск ($startReason)")
 
         if (cfg.serverAddress.isBlank() || cfg.vkLink.isBlank()) {
             fail("Не заполнены настройки клиента")
@@ -411,7 +412,7 @@ class ProxyService : VpnService() {
         notifier.cancelCaptcha()
         // Причина обязательна: по логу после гибернации надо отличать команду пользователя
         // от ошибки ядра и от отзыва VPN системой.
-        ProxyStore.log("Остановка: $reason")
+        ProxyStore.log("Сессия $session: остановка ($reason)")
         prefs.setCleanExit(true)
         ProxyStore.finish()
         releaseAll()

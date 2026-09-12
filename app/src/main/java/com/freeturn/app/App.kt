@@ -41,7 +41,7 @@ class App : Application() {
         ProxyStore.attachFile(LogFile(File(filesDir, "logs")))
         // Строка в середине лога сессии = процесс убивали и подняли заново; без неё
         // sticky-рестарт неотличим от обычной работы.
-        ProxyStore.log("Процесс запущен")
+        ProxyStore.log("Процесс запущен pid=${android.os.Process.myPid()}")
         // Раз за процесс: в onCreate сервиса эти транзакции доставались главному потоку
         // ровно на нажатии кнопки.
         ProxyNotifier.createChannels(this)
