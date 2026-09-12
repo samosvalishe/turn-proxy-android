@@ -45,7 +45,10 @@ class ProxyViewModel(
         viewModelScope.launch {
             if (!prefs.autoConnectFlow.first()) return@launch
             if (!prefs.proxyDesiredFlow.first()) return@launch
-            if (prefs.clientConfigFlow.first().wireGuardActive && !vpnConsent()) return@launch
+            val tunnel = prefs.clientConfigFlow.first().wireGuardActive
+            // Sticky-старт мог занять сессию, пока читали DataStore.
+            if (engine.isRunning || ProxyStore.status.value.phase != ProxyPhase.Idle) return@launch
+            if (tunnel && !vpnConsent()) return@launch
             launcher.start()
         }
     }

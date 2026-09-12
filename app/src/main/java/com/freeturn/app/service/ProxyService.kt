@@ -109,6 +109,7 @@ class ProxyService : VpnService() {
         // stopSelf(startId), а не stopSelf(): START, пришедший следом за отменой,
         // делает её неактуальной - иначе он поднял бы сессию в умирающем сервисе.
         if (intent?.action == ProxyActions.STOP) {
+            prefs.setProxyDesired(false)
             shutdown("команда STOP")
             stopSelf(startId)
             return START_NOT_STICKY
@@ -146,6 +147,7 @@ class ProxyService : VpnService() {
                 // сервис. Без этой проверки он поднимал сессию заново - и так по кругу,
                 // сжигая персону и кредиты VK на каждом витке.
                 if (!fresh && !prefs.proxyDesiredFlow.first()) {
+                    if (!isCurrent(next)) return@launch
                     ProxyStore.log("Сервис возвращён системой, но прокси выключен - не поднимаем")
                     shutdown("возврат сервиса без намерения")
                     stopSelf(lastStartId)
@@ -154,6 +156,7 @@ class ProxyService : VpnService() {
                 // Прошлая сессия могла ещё подниматься: сначала ядро отпускает свою
                 // копию fd, только потом закрываем прошлый интерфейс.
                 engine.stop(previous)
+                if (!isCurrent(next)) return@launch
                 // Хвост прошлой сессии целиком: раньше снимался только tun, а её SOCKS5
                 // оставался на порту - новая падала бы с "Address already in use".
                 releaseSessionOf(next)
@@ -166,6 +169,7 @@ class ProxyService : VpnService() {
     /** [fresh] - команда пользователя; иначе это возврат сервиса после смерти процесса. */
     private suspend fun startSession(session: Long, fresh: Boolean) {
         val cfg = prefs.clientConfigFlow.first()
+        if (!isCurrent(session)) return
         ProxyStore.setLogsEnabled(cfg.logsEnabled)
         // Лог рестарта не чистим: строка "Процесс запущен" от App - единственный след того,
         // что процесс убивали, и после clearLogs от неё ничего бы не осталось.
@@ -178,9 +182,11 @@ class ProxyService : VpnService() {
         }
 
         val json = buildConfigJson(cfg)
+        if (!isCurrent(session)) return
         val argv = try {
             engine.configToArgs(json)
         } catch (e: Exception) {
+            if (!isCurrent(session)) return
             fail("Конфиг отклонён ядром: ${e.message}")
             return
         }
@@ -203,6 +209,7 @@ class ProxyService : VpnService() {
             // На старте интерфейс обязателен: без него сессии просто нет.
             when (val tunResult = openTun(cfg, session, hotspot)) {
                 is TunResult.Failed -> {
+                    if (!isCurrent(session)) return
                     fail(tunResult.message)
                     return
                 }
@@ -214,6 +221,7 @@ class ProxyService : VpnService() {
         val started = try {
             engine.start(session, json, tun?.let { tunHandle }, protector)
         } catch (e: Exception) {
+            if (!isCurrent(session)) return
             fail("Ядро не запустилось: ${e.message}")
             return
         }

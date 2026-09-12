@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -62,6 +63,18 @@ class AppPreferences(context: Context) {
     @OptIn(ExperimentalCoroutinesApi::class)
     private val desiredScope =
         CoroutineScope(Dispatchers.IO.limitedParallelism(1) + SupervisorJob())
+
+    // Снимаем старую метку до записи состояния новой сессии, ровно один раз за процесс.
+    private val previousUncleanExit = desiredScope.async {
+        var unclean = false
+        context.dataStore.edit { prefs ->
+            unclean = prefs[CLEAN_EXIT] == false
+            prefs[CLEAN_EXIT] = true
+        }
+        unclean
+    }
+
+    suspend fun previousSessionUnclean(): Boolean = previousUncleanExit.await()
 
     private fun <T> prefFlow(transform: (Preferences) -> T): Flow<T> =
         context.dataStore.data
@@ -147,6 +160,7 @@ class AppPreferences(context: Context) {
     /** Не suspend по той же причине, что и [setProxyDesired]. */
     fun setCleanExit(clean: Boolean) {
         desiredScope.launch {
+            previousUncleanExit.await()
             context.dataStore.edit { prefs -> prefs[CLEAN_EXIT] = clean }
         }
     }

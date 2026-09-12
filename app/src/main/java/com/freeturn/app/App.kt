@@ -13,7 +13,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -51,12 +50,11 @@ class App : Application() {
         observeWidgetState()
     }
 
-    // Прошлый процесс не дошёл до штатной остановки - его убили с живой сессией. Без
-    // этой строки убийство неотличимо от обычного перезапуска приложения.
+    // Незакрытая сессия не доказывает причину завершения процесса.
     private fun reportPreviousExit() {
         scope.launch {
-            if (appPreferences.cleanExitFlow.first()) return@launch
-            ProxyStore.log("Прошлый процесс убит с активной сессией", LogLevel.Warning)
+            if (!appPreferences.previousSessionUnclean()) return@launch
+            ProxyStore.log("Предыдущая сессия завершилась без штатной остановки", LogLevel.Warning)
         }
     }
 
