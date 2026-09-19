@@ -153,10 +153,6 @@ class AppPreferences(context: Context) {
         }
     }
 
-    // false на старте сессии, true при штатной остановке: если процесс убит системой,
-    // до записи true дело не доходит, и следующий запуск это увидит.
-    val cleanExitFlow: Flow<Boolean> = prefFlow { prefs -> prefs[CLEAN_EXIT] ?: true }
-
     /** Не suspend по той же причине, что и [setProxyDesired]. */
     fun setCleanExit(clean: Boolean) {
         desiredScope.launch {

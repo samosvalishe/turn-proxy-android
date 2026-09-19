@@ -4,15 +4,27 @@
 -renamesourcefileattribute SourceFile
 
 # ── JSch ──────────────────────────────────────────────────────────────────────
-# JSch загружает криптографические алгоритмы через reflection по имени класса.
-# Без этого правила R8 удалит/переименует нужные классы и SSH не будет работать.
--keep class com.jcraft.jsch.** { *; }
+-keep class * implements com.jcraft.jsch.Cipher { <init>(); }
+-keep class * implements com.jcraft.jsch.Compression { <init>(); }
+-keep class * implements com.jcraft.jsch.DH { <init>(); }
+-keep class * implements com.jcraft.jsch.ECDH { <init>(); }
+-keep class * implements com.jcraft.jsch.GSSContext { <init>(); }
+-keep class * implements com.jcraft.jsch.HASH { <init>(); }
+-keep class * implements com.jcraft.jsch.KDF { <init>(); }
+-keep class * implements com.jcraft.jsch.KEM { <init>(); }
+-keep class * extends com.jcraft.jsch.KeyExchange { <init>(); }
+-keep class * implements com.jcraft.jsch.KeyPairGenDSA { <init>(); }
+-keep class * implements com.jcraft.jsch.KeyPairGenECDSA { <init>(); }
+-keep class * implements com.jcraft.jsch.KeyPairGenEdDSA { <init>(); }
+-keep class * implements com.jcraft.jsch.KeyPairGenRSA { <init>(); }
+-keep class * implements com.jcraft.jsch.MAC { <init>(); }
+-keep class * implements com.jcraft.jsch.Random { <init>(); }
+-keep class * implements com.jcraft.jsch.Signature { <init>(); }
+-keep class * extends com.jcraft.jsch.UserAuth { <init>(); }
+-keep class * implements com.jcraft.jsch.XDH { <init>(); }
 -dontwarn com.jcraft.jsch.**
 
-# ── Bouncy Castle (Ed25519 / curve25519 / chacha20) ───────────────────────────
-# mwiede/jsch 2.x подгружает алгоритмы BC через reflection. R8 стрипает эти
-# классы в release -> Ed25519-ключи и современный KEX не работают.
--keep class org.bouncycastle.** { *; }
+# ── Bouncy Castle ─────────────────────────────────────────────────────────────
 -dontwarn org.bouncycastle.**
 -dontwarn javax.naming.**
 

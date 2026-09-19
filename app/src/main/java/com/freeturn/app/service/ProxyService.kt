@@ -116,10 +116,6 @@ class ProxyService : VpnService() {
             return START_NOT_STICKY
         }
         lastStartId = startId
-        // Sticky-рестарт вернул сервис без intent: своей заявки у экземпляра нет, а
-        // гасить живую сессию при смерти он обязан - иначе ядро остаётся крутиться,
-        // а его копия tun-дескриптора держит VPN поднятым до конца процесса.
-        if (intent == null && engine.isRunning) session = engine.currentSession
 
         // startForeground - первым, иначе ForegroundServiceDidNotStartInTimeException.
         try {

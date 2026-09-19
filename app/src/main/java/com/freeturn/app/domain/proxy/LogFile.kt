@@ -94,7 +94,6 @@ class LogFile(dir: File) {
     private fun LogLevel.tag(): String = when (this) {
         LogLevel.Error -> "E"
         LogLevel.Warning -> "W"
-        LogLevel.Success -> "S"
         LogLevel.Event -> "*"
         LogLevel.Plain -> " "
     }

@@ -248,7 +248,6 @@ private fun LogLine(entry: LogEntry) {
     val textColor = when (level) {
         LogLevel.Error   -> MaterialTheme.colorScheme.error
         LogLevel.Warning -> MaterialTheme.extendedColorScheme.warning
-        LogLevel.Success -> MaterialTheme.extendedColorScheme.success
         LogLevel.Event   -> MaterialTheme.colorScheme.primary
         LogLevel.Plain   -> MaterialTheme.colorScheme.onSurfaceVariant
     }
