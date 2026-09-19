@@ -3,8 +3,7 @@ package com.freeturn.app.data
 /** Разбор argv-строки от ядра (`Mobile.configToArgs`) для показа пользователю. */
 object CoreCommand {
 
-    // Лог виден на экране и шарится пользователем.
-    private val SENSITIVE_FLAGS = setOf("-peer", "-link", "-obf-key", "-turn", "-client-id")
+    private val SENSITIVE_FLAGS = setOf("-peer", "-links", "-obf-key", "-turn", "-client-id", "-sub")
 
     private const val MASK = "••••••"
 

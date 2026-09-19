@@ -4,4 +4,6 @@
     <!-- DataStore хранит профили с SSH-секретами в открытом виде - не бэкапим.
          Перенос - через зашифрованный паролем экспорт/импорт. -->
     <exclude domain="file" path="datastore/"/>
+    <!-- Лог сессии: при выключенной приватности в нём peer, ссылка VK, obf-ключ. -->
+    <exclude domain="file" path="logs/"/>
 </full-backup-content>
