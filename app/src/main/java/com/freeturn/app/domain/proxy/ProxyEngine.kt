@@ -114,6 +114,7 @@ class ProxyEngine(private val stateDir: String) {
                 // Перед стартом, а не в init: тут уже IO-поток, и загрузка нативной
                 // библиотеки не встаёт поперёк создания графа DI.
                 Mobile.setStateDir(stateDir)
+                Mobile.setLogBuffer(false)
                 Mobile.setEventSink(sink)
                 // Только при туннеле: в прокси-режиме protect увёл бы ядро мимо чужого
                 // активного VPN - поведение, которого сейчас нет.

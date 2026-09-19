@@ -64,18 +64,12 @@ object ProxyStore {
     fun fail(message: String) {
         val generation = errorSeq.incrementAndGet()
         _status.value = ProxyStatus(phase = ProxyPhase.Error, error = message)
-        scope.launch {
-            delay(ERROR_RESET_MS)
-            // Своё поколение: за 4 секунды состояние могла сменить и новая ошибка,
-            // и ядро - гасить чужое нельзя.
-            if (errorSeq.get() == generation && _status.value.phase == ProxyPhase.Error) idle()
-        }
+        scheduleErrorReset(generation)
     }
 
     /** Фаза от ядра. Момент подключения ставится один раз - рестарт его не сбивает. */
     fun setPhase(phase: ProxyPhase, active: Int, total: Int, error: String = "") {
-        // Ошибка от ядра - своё поколение: висящий таймер прошлого fail() её не снимет.
-        if (phase == ProxyPhase.Error) errorSeq.incrementAndGet()
+        if (phase == ProxyPhase.Error) scheduleErrorReset(errorSeq.incrementAndGet())
         _status.update {
             val connected = if (phase == ProxyPhase.Connected) {
                 it.connectedSince ?: SystemClock.elapsedRealtime()
@@ -83,6 +77,13 @@ object ProxyStore {
                 it.connectedSince
             }
             it.copy(phase = phase, active = active, total = total, error = error, connectedSince = connected)
+        }
+    }
+
+    private fun scheduleErrorReset(generation: Long) {
+        scope.launch {
+            delay(ERROR_RESET_MS)
+            if (errorSeq.get() == generation && _status.value.phase == ProxyPhase.Error) idle()
         }
     }
 
