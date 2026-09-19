@@ -16,6 +16,7 @@ import com.freeturn.app.R
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.CoreCommand
 import com.freeturn.app.data.config.ClientConfig
+import com.freeturn.app.data.config.coreDnsServers
 import com.freeturn.app.data.config.toCoreJson
 import com.freeturn.app.domain.proxy.LogLevel
 import com.freeturn.app.domain.proxy.ProxyEngine
@@ -304,7 +305,7 @@ class ProxyService : VpnService() {
         ProxyStore.log("Смена сети - переподключение (сон с прошлой проверки $slept c)")
         scope.launch {
             val cfg = prefs.clientConfigFlow.first()
-            engine.reconnect(if (cfg.useCarrierDns) network.physicalDnsServers() else "")
+            engine.reconnect(cfg.coreDnsServers { network.physicalDnsServers() }.joinToString(","))
         }
     }
 

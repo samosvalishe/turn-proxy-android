@@ -111,12 +111,7 @@ fun ClientConfig.toCoreJson(
     carrierDns: String? = null,
     ownClientId: String = "",
 ): String {
-    val manualDns = DnsList.normalize(customDns)
-    val dnsServers = when {
-        manualDns.isNotBlank() -> manualDns.split(",")
-        useCarrierDns -> carrierDns?.split(",").orEmpty()
-        else -> emptyList()
-    }.map { it.trim() }.filter { it.isNotEmpty() }
+    val dnsServers = coreDnsServers { carrierDns }
 
     val obfOn = srv.obfEnabled && ObfProfile.isValidKey(srv.obfKey)
     // Ядро поднимает встроенный туннель только поверх udp; UI тоже гасит выбор tcp.
@@ -170,6 +165,15 @@ fun ClientConfig.toCoreJson(
             ),
         )
     )
+}
+
+fun ClientConfig.coreDnsServers(carrierDns: () -> String?): List<String> {
+    val manualDns = DnsList.normalize(customDns)
+    return when {
+        manualDns.isNotBlank() -> manualDns.split(",")
+        useCarrierDns -> carrierDns()?.split(",").orEmpty()
+        else -> emptyList()
+    }.map { it.trim() }.filter { it.isNotEmpty() }
 }
 
 private fun KcpProfile.toCoreJson() = CoreConfigJson.Kcp(

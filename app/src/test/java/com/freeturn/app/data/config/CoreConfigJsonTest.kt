@@ -149,6 +149,15 @@ class CoreConfigJsonTest {
     }
 
     @Test
+    fun handoverDnsKeepsManualList() {
+        val manual = base.copy(useCarrierDns = true, customDns = "1.1.1.1")
+        assertEquals(listOf("1.1.1.1"), manual.coreDnsServers { error("carrier queried") })
+
+        val carrier = base.copy(useCarrierDns = true)
+        assertEquals(listOf("10.0.0.1", "10.0.0.2"), carrier.coreDnsServers { "10.0.0.1, 10.0.0.2" })
+    }
+
+    @Test
     fun obfNeedsValidKey() {
         val srv = ServerOpts(obfProfile = ObfProfile.RTPOPUS, obfKey = "short")
         val obf = parse(base, srv)["obf"]!!.jsonObject

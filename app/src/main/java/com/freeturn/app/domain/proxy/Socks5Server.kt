@@ -1,13 +1,12 @@
 package com.freeturn.app.domain.proxy
 
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancelChildren
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.EOFException
 import java.io.InputStream
 import java.io.OutputStream
@@ -20,6 +19,8 @@ import java.net.Socket
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 import kotlin.coroutines.coroutineContext
 
 /**
@@ -32,18 +33,21 @@ import kotlin.coroutines.coroutineContext
  * ([protect]), иначе ответы в локальную сеть уехали бы в туннель.
  *
  * Слушает 0.0.0.0 без авторизации: открыт всей локальной сети, не только клиентам
- * точки доступа.
+ * точки доступа. Цели на самом телефоне (loopback) закрыты.
+ *
+ * Одноразовый: после [stop] экземпляр не перезапускается.
  */
 class Socks5Server(
     private val protect: (Socket) -> Boolean,
     private val port: Int = DEFAULT_PORT,
 ) {
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val executor = Executors.newCachedThreadPool()
+    private val scope = CoroutineScope(executor.asCoroutineDispatcher() + SupervisorJob())
+    private val sockets = ConcurrentHashMap.newKeySet<Socket>()
 
     // Слушающий сокет - под монитором: bind идёт на потоке вызывающего, чтобы
     // BindException был виден ему, а не утонул в корутине.
-    private var serverSocket: ServerSocket? = null
-    private var acceptJob: Job? = null
+    @Volatile private var serverSocket: ServerSocket? = null
 
     @Synchronized
     fun start() {
@@ -55,7 +59,7 @@ class Socks5Server(
             return
         }
         serverSocket = socket
-        acceptJob = scope.launch { acceptLoop(socket) }
+        scope.launch { acceptLoop(socket) }
         ProxyStore.log("SOCKS5: раздача туннеля на $BIND_ADDRESS:$port (только TCP)")
     }
 
@@ -63,10 +67,11 @@ class Socks5Server(
     fun stop() {
         val socket = serverSocket ?: return
         serverSocket = null
-        // Сокет закрываем до отмены: accept() блокирующий и на отмену корутины не смотрит.
-        try { socket.close() } catch (_: Exception) {}
-        acceptJob = null
-        scope.coroutineContext.cancelChildren()
+        socket.closeQuietly()
+        sockets.forEach { it.closeQuietly() }
+        sockets.clear()
+        scope.cancel()
+        executor.shutdown()
         ProxyStore.log("SOCKS5: раздача остановлена")
     }
 
@@ -85,44 +90,53 @@ class Socks5Server(
         }
     }
 
-    private suspend fun handleClient(client: Socket) = withContext(Dispatchers.IO) {
+    private suspend fun handleClient(client: Socket) = coroutineScope {
         var target: Socket? = null
+        track(client)
         try {
             // Обратный канал - мимо туннеля: приложение теперь внутри tun, и ответы
             // клиенту в локальную сеть без этого ушли бы в туннель.
             protect(client)
+            client.soTimeout = HANDSHAKE_TIMEOUT_MS
 
             val input = client.getInputStream()
             val output = client.getOutputStream()
 
-            if (!negotiate(input, output)) return@withContext
+            if (!negotiate(input, output)) return@coroutineScope
 
-            if (input.readByte() != VERSION) return@withContext
+            if (input.readByte() != VERSION) return@coroutineScope
             val command = input.readByte()
             input.readByte() // RSV
             val addressType = input.readByte()
 
             if (command != CMD_CONNECT) {
                 sendReply(output, REPLY_COMMAND_NOT_SUPPORTED)
-                return@withContext
+                return@coroutineScope
             }
             // Длину неизвестного типа адреса не угадать - дочитать до порта нечем,
             // поэтому соединение после ответа закрывается.
             val host = readHost(input, addressType) ?: run {
                 sendReply(output, REPLY_ADDRESS_TYPE_NOT_SUPPORTED)
-                return@withContext
+                return@coroutineScope
             }
-            val targetPort = readPort(input)
+            val address = InetSocketAddress(host, readPort(input))
+            val ip = address.address
+            if (ip != null && (ip.isLoopbackAddress || ip.isAnyLocalAddress)) {
+                sendReply(output, REPLY_NOT_ALLOWED)
+                return@coroutineScope
+            }
 
             val socket = Socket()
             target = socket
+            track(socket)
             try {
-                socket.connect(InetSocketAddress(host, targetPort), CONNECT_TIMEOUT_MS)
+                socket.connect(address, CONNECT_TIMEOUT_MS)
             } catch (e: Exception) {
                 sendReply(output, replyFor(e))
-                return@withContext
+                return@coroutineScope
             }
             sendReply(output, REPLY_SUCCESS)
+            client.soTimeout = 0
 
             val upstream = launch { pipe(input, socket.getOutputStream(), socket) }
             val downstream = launch { pipe(socket.getInputStream(), output, client) }
@@ -131,9 +145,16 @@ class Socks5Server(
         } catch (_: EOFException) {
         } catch (_: Exception) {
         } finally {
-            try { client.close() } catch (_: Exception) {}
-            try { target?.close() } catch (_: Exception) {}
+            client.closeQuietly()
+            target?.closeQuietly()
+            sockets.remove(client)
+            target?.let(sockets::remove)
         }
+    }
+
+    private fun track(socket: Socket) {
+        sockets.add(socket)
+        if (serverSocket == null) socket.closeQuietly()
     }
 
     /** false - клиент не предложил "без авторизации" либо поздоровался не по протоколу. */
@@ -185,11 +206,7 @@ class Socks5Server(
      * встречная сторона держала бы соединение открытым, а обе `join` не возвращались бы
      * до таймаута где-то в сети.
      */
-    private suspend fun pipe(
-        source: InputStream,
-        destination: OutputStream,
-        sink: Socket,
-    ) = withContext(Dispatchers.IO) {
+    private fun pipe(source: InputStream, destination: OutputStream, sink: Socket) {
         val buffer = ByteArray(BUFFER_SIZE)
         try {
             while (true) {
@@ -211,6 +228,7 @@ class Socks5Server(
         private const val BACKLOG = 50
         private const val BUFFER_SIZE = 8192
         private const val CONNECT_TIMEOUT_MS = 10_000
+        private const val HANDSHAKE_TIMEOUT_MS = 15_000
 
         private const val VERSION = 5
         private const val METHOD_NO_AUTH = 0x00
@@ -222,11 +240,20 @@ class Socks5Server(
 
         private const val REPLY_SUCCESS = 0x00
         private const val REPLY_GENERAL_FAILURE = 0x01
+        private const val REPLY_NOT_ALLOWED = 0x02
         private const val REPLY_HOST_UNREACHABLE = 0x04
         private const val REPLY_CONNECTION_REFUSED = 0x05
         private const val REPLY_COMMAND_NOT_SUPPORTED = 0x07
         private const val REPLY_ADDRESS_TYPE_NOT_SUPPORTED = 0x08
     }
+}
+
+private fun Socket.closeQuietly() {
+    try { close() } catch (_: Exception) {}
+}
+
+private fun ServerSocket.closeQuietly() {
+    try { close() } catch (_: Exception) {}
 }
 
 private fun InputStream.readByte(): Int = read().also { if (it == -1) throw EOFException() }
