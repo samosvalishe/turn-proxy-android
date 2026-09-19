@@ -4,7 +4,10 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.freeturn.app.data.AppPreferences
+import com.freeturn.app.data.DnsList
 import com.freeturn.app.data.config.ClientConfig
+import com.freeturn.app.data.config.DnsMode
+import com.freeturn.app.data.config.HostPort
 import com.freeturn.app.data.config.KcpProfile
 import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.data.config.ProxyMode
@@ -138,11 +141,16 @@ class ImportViewModel(
                 tunnelTransport = if (wgConf.isNotEmpty()) TunnelTransport.WIREGUARD
                 else TunnelTransport.NONE,
                 wireGuardConfig = wgConf,
-                clientId = link.clientId.trim()
+                clientId = link.clientId.trim(),
+                dnsMode = link.dnsMode.takeIf { it in DnsMode.VALUES } ?: DnsMode.AUTO,
+                customDns = DnsList.normalize(link.dnsServers),
+                manualCaptcha = link.manualCaptcha,
+                localPort = link.listen.takeIf(HostPort::isValid) ?: ClientConfig.DEFAULT_LOCAL_PORT
             ),
             opts = ServerOpts(
                 obfProfile = link.obfProfile.ifBlank { ObfProfile.NONE },
                 obfKey = link.obfKey,
+                obfTimingMs = link.obfTimingMs.coerceIn(0, ObfProfile.TIMING_MAX),
                 proxyMode = if (link.mode == ProxyMode.TCP) ProxyMode.TCP else ProxyMode.UDP,
                 kcp = link.kcp ?: KcpProfile.DEFAULT
             )

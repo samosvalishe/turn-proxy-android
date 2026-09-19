@@ -32,6 +32,7 @@ object ShareLinkBuilder {
             kcp = server.opts.kcp.takeIf { tcpMode && it != KcpProfile.DEFAULT },
             obfProfile = if (ObfProfile.isValidKey(obfKey)) obfProfile else "",
             obfKey = if (ObfProfile.isValidKey(obfKey)) obfKey else "",
+            obfTimingMs = server.opts.obfTimingMs,
             n = server.client.threads,
             streamsPerCred = server.client.streamsPerCred,
             clientId = clientId.trim(),
