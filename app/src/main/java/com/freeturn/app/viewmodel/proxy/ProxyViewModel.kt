@@ -26,9 +26,6 @@ class ProxyViewModel(
 
     fun stop() = launcher.stop()
 
-    /** Окно видно - только на это время ядро опрашивают на метрики. */
-    fun setMetricsVisible(visible: Boolean) = engine.setMetricsEnabled(visible)
-
     /**
      * Возврат приложения на передний план. Живую сессию не трогаем - открытие окна
      * не событие сети, а пинок ядру рециклил бы рабочие аллокации. Мёртвую поднимаем

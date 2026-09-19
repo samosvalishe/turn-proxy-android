@@ -13,8 +13,6 @@ data class ProxyStatus(
     val phase: ProxyPhase = ProxyPhase.Idle,
     val active: Int = 0,
     val total: Int = 0,
-    val rxRate: Long = 0,
-    val txRate: Long = 0,
     val tunnelUp: Boolean = false,
     val connectedSince: Long? = null,
     val error: String = "",

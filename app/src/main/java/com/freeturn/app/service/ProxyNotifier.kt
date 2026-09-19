@@ -75,7 +75,6 @@ class ProxyNotifier(private val service: Service) {
 
     fun update(status: ProxyStatus, tunnelMode: Boolean) {
         if (status.captchaUrl.isNotEmpty()) showCaptcha() else cancelCaptcha()
-        // Метрики тикают каждые 2 с: перерисовываем, только если что-то видимое изменилось.
         if (status.visible() == shown?.visible()) return
         shown = status
         notify(NOTIF_ID_FG, build(status, tunnelMode))
@@ -89,10 +88,7 @@ class ProxyNotifier(private val service: Service) {
             status.phase == ProxyPhase.Error -> service.getString(R.string.notif_proxy_connect_error)
             else -> service.getString(R.string.notif_proxy_connecting)
         }
-        // Сразу после коннекта метрик ещё нет (поллер тикает раз в 2 с) - строка была бы пустой.
-        val details = listOfNotNull(streamsText(status), speedText(status))
-            .takeIf { connected && it.isNotEmpty() }
-            ?.joinToString(" • ")
+        val details = streamsText(status)?.takeIf { connected }
             ?: service.getString(R.string.notif_proxy_title)
         return NotificationCompat.Builder(service, CHANNEL_PROXY)
             .setContentTitle(title)
@@ -111,16 +107,6 @@ class ProxyNotifier(private val service: Service) {
             status.active,
             status.total
         ) else null
-
-    private fun speedText(status: ProxyStatus): String? =
-        if (status.rxRate == 0L && status.txRate == 0L) null
-        else "↓ ${rate(status.rxRate)} ↑ ${rate(status.txRate)}"
-
-    private fun rate(bytes: Long): String = when {
-        bytes < 1024 -> "$bytes B/s"
-        bytes < 1024 * 1024 -> "${bytes / 1024} KB/s"
-        else -> String.format(Locale.US, "%.1f MB/s", bytes / (1024f * 1024f))
-    }
 
     /** Дедуп: пока предыдущий алерт не закрыт - повторно не шумим. */
     private fun showCaptcha() {
@@ -155,6 +141,4 @@ class ProxyNotifier(private val service: Service) {
     }
 }
 
-/** Что видно в нотификации: скорость округляем, чтобы не дёргать её каждый тик. */
-private fun ProxyStatus.visible() =
-    listOf(phase, active, total, rxRate / 1024, txRate / 1024)
+private fun ProxyStatus.visible() = listOf(phase, active, total)

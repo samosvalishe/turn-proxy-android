@@ -5,17 +5,13 @@ import com.freeturn.core.mobile.Mobile
 import com.freeturn.core.mobile.Protector
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicLong
-import java.util.concurrent.atomic.AtomicReference
 
 /** Защита сокетов ядра от заворачивания в свой же VpnService. Реализация - в `service`. */
 fun interface SocketProtector {
@@ -61,14 +57,6 @@ class ProxyEngine(private val stateDir: String) {
     private val sink = CoreEventSink()
     private var protector: Protector? = null
 
-    // getAndSet, а не volatile-поле: снимают поллер и stop (до лока), и startPolling
-    // (под локом) - при простом чтении-записи ссылка на живой цикл терялась бы.
-    private val poller = AtomicReference<Job?>(null)
-
-    // Метрики нужны только открытому экрану: в фоне их никто не читает (нотификация
-    // скорости не показывает), а опрос будил бы процесс каждые 2 c всю сессию.
-    @Volatile private var metricsWanted = false
-
     // Заявки: последняя выданная и последняя отменённая.
     private val issued = AtomicLong(0)
     private val cancelled = AtomicLong(0)
@@ -79,9 +67,6 @@ class ProxyEngine(private val stateDir: String) {
     val version: String get() = Mobile.version()
 
     val isRunning: Boolean get() = running != 0L
-
-    /** Заявка живой сессии; 0 - ядро стоит. Для хоста, поднятого системой без своей заявки. */
-    val currentSession: Long get() = running
 
     /**
      * Заявка на сессию. Владелец гасит по этому id только свою: пока он
@@ -128,7 +113,7 @@ class ProxyEngine(private val stateDir: String) {
             running = 0L
             throw e
         }
-        startPolling()
+        ProxyStore.setTunnelUp(tun != null)
         true
     }
 
@@ -146,10 +131,7 @@ class ProxyEngine(private val stateDir: String) {
         // Флаг снимаем до лока: Mobile.stop блокирует до фактической остановки (в
         // туннеле - секунды), и всё это время живое ядро шлёт события. Иначе после
         // "стоп" всплывает капча уже погашенной сессии.
-        if (running == session) {
-            running = 0L
-            stopPolling()
-        }
+        if (running == session) running = 0L
         // За лок идём всегда, даже увидев running == 0: наша заявка могла быть уже
         // внутри start, за этим самым локом, и вот-вот поднять ядро (стоп сразу
         // после старта). Ранний выход по неатомарному чтению оставлял её жить.
@@ -172,7 +154,6 @@ class ProxyEngine(private val stateDir: String) {
 
     private suspend fun stopLocked() {
         running = 0L
-        stopPolling()
         withContext(Dispatchers.IO + NonCancellable) {
             // Отписка раньше остановки - ядро гаснет не мгновенно.
             Mobile.setEventSink(null)
@@ -180,18 +161,6 @@ class ProxyEngine(private val stateDir: String) {
             Mobile.stop()
         }
         protector = null
-    }
-
-    /** Экран с метриками виден. Выключение обнуляет скорости - иначе они замрут на экране. */
-    fun setMetricsEnabled(enabled: Boolean) {
-        if (metricsWanted == enabled) return
-        metricsWanted = enabled
-        if (!enabled) {
-            stopPolling()
-            ProxyStore.clearRates()
-            return
-        }
-        if (running != 0L) startPolling()
     }
 
     /**
@@ -240,33 +209,6 @@ class ProxyEngine(private val stateDir: String) {
     /** Эквивалентная CLI-строка для экрана "команда" (гарантированно совпадает с ядром). */
     fun configToArgs(configJson: String): String = Mobile.configToArgs(configJson)
 
-    /** Пустая строка - конфиг валиден. */
-    fun validate(configJson: String): String = Mobile.validateConfig(configJson)
-
-    /** Метрики: событий на них нет, ядро отдаёт только снимок. */
-    private fun startPolling() {
-        if (!metricsWanted) return
-        val next = scope.launch {
-            while (isActive && running != 0L) {
-                delay(POLL_INTERVAL_MS)
-                if (running == 0L) return@launch
-                val snap = Mobile.getState()
-                ProxyStore.setMetrics(
-                    active = snap.streams.toInt(),
-                    total = snap.total.toInt(),
-                    rxRate = snap.rxRate,
-                    txRate = snap.txRate,
-                    tunnelUp = Mobile.tunnelStats().up,
-                )
-            }
-        }
-        poller.getAndSet(next)?.cancel()
-    }
-
-    private fun stopPolling() {
-        poller.getAndSet(null)?.cancel()
-    }
-
     /**
      * Колбэки приходят из горутин Go: блокировать их нельзя, поэтому только
      * запись в StateFlow. После [stop] игнорируются - ядро гаснет не мгновенно,
@@ -288,10 +230,6 @@ class ProxyEngine(private val stateDir: String) {
             if (running == 0L) return
             ProxyStore.setCaptcha(url)
         }
-    }
-
-    private companion object {
-        const val POLL_INTERVAL_MS = 2_000L
     }
 }
 
