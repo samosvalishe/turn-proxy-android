@@ -25,9 +25,6 @@ import com.freeturn.app.domain.UpdateState
 import com.freeturn.app.domain.proxy.ProxyStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,8 +36,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import java.io.IOException
 
 sealed interface ServerCleanupState {
@@ -117,11 +112,6 @@ class SettingsViewModel(
     // Ожидаем DataStore, чтобы дефолт StateFlow не пропустил диалог первой сессии.
     suspend fun batteryPromptShownOnce(): Boolean = prefs.batteryPromptShownFlow.first()
 
-    // Persist мгновенный; сетевые рестарты коалесцируются.
-    private val syncSideEffectMutex = Mutex()
-    private var syncSideEffectJob: Job? = null
-    private val syncSideEffectDebounceMs = 600L
-
     init {
         viewModelScope.launch {
             _initialTgSubscribeShown.value = prefs.tgSubscribeShownFlow.first()
@@ -179,18 +169,6 @@ class SettingsViewModel(
         viewModelScope.launch { prefs.setAutoConnect(enabled) }
     }
 
-    // expectedActiveId не даёт отложенной записи затереть новый активный сервер.
-    fun saveClientConfig(config: ClientConfig, expectedActiveId: String? = null) {
-        viewModelScope.launch {
-            val targetId = expectedActiveId
-                ?: prefs.serversSnapshot.first().activeId ?: return@launch
-            if (!prefs.updateServer(targetId) { it.copy(client = config) }) return@launch
-            if (targetId == prefs.serversSnapshot.first().activeId) {
-                ProxyStore.setLogsEnabled(config.logsEnabled)
-            }
-        }
-    }
-
     fun setSplitTunnelMode(value: String) {
         viewModelScope.launch {
             prefs.updateActiveServer {
@@ -229,18 +207,7 @@ class SettingsViewModel(
             val target = prefs.serversSnapshot.first().list.firstOrNull { it.id == id }
                 ?: return@launch
             prefs.setActiveServerId(target.id)
-
-            if (prefs.restartServerOnSwitchFlow.first()) {
-                orchestrator.restartServerIfRunning()
-            }
-
-            sshRepository.activeSshConfig?.let { prev ->
-                if (prev.ip != target.ssh.ip || prev.port != target.ssh.port) {
-                    sshRepository.disconnect()
-                }
-            }
-
-            orchestrator.restartProxyIfRunning()
+            orchestrator.onActiveServerChanged(target)
         }
     }
 
@@ -289,23 +256,7 @@ class SettingsViewModel(
                 it.copy(client = it.client.copy(syncServerSwitches = enabled))
             }
             if (!changed) return@launch
-            scheduleServerSync()
-        }
-    }
-
-    /** Отложенный рестарт пары сервер+клиент: правки летят пачками, SSH-команда - одна. */
-    private fun scheduleServerSync() {
-        // NonCancellable не даёт новому переключению оборвать SSH-команду на полпути.
-        syncSideEffectJob?.cancel()
-        syncSideEffectJob = viewModelScope.launch {
-            delay(syncSideEffectDebounceMs)
-            syncSideEffectMutex.withLock {
-                if (!prefs.clientConfigFlow.first().syncServerSwitches) return@withLock
-                withContext(NonCancellable) {
-                    orchestrator.restartServerIfRunning()
-                    orchestrator.restartProxyIfRunning()
-                }
-            }
+            orchestrator.scheduleSync()
         }
     }
 
@@ -328,7 +279,7 @@ class SettingsViewModel(
             }
             if (!changed) return@launch
             if (id != null && id != prefs.serversSnapshot.first().activeId) return@launch
-            scheduleServerSync()
+            orchestrator.scheduleSync()
         }
     }
 
@@ -361,14 +312,7 @@ class SettingsViewModel(
                     )
                 )
             }
-            if (changed) {
-                if (sync) {
-                    orchestrator.restartServerIfRunning()
-                } else {
-                    sshRepository.logNote("рестарт сервера пропущен: синхронизация выключена")
-                }
-                orchestrator.restartProxyIfRunning()
-            }
+            if (changed) orchestrator.restartPair(syncServer = sync)
         }
     }
 

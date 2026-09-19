@@ -25,11 +25,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,13 +72,9 @@ fun ClientSetupScreen(
     val effSshIp = server?.ssh?.ip ?: sshConfig.ip
     val effProxyListen = server?.proxyListen ?: activeProxyListen
 
-    // Единая точка записи client-конфига: сервер by-id либо активный.
     fun clientEdit(transform: (ClientConfig) -> ClientConfig) {
-        if (serverId != null) {
-            settingsViewModel.updateServerClient(serverId, transform)
-        } else {
-            settingsViewModel.saveClientConfig(transform(settingsViewModel.clientConfig.value), snapshot.activeId)
-        }
+        val targetId = serverId ?: snapshot.activeId ?: return
+        settingsViewModel.updateServerClient(targetId, transform)
     }
 
     val context = LocalContext.current
@@ -114,12 +112,7 @@ fun ClientSetupScreen(
         }
     }
 
-    // Авто-сохранение с дебаунсом 600 мс.
-    LaunchedEffect(
-        fieldsKey, serverAddress, vkLink, threads, streamsPerCred, localPort, magicTurn, customDns
-    ) {
-        if (!fieldsDirty) return@LaunchedEffect
-        delay(600)
+    fun persistFields() {
         clientEdit { current ->
             current.copy(
                 serverAddress = serverAddress.trim(),
@@ -131,6 +124,21 @@ fun ClientSetupScreen(
                 customDns     = customDns.trim()
             )
         }
+    }
+
+    var pendingSave by remember(fieldsKey) { mutableStateOf(false) }
+    LaunchedEffect(
+        fieldsKey, serverAddress, vkLink, threads, streamsPerCred, localPort, magicTurn, customDns
+    ) {
+        if (!fieldsDirty) return@LaunchedEffect
+        pendingSave = true
+        delay(600)
+        persistFields()
+        pendingSave = false
+    }
+    val flush by rememberUpdatedState { persistFields() }
+    DisposableEffect(Unit) {
+        onDispose { if (pendingSave) flush() }
     }
 
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()

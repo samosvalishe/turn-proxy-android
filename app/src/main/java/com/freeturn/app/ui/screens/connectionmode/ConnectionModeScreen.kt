@@ -88,11 +88,8 @@ fun ConnectionModeScreen(
     val isActive = serverId == null || serverId == snapshot.activeId
 
     fun clientEdit(transform: (ClientConfig) -> ClientConfig) {
-        if (serverId != null) {
-            settingsViewModel.updateServerClient(serverId, transform)
-        } else {
-            settingsViewModel.saveClientConfig(transform(settingsViewModel.clientConfig.value), snapshot.activeId)
-        }
+        val targetId = serverId ?: snapshot.activeId ?: return
+        settingsViewModel.updateServerClient(targetId, transform)
     }
 
     val context = LocalContext.current
