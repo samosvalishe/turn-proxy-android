@@ -113,9 +113,8 @@ internal object ServerJson {
                 provider = cliO.optString("provider", Provider.VK).let {
                     if (it in Provider.VALUES) it else Provider.VK
                 },
-                // Фоллбэки = дефолты ClientConfig (для новых полей).
-                threads = cliO.optInt("threads", 12),
-                streamsPerCred = cliO.optInt("streamsPerCred", 6),
+                threads = cliO.optInt("threads", ClientConfig.DEFAULT_THREADS),
+                streamsPerCred = cliO.optInt("streamsPerCred", ClientConfig.DEFAULT_STREAMS_PER_CRED),
                 useUdp = cliO.optBoolean("useUdp", false),
                 manualCaptcha = cliO.optBoolean("manualCaptcha", false),
                 localPort = cliO.optString("localPort", ClientConfig.DEFAULT_LOCAL_PORT),
