@@ -167,11 +167,16 @@ class AppPreferences(context: Context) {
 
     // Каждая операция - одна транзакция dataStore.edit: атомарный read-modify-write,
     // параллельные записи не теряются и не оставляют активный id без сервера.
+    // Неразборчивый список не перезаписываем вовсе - иначе правка любого поля стирала
+    // все серверы разом; остаётся шанс вытащить их руками или откатить бэкапом.
+
+    private fun Preferences.serversForWrite(): List<Server>? =
+        ServerJson.decodeListOrNull(this[SERVERS_JSON])
 
     suspend fun updateServer(id: String, transform: (Server) -> Server): Boolean {
         var changed = false
         context.dataStore.edit { prefs ->
-            val list = ServerJson.decodeList(prefs[SERVERS_JSON])
+            val list = prefs.serversForWrite() ?: return@edit
             val updated = list.map { if (it.id == id) transform(it) else it }
             changed = updated != list
             if (changed) prefs[SERVERS_JSON] = ServerJson.encodeList(updated)
@@ -183,7 +188,7 @@ class AppPreferences(context: Context) {
         var changed = false
         context.dataStore.edit { prefs ->
             val activeId = prefs[ACTIVE_SERVER_ID]?.takeIf { it.isNotBlank() } ?: return@edit
-            val list = ServerJson.decodeList(prefs[SERVERS_JSON])
+            val list = prefs.serversForWrite() ?: return@edit
             val updated = list.map { if (it.id == activeId) transform(it) else it }
             changed = updated != list
             if (changed) prefs[SERVERS_JSON] = ServerJson.encodeList(updated)
@@ -193,7 +198,7 @@ class AppPreferences(context: Context) {
 
     suspend fun addServer(server: Server, activate: Boolean = false): String {
         context.dataStore.edit { prefs ->
-            val list = ServerJson.decodeList(prefs[SERVERS_JSON])
+            val list = prefs.serversForWrite() ?: return@edit
             val base = server.name.trim().ifBlank { Server.FALLBACK_NAME }
             val named = server.copy(name = uniqueServerName(base, list))
             prefs[SERVERS_JSON] = ServerJson.encodeList(list + named)
@@ -205,7 +210,7 @@ class AppPreferences(context: Context) {
     suspend fun cloneServer(id: String): String? {
         var newId: String? = null
         context.dataStore.edit { prefs ->
-            val list = ServerJson.decodeList(prefs[SERVERS_JSON])
+            val list = prefs.serversForWrite() ?: return@edit
             val source = list.firstOrNull { it.id == id } ?: return@edit
             val copy = source.copy(
                 id = UUID.randomUUID().toString(),
@@ -219,7 +224,7 @@ class AppPreferences(context: Context) {
 
     suspend fun renameServer(id: String, name: String) {
         context.dataStore.edit { prefs ->
-            val list = ServerJson.decodeList(prefs[SERVERS_JSON])
+            val list = prefs.serversForWrite() ?: return@edit
             val target = list.firstOrNull { it.id == id } ?: return@edit
             val unique = uniqueServerName(name.trim().ifBlank { target.name }, list, excludingId = id)
             if (unique == target.name) return@edit
@@ -230,7 +235,7 @@ class AppPreferences(context: Context) {
 
     suspend fun deleteServer(id: String) {
         context.dataStore.edit { prefs ->
-            val list = ServerJson.decodeList(prefs[SERVERS_JSON])
+            val list = prefs.serversForWrite() ?: return@edit
             val remaining = list.filterNot { it.id == id }
             if (remaining.size == list.size) return@edit
             prefs[SERVERS_JSON] = ServerJson.encodeList(remaining)

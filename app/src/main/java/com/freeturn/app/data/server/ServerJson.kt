@@ -10,6 +10,7 @@ import com.freeturn.app.data.config.SplitTunnelMode
 import com.freeturn.app.data.config.SshConfig
 import com.freeturn.app.data.config.TunnelTransport
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 import java.util.UUID
 
@@ -21,14 +22,22 @@ internal object ServerJson {
         return arr.toString()
     }
 
-    fun decodeList(raw: String?): List<Server> {
+    /** Для чтения: неразборчивая строка показывается пустым списком. */
+    fun decodeList(raw: String?): List<Server> = decodeListOrNull(raw).orEmpty()
+
+    /**
+     * null - строка не разбирается как массив. Писать поверх такого списка нельзя:
+     * пустой список + новая запись молча стирали все серверы. Мусорный элемент
+     * пропускается, а не роняет весь массив.
+     */
+    fun decodeListOrNull(raw: String?): List<Server>? {
         if (raw.isNullOrBlank()) return emptyList()
-        return try {
-            val arr = JSONArray(raw)
-            (0 until arr.length()).map { decode(arr.getJSONObject(it)) }
-        } catch (_: Throwable) {
-            emptyList()
+        val arr = try {
+            JSONArray(raw)
+        } catch (_: JSONException) {
+            return null
         }
+        return (0 until arr.length()).mapNotNull { arr.optJSONObject(it)?.let(::decode) }
     }
 
     private fun encode(p: Server): JSONObject = JSONObject().apply {

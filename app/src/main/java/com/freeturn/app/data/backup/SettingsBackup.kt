@@ -48,13 +48,16 @@ object SettingsBackup {
         } catch (_: Exception) {
             throw BackupCrypto.FormatException("bad payload")
         }
-        val serversJson = o.optJSONArray("servers")?.toString() ?: "[]"
+        // Restore сначала чистит профиль: битый список дал бы "восстановлено 0" на пустом месте.
+        val servers = o.optJSONArray("servers")
+            ?.let { ServerJson.decodeListOrNull(it.toString()) }
+            ?: throw BackupCrypto.FormatException("bad servers")
         // Битый/отсутствующий cid валим здесь, до затирания профиля: применить такой бэкап -
         // значит подменить личность на чужую и получить обрыв на allowlist.
         val cid = o.optString("ownClientId")
         if (!ClientId.isValid(cid)) throw BackupCrypto.FormatException("bad client id")
         return BackupData(
-            servers = ServerJson.decodeList(serversJson),
+            servers = servers,
             activeId = o.optString("activeId").takeIf { it.isNotBlank() },
             ownClientId = cid,
             dynamicTheme = o.optBoolean("dynamicTheme", true),

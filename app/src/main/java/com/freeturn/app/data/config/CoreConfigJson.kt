@@ -113,7 +113,7 @@ fun ClientConfig.toCoreJson(
 ): String {
     val dnsServers = coreDnsServers { carrierDns }
 
-    val obfOn = srv.obfEnabled && ObfProfile.isValidKey(srv.obfKey)
+    val obfOn = srv.obfEnabled
     // Ядро поднимает встроенный туннель только поверх udp; UI тоже гасит выбор tcp.
     val tcpMode = srv.tcpMode && !wireGuardActive
 

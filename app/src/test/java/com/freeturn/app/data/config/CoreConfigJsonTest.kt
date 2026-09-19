@@ -157,12 +157,14 @@ class CoreConfigJsonTest {
         assertEquals(listOf("10.0.0.1", "10.0.0.2"), carrier.coreDnsServers { "10.0.0.1, 10.0.0.2" })
     }
 
+    // Битый ключ уходит в ядро как есть: оно отвергнет старт с причиной, а тихий
+    // none дал бы отказ сервера без объяснений.
     @Test
-    fun obfNeedsValidKey() {
+    fun badObfKeyReachesCore() {
         val srv = ServerOpts(obfProfile = ObfProfile.RTPOPUS, obfKey = "short")
         val obf = parse(base, srv)["obf"]!!.jsonObject
-        assertEquals(ObfProfile.NONE, obf["profile"]!!.jsonPrimitive.content)
-        assertEquals("", obf["key"]!!.jsonPrimitive.content)
+        assertEquals(ObfProfile.RTPOPUS, obf["profile"]!!.jsonPrimitive.content)
+        assertEquals("short", obf["key"]!!.jsonPrimitive.content)
 
         val key = "a".repeat(64)
         val ok = parse(base, ServerOpts(obfProfile = ObfProfile.RTPOPUS, obfKey = key))["obf"]!!.jsonObject

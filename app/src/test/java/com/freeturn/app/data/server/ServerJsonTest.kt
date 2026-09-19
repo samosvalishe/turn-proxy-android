@@ -4,6 +4,7 @@ import com.freeturn.app.data.config.KcpProfile
 import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.data.config.ProxyMode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ServerJsonTest {
@@ -46,5 +47,18 @@ class ServerJsonTest {
     fun `unknown mode falls back to udp`() {
         val raw = """[{"id":"1","name":"s","opts":{"proxyMode":"quic"}}]"""
         assertEquals(ProxyMode.UDP, ServerJson.decodeList(raw).single().opts.proxyMode)
+    }
+
+    // null запрещает запись поверх: пустой список + правка стирали все серверы.
+    @Test
+    fun `unparseable list is null, not empty`() {
+        assertNull(ServerJson.decodeListOrNull("{broken"))
+        assertEquals(emptyList<Server>(), ServerJson.decodeListOrNull(null))
+    }
+
+    @Test
+    fun `junk element does not drop the rest`() {
+        val raw = """[42,{"id":"1","name":"s"}]"""
+        assertEquals("1", ServerJson.decodeListOrNull(raw)!!.single().id)
     }
 }

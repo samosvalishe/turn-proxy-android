@@ -62,7 +62,7 @@ class ImportViewModel(
 
     private suspend fun offer(raw: String) {
         if (_uiState.value.saving) return
-        FreeturnLink.parse(raw).fold(
+        FreeturnLink.parse(raw).mapCatching { it.also(::requireUsableObf) }.fold(
             onSuccess = { link ->
                 val servers = prefs.serversSnapshot.first().list
                 val normalizedConf = link.wgConf.trim()
@@ -112,6 +112,14 @@ class ImportViewModel(
     fun dismiss() {
         if (_uiState.value.saving) return
         _uiState.value = ImportUiState()
+    }
+
+    // Ссылку с непригодной обфускацией отбиваем на входе: сохранённый сервер
+    // стартовал бы с конфигом, который отвергнет ядро или сервер.
+    private fun requireUsableObf(link: FreeturnLink) {
+        if (link.obfProfile.isBlank() || link.obfProfile == ObfProfile.NONE) return
+        require(link.obfProfile in ObfProfile.VALUES) { "unknown obf profile" }
+        require(ObfProfile.isValidKey(link.obfKey)) { "bad obf key" }
     }
 
     private fun buildServer(link: FreeturnLink, st: ImportUiState, fallbackName: String): Server {
