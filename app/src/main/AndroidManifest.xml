@@ -26,13 +26,6 @@
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="PackageVisibilityPolicy,QueryAllPackagesPermission" />
 
-    <queries>
-        <intent>
-            <action android:name="android.intent.action.MAIN" />
-            <category android:name="android.intent.category.LAUNCHER" />
-        </intent>
-    </queries>
-
     <application
         android:name=".App"
         android:allowBackup="true"
@@ -74,10 +67,9 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
-        <!-- Трамплин внешних входов (ярлыки, виджет, тайл): START с запросом согласия на VPN. -->
         <activity
             android:name=".service.ProxyShortcutActivity"
-            android:exported="true"
+            android:exported="false"
             android:excludeFromRecents="true"
             android:taskAffinity=""
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />

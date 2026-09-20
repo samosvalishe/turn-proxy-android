@@ -18,6 +18,8 @@ object BackupCrypto {
     private const val MAGIC = "freeturn-backup"
     private const val VERSION = 1
     private const val ITERATIONS = 210_000
+    private const val MIN_ITERATIONS = 100_000
+    private const val MAX_ITERATIONS = 2_000_000
     private const val KEY_BITS = 256
     private const val SALT_LEN = 16
     private const val IV_LEN = 12
@@ -56,6 +58,7 @@ object BackupCrypto {
         }
         if (o.optString("magic") != MAGIC) throw FormatException("not a FreeTurn backup")
         val iter = o.optInt("iter", ITERATIONS)
+        if (iter !in MIN_ITERATIONS..MAX_ITERATIONS) throw FormatException("bad iteration count")
         val salt = unb64(o, "salt")
         val iv = unb64(o, "iv")
         val ct = unb64(o, "ct")
