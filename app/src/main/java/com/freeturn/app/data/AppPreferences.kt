@@ -344,6 +344,7 @@ class AppPreferences(context: Context) {
             privacyMode = privacyModeFlow.first(),
             seasonalDecor = seasonalDecorFlow.first(),
             restartServerOnSwitch = restartServerOnSwitchFlow.first(),
+            autoConnect = autoConnectFlow.first(),
             hotspotProxy = hotspotProxyEnabledFlow.first(),
             suppressUpdatePrompt = suppressUpdatePromptFlow.first(),
             suppressTgPrompt = suppressTgPromptFlow.first()
@@ -372,6 +373,7 @@ class AppPreferences(context: Context) {
             prefs[PRIVACY_MODE] = data.privacyMode
             prefs[SEASONAL_DECOR] = data.seasonalDecor
             prefs[RESTART_SERVER_ON_SWITCH] = data.restartServerOnSwitch
+            prefs[AUTO_CONNECT] = data.autoConnect
             prefs[HOTSPOT_PROXY] = data.hotspotProxy
             prefs[SUPPRESS_UPDATE_PROMPT] = data.suppressUpdatePrompt
             prefs[SUPPRESS_TG_PROMPT] = data.suppressTgPrompt

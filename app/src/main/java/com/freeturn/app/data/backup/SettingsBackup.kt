@@ -18,6 +18,7 @@ data class BackupData(
     val privacyMode: Boolean,
     val seasonalDecor: Boolean,
     val restartServerOnSwitch: Boolean,
+    val autoConnect: Boolean,
     val hotspotProxy: Boolean,
     val suppressUpdatePrompt: Boolean,
     val suppressTgPrompt: Boolean
@@ -37,6 +38,7 @@ object SettingsBackup {
         put("privacyMode", data.privacyMode)
         put("seasonalDecor", data.seasonalDecor)
         put("restartServerOnSwitch", data.restartServerOnSwitch)
+        put("autoConnect", data.autoConnect)
         put("hotspotProxy", data.hotspotProxy)
         put("suppressUpdatePrompt", data.suppressUpdatePrompt)
         put("suppressTgPrompt", data.suppressTgPrompt)
@@ -65,6 +67,7 @@ object SettingsBackup {
             privacyMode = o.optBoolean("privacyMode", false),
             seasonalDecor = o.optBoolean("seasonalDecor", true),
             restartServerOnSwitch = o.optBoolean("restartServerOnSwitch", false),
+            autoConnect = o.optBoolean("autoConnect", false),
             hotspotProxy = o.optBoolean("hotspotProxy", false),
             suppressUpdatePrompt = o.optBoolean("suppressUpdatePrompt", false),
             suppressTgPrompt = o.optBoolean("suppressTgPrompt", false)

@@ -4,7 +4,10 @@ import com.freeturn.app.data.config.KcpProfile
 import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.data.config.ProxyMode
 
-/** Снимок серверных опций. obfKey хранится в шифрованном хранилище AppPreferences. */
+/**
+ * Снимок серверных опций. Лежит в DataStore открытым текстом (как и SSH-секреты),
+ * поэтому datastore/ исключён из системного бэкапа.
+ */
 data class ServerOpts(
     /** Wire-профиль обфускации: none | rtpopus | rtpopus2 | rtpopus3 (-obf-profile). */
     val obfProfile: String = ObfProfile.NONE,
