@@ -61,7 +61,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
 import com.freeturn.app.domain.UpdateState
-import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.ui.components.BackupPasswordDialog
 import com.freeturn.app.ui.components.BusyProgressIndicator
 import com.freeturn.app.ui.components.SectionLabel
@@ -77,7 +77,9 @@ import com.freeturn.app.ui.theme.Spacing
 import com.freeturn.app.ui.util.hapticClickable
 import com.freeturn.app.viewmodel.settings.BackupEvent
 import com.freeturn.app.viewmodel.settings.RestoreFailReason
+import com.freeturn.app.viewmodel.settings.BackupViewModel
 import com.freeturn.app.viewmodel.settings.SettingsViewModel
+import org.koin.androidx.compose.koinViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -87,7 +89,8 @@ import java.util.Locale
 @Composable
 fun AppScreen(
     settingsViewModel: SettingsViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    backupViewModel: BackupViewModel = koinViewModel()
 ) {
     val context = LocalContext.current
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
@@ -108,12 +111,12 @@ fun AppScreen(
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/octet-stream")
     ) { uri: Uri? ->
-        if (uri != null) settingsViewModel.exportBackup(uri, exportPassword)
+        if (uri != null) backupViewModel.exportBackup(uri, exportPassword)
     }
 
     // Снекбар по результату экспорта/импорта.
     LaunchedEffect(Unit) {
-        settingsViewModel.backupEvents.collect { event ->
+        backupViewModel.events.collect { event ->
             snackbarHostState.showSnackbar(backupEventMessage(context, event))
         }
     }
@@ -263,7 +266,7 @@ fun AppScreen(
                 TextButton(
                     onClick = {
                         showResetDialog = false
-                        settingsViewModel.resetAllSettings()
+                        backupViewModel.resetAllSettings()
                     },
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.error

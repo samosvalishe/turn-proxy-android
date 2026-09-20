@@ -30,7 +30,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.data.config.SshConfig
-import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.ui.util.HapticUtil
 
 @Composable
 fun SshFormFields(

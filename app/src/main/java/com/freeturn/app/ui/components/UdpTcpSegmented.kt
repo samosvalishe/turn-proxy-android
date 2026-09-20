@@ -15,7 +15,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import com.freeturn.app.R
-import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.ui.theme.Spacing
 
 /**

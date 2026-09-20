@@ -13,7 +13,8 @@ import com.freeturn.app.data.share.ShareLinkBuilder
 import com.freeturn.app.data.share.SharedClient
 import com.freeturn.app.data.share.WgPeer
 import com.freeturn.app.domain.share.ShareRepository
-import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.viewmodel.HapticEvent
+import com.freeturn.app.viewmodel.Haptics
 import com.freeturn.app.viewmodel.uiError
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -79,6 +80,7 @@ data class ShareUiState(
 class ShareViewModel(
     private val repo: ShareRepository,
     private val prefs: AppPreferences,
+    private val haptics: Haptics,
     context: Context
 ) : ViewModel() {
 
@@ -297,7 +299,7 @@ class ShareViewModel(
         newPeer: WgPeer? = null,
         newClient: SharedClient? = null
     ) {
-        HapticUtil.perform(appContext, HapticUtil.Pattern.SUCCESS)
+        haptics.perform(HapticEvent.SUCCESS)
         _uiState.update { cur ->
             val appendable = cur.selectedServerId == serverId && cur.peersLoaded
             cur.copy(
@@ -311,7 +313,7 @@ class ShareViewModel(
     }
 
     private fun commitCreateError(e: Throwable) {
-        HapticUtil.perform(appContext, HapticUtil.Pattern.ERROR)
+        haptics.perform(HapticEvent.ERROR)
         _uiState.update { it.copy(creating = false, createError = e.uiError(appContext)) }
     }
 
@@ -372,7 +374,7 @@ class ShareViewModel(
                     }
                 }
                 .onFailure { e ->
-                    HapticUtil.perform(appContext, HapticUtil.Pattern.ERROR)
+                    haptics.perform(HapticEvent.ERROR)
                     _uiState.update {
                         it.copy(resharePubkey = null, peersError = e.uiError(appContext))
                     }
@@ -420,7 +422,7 @@ class ShareViewModel(
                 else repo.removeClient(server.ssh, target.clientId.orEmpty())
             result
                 .onSuccess {
-                    HapticUtil.perform(appContext, HapticUtil.Pattern.SUCCESS)
+                    haptics.perform(HapticEvent.SUCCESS)
                     _uiState.update {
                         it.copy(
                             revoking = false,
@@ -431,7 +433,7 @@ class ShareViewModel(
                     }
                 }
                 .onFailure { e ->
-                    HapticUtil.perform(appContext, HapticUtil.Pattern.ERROR)
+                    haptics.perform(HapticEvent.ERROR)
                     _uiState.update {
                         it.copy(
                             revoking = false,

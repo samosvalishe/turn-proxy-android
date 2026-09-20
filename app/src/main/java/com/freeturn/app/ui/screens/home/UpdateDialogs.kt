@@ -19,7 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
-import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.domain.UpdateState
 import com.freeturn.app.ui.components.BusyProgressIndicator
 

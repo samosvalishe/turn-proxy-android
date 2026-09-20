@@ -51,7 +51,7 @@ import com.freeturn.app.data.config.ClientConfig
 import com.freeturn.app.data.config.ProxyMode
 import com.freeturn.app.data.config.TunnelTransport
 import com.freeturn.app.data.server.ServerOpts
-import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.ui.components.ApplyFab
 import com.freeturn.app.ui.components.FabClearance
 import com.freeturn.app.ui.components.InlineNoticeCard
@@ -64,6 +64,7 @@ import com.freeturn.app.ui.components.UdpTcpSegmented
 import com.freeturn.app.ui.screens.splittunnel.SplitTunnelModal
 import com.freeturn.app.ui.theme.Spacing
 import com.freeturn.app.viewmodel.proxy.ProxyViewModel
+import com.freeturn.app.viewmodel.server.ServerConfigViewModel
 import com.freeturn.app.viewmodel.settings.SettingsViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -73,12 +74,13 @@ import kotlinx.coroutines.withContext
 @Composable
 fun ConnectionModeScreen(
     settingsViewModel: SettingsViewModel,
+    serverConfigViewModel: ServerConfigViewModel,
     proxyViewModel: ProxyViewModel,
     serverId: String? = null,
     onBack: (() -> Unit)? = null
 ) {
-    val snapshot by settingsViewModel.serversSnapshot.collectAsStateWithLifecycle()
-    val activeClient by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
+    val snapshot by serverConfigViewModel.serversSnapshot.collectAsStateWithLifecycle()
+    val activeClient by serverConfigViewModel.clientConfig.collectAsStateWithLifecycle()
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
     val status by proxyViewModel.status.collectAsStateWithLifecycle()
 
@@ -89,7 +91,7 @@ fun ConnectionModeScreen(
 
     fun clientEdit(transform: (ClientConfig) -> ClientConfig) {
         val targetId = serverId ?: snapshot.activeId ?: return
-        settingsViewModel.updateServerClient(targetId, transform)
+        serverConfigViewModel.updateServerClient(targetId, transform)
     }
 
     val context = LocalContext.current
@@ -112,7 +114,7 @@ fun ConnectionModeScreen(
 
     fun applyForward() {
         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-        settingsViewModel.applyForwardConfig(
+        serverConfigViewModel.applyForwardConfig(
             serverId,
             if (isTcp) ProxyMode.TCP else ProxyMode.UDP,
             kcpDraft
@@ -229,7 +231,7 @@ fun ConnectionModeScreen(
                             // Встроенный туннель живёт только поверх udp: иначе сервер
                             // остался бы поднят в tcp и отклонял бы наши сессии.
                             isTcp = false
-                            if (savedOpts.tcpMode) settingsViewModel.setProxyMode(serverId, ProxyMode.UDP)
+                            if (savedOpts.tcpMode) serverConfigViewModel.setProxyMode(serverId, ProxyMode.UDP)
                         },
                         shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
                     ) { Text(stringResource(R.string.mode_vpn)) }
@@ -301,8 +303,8 @@ fun ConnectionModeScreen(
             mode = saved.splitTunnelMode,
             apps = saved.splitTunnelApps,
             locked = status.busy,
-            onModeChange = settingsViewModel::setSplitTunnelMode,
-            onAppsChange = settingsViewModel::setSplitTunnelApps,
+            onModeChange = serverConfigViewModel::setSplitTunnelMode,
+            onAppsChange = serverConfigViewModel::setSplitTunnelApps,
             onDismiss = { showSplitSheet = false },
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )

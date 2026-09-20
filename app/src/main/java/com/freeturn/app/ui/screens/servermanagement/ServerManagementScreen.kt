@@ -56,13 +56,14 @@ import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.data.config.ProxyMode
 import com.freeturn.app.domain.ServerState
 import com.freeturn.app.domain.SshConnectionState
-import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.ui.components.ApplyFab
 import com.freeturn.app.ui.components.FabClearance
 import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.ui.theme.Spacing
 import com.freeturn.app.ui.util.copyToClipboard
 import com.freeturn.app.viewmodel.server.ServerViewModel
+import com.freeturn.app.viewmodel.server.ServerConfigViewModel
 import com.freeturn.app.viewmodel.settings.SettingsViewModel
 import com.freeturn.app.viewmodel.server.serverSettingsAvailable
 import kotlinx.coroutines.delay
@@ -71,23 +72,24 @@ import kotlinx.coroutines.delay
 fun ServerManagementScreen(
     serverViewModel: ServerViewModel,
     settingsViewModel: SettingsViewModel,
+    serverConfigViewModel: ServerConfigViewModel,
     onEditConnection: (() -> Unit)? = null,
     // null = активный сервер; не-null = настройки конкретного сервера по id (Settings).
     serverId: String? = null,
     onBack: () -> Unit
 ) {
-    val snapshot by settingsViewModel.serversSnapshot.collectAsStateWithLifecycle()
+    val snapshot by serverConfigViewModel.serversSnapshot.collectAsStateWithLifecycle()
     val server = serverId?.let { id -> snapshot.list.firstOrNull { it.id == id } }
     // Управление ядром доступно только для активного сервера.
     val isActive = serverId == null || serverId == snapshot.activeId
     val sshState by serverViewModel.sshState.collectAsStateWithLifecycle()
     val serverState by serverViewModel.serverState.collectAsStateWithLifecycle()
-    val activeListen by settingsViewModel.proxyListen.collectAsStateWithLifecycle()
-    val activeConnect by settingsViewModel.proxyConnect.collectAsStateWithLifecycle()
+    val activeListen by serverConfigViewModel.proxyListen.collectAsStateWithLifecycle()
+    val activeConnect by serverConfigViewModel.proxyConnect.collectAsStateWithLifecycle()
     val savedListen = server?.proxyListen ?: activeListen
     val savedConnect = server?.proxyConnect ?: activeConnect
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
-    val clientCfg by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
+    val clientCfg by serverConfigViewModel.clientConfig.collectAsStateWithLifecycle()
     val serverOpts by serverViewModel.serverOpts.collectAsStateWithLifecycle()
     // Источник черновиков: живой конфиг (активный) или снимок (неактивный).
     val effClient = if (isActive) clientCfg else (server?.client ?: clientCfg)
@@ -137,10 +139,10 @@ fun ServerManagementScreen(
         // Пейсинг без профиля ядро отвергает.
         val timing = if (obfDraft == ObfProfile.NONE) 0 else timingDraft
         if (isActive) {
-            settingsViewModel.applyServerConfig(listenFull, proxyConnect, mode, obfDraft, keyDraft, timing)
+            serverConfigViewModel.applyServerConfig(listenFull, proxyConnect, mode, obfDraft, keyDraft, timing)
         } else {
             // !isActive ⇒ serverId != null (см. isActive выше) - smart cast.
-            settingsViewModel.updateServerConfig(serverId, listenFull, proxyConnect, mode, obfDraft, keyDraft, timing)
+            serverConfigViewModel.updateServerConfig(serverId, listenFull, proxyConnect, mode, obfDraft, keyDraft, timing)
         }
         onBack()
     }
@@ -218,7 +220,7 @@ fun ServerManagementScreen(
                         actionLabel = stringResource(R.string.make_active),
                         onAction = {
                             HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                            settingsViewModel.applyServer(serverId)
+                            serverConfigViewModel.applyServer(serverId)
                         }
                     )
                     Spacer(Modifier.height(Spacing.xxl))

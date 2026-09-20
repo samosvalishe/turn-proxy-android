@@ -167,7 +167,6 @@ class ProxyService : VpnService() {
     private suspend fun startSession(session: Long, fresh: Boolean) {
         val cfg = prefs.clientConfigFlow.first()
         if (!isCurrent(session)) return
-        ProxyStore.setLogsEnabled(cfg.logsEnabled)
         // Лог рестарта не чистим: строка "Процесс запущен" от App - единственный след того,
         // что процесс убивали, и после clearLogs от неё ничего бы не осталось.
         if (fresh) ProxyStore.clearLogs()

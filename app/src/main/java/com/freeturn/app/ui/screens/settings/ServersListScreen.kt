@@ -35,6 +35,7 @@ import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.ui.components.SettingsGroup
 import com.freeturn.app.ui.components.settingsItemShape
 import com.freeturn.app.ui.util.redact
+import com.freeturn.app.viewmodel.server.ServerConfigViewModel
 import com.freeturn.app.viewmodel.settings.SettingsViewModel
 import com.freeturn.app.ui.theme.Spacing
 
@@ -42,10 +43,11 @@ import com.freeturn.app.ui.theme.Spacing
 @Composable
 fun ServersListScreen(
     settingsViewModel: SettingsViewModel,
+    serverConfigViewModel: ServerConfigViewModel,
     onBack: () -> Unit,
     onOpenServer: (String) -> Unit
 ) {
-    val snapshot by settingsViewModel.serversSnapshot.collectAsStateWithLifecycle()
+    val snapshot by serverConfigViewModel.serversSnapshot.collectAsStateWithLifecycle()
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 

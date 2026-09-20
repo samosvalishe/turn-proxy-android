@@ -1,4 +1,4 @@
-package com.freeturn.app.data
+package com.freeturn.app.ui.util
 
 import android.content.Context
 import android.media.AudioAttributes
@@ -8,6 +8,8 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.provider.Settings
 import androidx.annotation.RequiresApi
+import com.freeturn.app.viewmodel.HapticEvent
+import com.freeturn.app.viewmodel.Haptics
 
 object HapticUtil {
 
@@ -115,4 +117,15 @@ object HapticUtil {
         .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
         .build()
+}
+
+class AndroidHaptics(private val context: Context) : Haptics {
+    override fun perform(event: HapticEvent) = HapticUtil.perform(
+        context,
+        when (event) {
+            HapticEvent.SUCCESS -> HapticUtil.Pattern.SUCCESS
+            HapticEvent.ERROR -> HapticUtil.Pattern.ERROR
+            HapticEvent.STEP -> HapticUtil.Pattern.SELECTION
+        }
+    )
 }

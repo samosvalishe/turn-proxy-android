@@ -1,6 +1,5 @@
 package com.freeturn.app.viewmodel.share
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.freeturn.app.data.AppPreferences
@@ -17,7 +16,8 @@ import com.freeturn.app.data.config.SshConfig
 import com.freeturn.app.data.config.TunnelTransport
 import com.freeturn.app.data.share.FreeturnLink
 import com.freeturn.app.domain.share.LinkImportBus
-import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.viewmodel.HapticEvent
+import com.freeturn.app.viewmodel.Haptics
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -46,10 +46,8 @@ data class ImportUiState(
 class ImportViewModel(
     private val prefs: AppPreferences,
     bus: LinkImportBus,
-    context: Context
+    private val haptics: Haptics
 ) : ViewModel() {
-
-    private val appContext = context.applicationContext
 
     private val _uiState = MutableStateFlow(ImportUiState())
     val uiState: StateFlow<ImportUiState> = _uiState.asStateFlow()
@@ -82,7 +80,7 @@ class ImportViewModel(
                 )
             },
             onFailure = {
-                HapticUtil.perform(appContext, HapticUtil.Pattern.ERROR)
+                haptics.perform(HapticEvent.ERROR)
                 _uiState.value = ImportUiState(parseError = true)
             }
         )
@@ -103,11 +101,11 @@ class ImportViewModel(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                HapticUtil.perform(appContext, HapticUtil.Pattern.ERROR)
+                haptics.perform(HapticEvent.ERROR)
                 _uiState.update { it.copy(saving = false, saveError = true) }
                 return@launch
             }
-            HapticUtil.perform(appContext, HapticUtil.Pattern.SUCCESS)
+            haptics.perform(HapticEvent.SUCCESS)
             _uiState.update { it.copy(saving = false, saved = true) }
         }
     }

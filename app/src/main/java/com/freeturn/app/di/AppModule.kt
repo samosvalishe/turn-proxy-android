@@ -17,7 +17,11 @@ import com.freeturn.app.viewmodel.proxy.ProxyViewModel
 import com.freeturn.app.viewmodel.server.ServerSetupViewModel
 import com.freeturn.app.viewmodel.server.ServerViewModel
 import com.freeturn.app.viewmodel.settings.SettingsViewModel
+import com.freeturn.app.viewmodel.settings.BackupViewModel
+import com.freeturn.app.viewmodel.server.ServerConfigViewModel
 import com.freeturn.app.viewmodel.share.ShareViewModel
+import com.freeturn.app.ui.util.AndroidHaptics
+import com.freeturn.app.viewmodel.Haptics
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
@@ -40,10 +44,13 @@ val appModule = module {
     // factory по той же причине: SSH-операции шаринга не делят сессию с активным сервером.
     factory { ShareRepository(androidContext(), get()) }
     single { LinkImportBus() }
+    single<Haptics> { AndroidHaptics(androidContext()) }
 
     viewModelOf(::ProxyViewModel)
     viewModelOf(::ServerViewModel)
     viewModelOf(::SettingsViewModel)
+    viewModelOf(::ServerConfigViewModel)
+    viewModelOf(::BackupViewModel)
     viewModelOf(::ServerSetupViewModel)
     viewModelOf(::ShareViewModel)
     viewModelOf(::ImportViewModel)

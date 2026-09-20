@@ -6,18 +6,21 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.navigation
 import com.freeturn.app.ui.screens.home.HomeScreen
 import com.freeturn.app.viewmodel.proxy.ProxyViewModel
+import com.freeturn.app.viewmodel.server.ServerConfigViewModel
 import com.freeturn.app.viewmodel.settings.SettingsViewModel
 
 /** Вкладка "Главная". Логи - отдельная вкладка нижнего меню (см. [logsGraph]). */
 internal fun NavGraphBuilder.homeGraph(
     navController: NavHostController,
     settingsViewModel: SettingsViewModel,
+    serverConfigViewModel: ServerConfigViewModel,
     proxyViewModel: ProxyViewModel
 ) {
     navigation<HomeGraph>(startDestination = Home) {
         composable<Home> { entry ->
             HomeScreen(
                 settingsViewModel = settingsViewModel,
+                serverConfigViewModel = serverConfigViewModel,
                 proxyViewModel = proxyViewModel,
                 // Хаб живёт в графе настроек. Прямой navigate отсюда пушил бы settings-экраны
                 // в стек вкладки "Главная" - save/restore вкладок портится. Поэтому сперва

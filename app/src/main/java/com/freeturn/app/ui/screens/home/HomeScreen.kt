@@ -38,9 +38,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.data.config.SplitTunnelMode
 import com.freeturn.app.ui.components.SettingsContentMaxWidth
-import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.ui.screens.splittunnel.SplitTunnelModal
 import com.freeturn.app.viewmodel.proxy.ProxyViewModel
+import com.freeturn.app.viewmodel.server.ServerConfigViewModel
 import com.freeturn.app.viewmodel.settings.SettingsViewModel
 import kotlinx.coroutines.launch
 import com.freeturn.app.ui.theme.Spacing
@@ -49,6 +50,7 @@ import com.freeturn.app.ui.theme.Spacing
 @Composable
 fun HomeScreen(
     settingsViewModel: SettingsViewModel,
+    serverConfigViewModel: ServerConfigViewModel,
     proxyViewModel: ProxyViewModel,
     onOpenServerSettings: (String) -> Unit,
     onAddServer: () -> Unit
@@ -56,12 +58,12 @@ fun HomeScreen(
     val context = LocalContext.current
     val status by proxyViewModel.status.collectAsStateWithLifecycle()
     val uptimeText = rememberProxyUptime(status.connectedSince)
-    val clientConfig by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
+    val clientConfig by serverConfigViewModel.clientConfig.collectAsStateWithLifecycle()
     val updateState by settingsViewModel.updateState.collectAsStateWithLifecycle()
     val suppressUpdatePrompt by settingsViewModel.suppressUpdatePrompt.collectAsStateWithLifecycle()
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
     val seasonalDecor by settingsViewModel.seasonalDecor.collectAsStateWithLifecycle()
-    val serversSnapshot by settingsViewModel.serversSnapshot.collectAsStateWithLifecycle()
+    val serversSnapshot by serverConfigViewModel.serversSnapshot.collectAsStateWithLifecycle()
 
     RequestStartupPermissions(settingsViewModel)
 
@@ -129,7 +131,7 @@ fun HomeScreen(
                     // Правка ссылки только пока прокси стоит (новая комната = реконнект).
                     callLinkLocked = status.busy,
                     onApplyServer = { id ->
-                        settingsViewModel.applyServer(id)
+                        serverConfigViewModel.applyServer(id)
                         scope.launch { sheetScaffoldState.bottomSheetState.partialExpand() }
                     },
                     onOpenServerSettings = { id ->
@@ -137,7 +139,7 @@ fun HomeScreen(
                         scope.launch { sheetScaffoldState.bottomSheetState.partialExpand() }
                         onOpenServerSettings(id)
                     },
-                    onSaveCallLink = { settingsViewModel.setActiveVkLink(it) }
+                    onSaveCallLink = { serverConfigViewModel.setActiveVkLink(it) }
                 )
             },
             snackbarHost = { SnackbarHost(snackbarHostState) }
@@ -191,8 +193,8 @@ fun HomeScreen(
             mode = clientConfig.splitTunnelMode,
             apps = clientConfig.splitTunnelApps,
             locked = status.busy,
-            onModeChange = settingsViewModel::setSplitTunnelMode,
-            onAppsChange = settingsViewModel::setSplitTunnelApps,
+            onModeChange = serverConfigViewModel::setSplitTunnelMode,
+            onAppsChange = serverConfigViewModel::setSplitTunnelApps,
             onDismiss = { showSplitSheet.value = false },
             containerColor = sheetColor
         )

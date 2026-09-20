@@ -44,10 +44,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
 import com.freeturn.app.data.config.ClientConfig
 import com.freeturn.app.data.config.Provider
-import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.ui.theme.Spacing
 import com.freeturn.app.viewmodel.server.ServerViewModel
+import com.freeturn.app.viewmodel.server.ServerConfigViewModel
 import com.freeturn.app.viewmodel.settings.SettingsViewModel
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -55,15 +56,16 @@ import kotlinx.coroutines.delay
 @Composable
 fun ClientSetupScreen(
     settingsViewModel: SettingsViewModel,
+    serverConfigViewModel: ServerConfigViewModel,
     serverViewModel: ServerViewModel,
     // null = активный сервер; не-null = конкретный сервер по id (Settings-флоу).
     serverId: String? = null,
     onBack: (() -> Unit)? = null
 ) {
-    val snapshot by settingsViewModel.serversSnapshot.collectAsStateWithLifecycle()
-    val activeClient by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
+    val snapshot by serverConfigViewModel.serversSnapshot.collectAsStateWithLifecycle()
+    val activeClient by serverConfigViewModel.clientConfig.collectAsStateWithLifecycle()
     val sshConfig by serverViewModel.sshConfig.collectAsStateWithLifecycle()
-    val activeProxyListen by settingsViewModel.proxyListen.collectAsStateWithLifecycle()
+    val activeProxyListen by serverConfigViewModel.proxyListen.collectAsStateWithLifecycle()
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
 
     // Источник данных: конкретный сервер по id либо активный.
@@ -74,7 +76,7 @@ fun ClientSetupScreen(
 
     fun clientEdit(transform: (ClientConfig) -> ClientConfig) {
         val targetId = serverId ?: snapshot.activeId ?: return
-        settingsViewModel.updateServerClient(targetId, transform)
+        serverConfigViewModel.updateServerClient(targetId, transform)
     }
 
     val context = LocalContext.current

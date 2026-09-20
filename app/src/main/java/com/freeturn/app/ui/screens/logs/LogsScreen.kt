@@ -60,7 +60,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
 import com.freeturn.app.ui.components.EmptyState
 import com.freeturn.app.ui.components.SettingsContentMaxWidth
-import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.domain.proxy.LogEntry
 import com.freeturn.app.domain.proxy.LogLevel
 import com.freeturn.app.ui.theme.Spacing

@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.data.config.SplitTunnelMode
 import com.freeturn.app.data.config.splitTunnelSelection
-import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.data.AppChoice
 import com.freeturn.app.data.installedInternetApps
 import com.freeturn.app.ui.components.EmptyState

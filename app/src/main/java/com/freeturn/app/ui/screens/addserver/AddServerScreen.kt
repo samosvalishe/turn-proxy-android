@@ -50,8 +50,9 @@ import com.freeturn.app.ui.components.SettingsGroup
 import com.freeturn.app.ui.components.SettingsGroupItem
 import com.freeturn.app.ui.screens.settings.backupEventMessage
 import com.freeturn.app.ui.theme.Spacing
-import com.freeturn.app.viewmodel.settings.SettingsViewModel
+import com.freeturn.app.viewmodel.settings.BackupViewModel
 import kotlinx.coroutines.launch
+import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 
 /**
@@ -63,10 +64,10 @@ import org.koin.compose.koinInject
  */
 @Composable
 fun AddServerScreen(
-    settingsViewModel: SettingsViewModel,
     onSelfHosted: () -> Unit,
     onManualCreate: (String) -> Unit,
-    onScanQr: () -> Unit
+    onScanQr: () -> Unit,
+    backupViewModel: BackupViewModel = koinViewModel()
 ) {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var showManualDialog by rememberSaveable { mutableStateOf(false) }
@@ -89,7 +90,7 @@ fun AddServerScreen(
     }
 
     LaunchedEffect(Unit) {
-        settingsViewModel.backupEvents.collect { event ->
+        backupViewModel.events.collect { event ->
             snackbarHostState.showSnackbar(backupEventMessage(context, event))
         }
     }
@@ -191,7 +192,7 @@ fun AddServerScreen(
             requireConfirmation = false,
             onConfirm = { password ->
                 showRestoreDialog = false
-                restoreUri?.let { settingsViewModel.restoreBackup(it, password) }
+                restoreUri?.let { backupViewModel.restoreBackup(it, password) }
             },
             onDismiss = { showRestoreDialog = false },
             warning = stringResource(R.string.backup_restore_warning)

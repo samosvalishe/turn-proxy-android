@@ -17,6 +17,7 @@ import com.freeturn.app.ui.screens.settings.ServersListScreen
 import com.freeturn.app.ui.screens.settings.SettingsScreen
 import com.freeturn.app.ui.screens.sshsetup.SshSetupScreen
 import com.freeturn.app.viewmodel.proxy.ProxyViewModel
+import com.freeturn.app.viewmodel.server.ServerConfigViewModel
 import com.freeturn.app.viewmodel.server.ServerViewModel
 import com.freeturn.app.viewmodel.settings.SettingsViewModel
 
@@ -24,6 +25,7 @@ import com.freeturn.app.viewmodel.settings.SettingsViewModel
 internal fun NavGraphBuilder.settingsGraph(
     navController: NavHostController,
     settingsViewModel: SettingsViewModel,
+    serverConfigViewModel: ServerConfigViewModel,
     proxyViewModel: ProxyViewModel,
     serverViewModel: ServerViewModel
 ) {
@@ -58,6 +60,7 @@ internal fun NavGraphBuilder.settingsGraph(
         composable<ServersList> {
             ServersListScreen(
                 settingsViewModel = settingsViewModel,
+                serverConfigViewModel = serverConfigViewModel,
                 onBack = { navController.popBackStack() },
                 onOpenServer = { id -> navController.navigate(ServerDetail(id)) }
             )
@@ -68,6 +71,7 @@ internal fun NavGraphBuilder.settingsGraph(
             ServerDetailScreen(
                 serverId = id,
                 settingsViewModel = settingsViewModel,
+                serverConfigViewModel = serverConfigViewModel,
                 serverViewModel = serverViewModel,
                 onBack = { navController.popBackStack() },
                 onOpenConnection = { navController.navigate(ClientSetup(id)) },
@@ -83,6 +87,7 @@ internal fun NavGraphBuilder.settingsGraph(
             NerdScreen(
                 serverId = id,
                 settingsViewModel = settingsViewModel,
+                serverConfigViewModel = serverConfigViewModel,
                 serverViewModel = serverViewModel,
                 onBack = { navController.popBackStack() }
             )
@@ -92,6 +97,7 @@ internal fun NavGraphBuilder.settingsGraph(
             val id = entry.toRoute<ConnectionMode>().serverId
             ConnectionModeScreen(
                 settingsViewModel = settingsViewModel,
+                serverConfigViewModel = serverConfigViewModel,
                 proxyViewModel = proxyViewModel,
                 serverId = id,
                 onBack = { navController.popBackStack() }
@@ -103,6 +109,7 @@ internal fun NavGraphBuilder.settingsGraph(
             ServerManagementScreen(
                 serverViewModel = serverViewModel,
                 settingsViewModel = settingsViewModel,
+                serverConfigViewModel = serverConfigViewModel,
                 serverId = id,
                 onBack = { navController.popBackStack() },
                 onEditConnection = { navController.navigate(SshSetup) }
@@ -113,6 +120,7 @@ internal fun NavGraphBuilder.settingsGraph(
             val id = entry.toRoute<ClientSetup>().serverId
             ClientSetupScreen(
                 settingsViewModel = settingsViewModel,
+                serverConfigViewModel = serverConfigViewModel,
                 serverViewModel = serverViewModel,
                 serverId = id,
                 onBack = { navController.popBackStack() }
@@ -122,7 +130,7 @@ internal fun NavGraphBuilder.settingsGraph(
         composable<SshSetup> {
             SshSetupScreen(
                 serverViewModel = serverViewModel,
-                settingsViewModel = settingsViewModel,
+                serverConfigViewModel = serverConfigViewModel,
                 // Форма поверх настроек сервера - после успеха возвращаемся назад.
                 onConnected = { navController.popBackStack() },
                 onBack = { navController.popBackStack() }

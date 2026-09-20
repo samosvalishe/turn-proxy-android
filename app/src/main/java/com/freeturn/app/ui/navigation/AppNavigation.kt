@@ -44,11 +44,12 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.freeturn.app.R
-import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.ui.screens.captcha.CaptchaWebViewDialog
 import com.freeturn.app.ui.screens.share.ImportSheet
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.viewmodel.proxy.ProxyViewModel
+import com.freeturn.app.viewmodel.server.ServerConfigViewModel
 import com.freeturn.app.viewmodel.server.ServerViewModel
 import com.freeturn.app.viewmodel.settings.SettingsViewModel
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -65,7 +66,8 @@ private const val NAV_FADE_OUT_MS = 120
 fun AppNavigation(
     settingsViewModel: SettingsViewModel = koinViewModel(),
     proxyViewModel: ProxyViewModel = koinViewModel(),
-    serverViewModel: ServerViewModel = koinViewModel()
+    serverViewModel: ServerViewModel = koinViewModel(),
+    serverConfigViewModel: ServerConfigViewModel = koinViewModel()
 ) {
     val isInitialized by settingsViewModel.isInitialized.collectAsStateWithLifecycle()
 
@@ -77,7 +79,7 @@ fun AppNavigation(
     val initialTgSubscribeShown by settingsViewModel.initialTgSubscribeShown.collectAsStateWithLifecycle()
     val initialSuppressTgPrompt by settingsViewModel.initialSuppressTgPrompt.collectAsStateWithLifecycle()
     val nerdMode by settingsViewModel.nerdMode.collectAsStateWithLifecycle()
-    val clientConfig by settingsViewModel.clientConfig.collectAsStateWithLifecycle()
+    val clientConfig by serverConfigViewModel.clientConfig.collectAsStateWithLifecycle()
     val logsTabVisible = nerdMode && clientConfig.logsEnabled
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -93,7 +95,7 @@ fun AppNavigation(
     // (там мог остаться хаб другого сервера) - сбрасываем его к корню. Если стек
     // настроек сейчас активен (не сохранён), clearBackStack - no-op.
     LaunchedEffect(navController) {
-        settingsViewModel.serversSnapshot
+        serverConfigViewModel.serversSnapshot
             .map { it.activeId }
             .distinctUntilChanged()
             .drop(1) // первая эмиссия - текущее значение, не смена
@@ -147,7 +149,8 @@ fun AppNavigation(
             navController = navController,
             settingsViewModel = settingsViewModel,
             proxyViewModel = proxyViewModel,
-            serverViewModel = serverViewModel
+            serverViewModel = serverViewModel,
+            serverConfigViewModel = serverConfigViewModel
         )
     }
 
@@ -188,7 +191,8 @@ private fun AppNavHost(
     navController: NavHostController,
     settingsViewModel: SettingsViewModel,
     proxyViewModel: ProxyViewModel,
-    serverViewModel: ServerViewModel
+    serverViewModel: ServerViewModel,
+    serverConfigViewModel: ServerConfigViewModel
 ) {
     // Системная настройка reduced motion отключает shared-axis переходы.
     val reducedMotion = LocalReducedMotion.current
@@ -229,11 +233,11 @@ private fun AppNavHost(
                 slideOutHorizontally(tween(NAV_SLIDE_MS, easing = EmphasizedEasing)) { it / 12 }
         }
     ) {
-        homeGraph(navController, settingsViewModel, proxyViewModel)
+        homeGraph(navController, settingsViewModel, serverConfigViewModel, proxyViewModel)
         logsGraph(proxyViewModel)
         shareGraph(navController)
-        addGraph(navController, settingsViewModel)
-        settingsGraph(navController, settingsViewModel, proxyViewModel, serverViewModel)
+        addGraph(navController, serverConfigViewModel)
+        settingsGraph(navController, settingsViewModel, serverConfigViewModel, proxyViewModel, serverViewModel)
     }
 }
 

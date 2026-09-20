@@ -14,7 +14,8 @@ import com.freeturn.app.data.config.TunnelTransport
 import com.freeturn.app.domain.proxy.ProxyOrchestrator
 import com.freeturn.app.domain.server.ServerSetupRepository
 import com.freeturn.app.domain.server.ServerStartOptions
-import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.viewmodel.HapticEvent
+import com.freeturn.app.viewmodel.Haptics
 import com.freeturn.app.viewmodel.uiError
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -137,6 +138,7 @@ class ServerSetupViewModel(
     private val repo: ServerSetupRepository,
     private val prefs: AppPreferences,
     private val orchestrator: ProxyOrchestrator,
+    private val haptics: Haptics,
     context: Context
 ) : ViewModel() {
 
@@ -195,7 +197,7 @@ class ServerSetupViewModel(
                     val ip = s.ssh.ip.trim()
                     val duplicate = prefs.serversSnapshot.first().list
                         .any { it.ssh.ip.isNotBlank() && it.ssh.ip.equals(ip, ignoreCase = true) }
-                    HapticUtil.perform(appContext, HapticUtil.Pattern.SUCCESS)
+                    haptics.perform(HapticEvent.SUCCESS)
                     _uiState.update {
                         it.copy(
                             checkingSsh = false,
@@ -212,7 +214,7 @@ class ServerSetupViewModel(
                     }
                 }
                 .onFailure { e ->
-                    HapticUtil.perform(appContext, HapticUtil.Pattern.ERROR)
+                    haptics.perform(HapticEvent.ERROR)
                     _uiState.update {
                         it.copy(checkingSsh = false, sshError = e.uiError(appContext))
                     }
@@ -247,12 +249,12 @@ class ServerSetupViewModel(
         }
         val st = _uiState.value.install
         if (st != null && st.current < st.tasks.size) {
-            HapticUtil.perform(appContext, HapticUtil.Pattern.SELECTION)
+            haptics.perform(HapticEvent.STEP)
         }
     }
 
     private fun fail(message: String?) {
-        HapticUtil.perform(appContext, HapticUtil.Pattern.ERROR)
+        haptics.perform(HapticEvent.ERROR)
         _uiState.update { s ->
             s.copy(install = s.install?.copy(error = message ?: "unknown error"))
         }
@@ -315,7 +317,7 @@ class ServerSetupViewModel(
             }
             advance()
 
-            HapticUtil.perform(appContext, HapticUtil.Pattern.SUCCESS)
+            haptics.perform(HapticEvent.SUCCESS)
             _uiState.update { st ->
                 st.copy(
                     install = st.install?.copy(

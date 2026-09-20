@@ -42,7 +42,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
-import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.domain.SshConnectionState
 import com.freeturn.app.ui.components.SectionLabel
 import com.freeturn.app.ui.components.SettingsBackButton
@@ -58,12 +58,14 @@ import com.freeturn.app.ui.util.redact
 import com.freeturn.app.viewmodel.server.ServerHubState
 import com.freeturn.app.viewmodel.server.ServerViewModel
 import com.freeturn.app.viewmodel.server.serverSettingsAvailable
+import com.freeturn.app.viewmodel.server.ServerConfigViewModel
 import com.freeturn.app.viewmodel.settings.SettingsViewModel
 
 @Composable
 fun ServerDetailScreen(
     serverId: String,
     settingsViewModel: SettingsViewModel,
+    serverConfigViewModel: ServerConfigViewModel,
     serverViewModel: ServerViewModel,
     onBack: () -> Unit,
     onOpenConnection: (String) -> Unit,
@@ -73,7 +75,7 @@ fun ServerDetailScreen(
     onCloned: (String) -> Unit
 ) {
     val context = LocalContext.current
-    val snapshot by settingsViewModel.serversSnapshot.collectAsStateWithLifecycle()
+    val snapshot by serverConfigViewModel.serversSnapshot.collectAsStateWithLifecycle()
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
     val sshState by serverViewModel.sshState.collectAsStateWithLifecycle()
     val sshConfig by serverViewModel.sshConfig.collectAsStateWithLifecycle()
@@ -149,7 +151,7 @@ fun ServerDetailScreen(
                     onRename = { showRename = true },
                     onClone = {
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                        settingsViewModel.cloneServer(serverId, onCloned)
+                        serverConfigViewModel.cloneServer(serverId, onCloned)
                     }
                 )
             }
@@ -177,7 +179,7 @@ fun ServerDetailScreen(
                         syncOn = sshConfigured && server.client.syncServerSwitches,
                         onActivate = {
                             HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                            settingsViewModel.applyServer(serverId)
+                            serverConfigViewModel.applyServer(serverId)
                         },
                         onRetry = {
                             HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
@@ -192,8 +194,8 @@ fun ServerDetailScreen(
                             checked = sshConfigured && server.client.syncServerSwitches,
                             enabled = sshConfigured,
                             onCheckedChange = { v ->
-                                if (isActive) settingsViewModel.setSyncServerSwitches(v)
-                                else settingsViewModel.updateServerClient(serverId) { it.copy(syncServerSwitches = v) }
+                                if (isActive) serverConfigViewModel.setSyncServerSwitches(v)
+                                else serverConfigViewModel.updateServerClient(serverId) { it.copy(syncServerSwitches = v) }
                             }
                         )
                     }
@@ -297,7 +299,7 @@ fun ServerDetailScreen(
         DeleteServerDialog(
             serverName = server.name,
             onConfirm = {
-                settingsViewModel.deleteServer(serverId)
+                serverConfigViewModel.deleteServer(serverId)
                 showDelete = false
             },
             onDismiss = { showDelete = false }
@@ -305,13 +307,13 @@ fun ServerDetailScreen(
     }
 
     if (showCleanup && server != null) {
-        val cleanupState by settingsViewModel.cleanupState.collectAsStateWithLifecycle()
+        val cleanupState by serverConfigViewModel.cleanupState.collectAsStateWithLifecycle()
         ServerCleanupDialog(
             state = cleanupState,
-            onConfirm = { settingsViewModel.cleanupServer(serverId) },
+            onConfirm = { serverConfigViewModel.cleanupServer(serverId) },
             onClose = {
                 showCleanup = false
-                settingsViewModel.resetCleanupState()
+                serverConfigViewModel.resetCleanupState()
             }
         )
     }
@@ -320,7 +322,7 @@ fun ServerDetailScreen(
         RenameServerDialog(
             currentName = server.name,
             onSave = { name ->
-                settingsViewModel.renameServer(serverId, name)
+                serverConfigViewModel.renameServer(serverId, name)
                 showRename = false
             },
             onDismiss = { showRename = false }

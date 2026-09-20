@@ -19,11 +19,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.freeturn.app.R
-import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.data.control.UninstallData
 import com.freeturn.app.ui.components.BusyProgressIndicator
 import com.freeturn.app.ui.theme.Spacing
-import com.freeturn.app.viewmodel.settings.ServerCleanupState
+import com.freeturn.app.viewmodel.server.ServerCleanupState
 
 /** Подтверждение удаления сервера из приложения (без серверной очистки). */
 @Composable

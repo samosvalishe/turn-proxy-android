@@ -15,6 +15,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
@@ -47,7 +48,16 @@ class App : Application() {
         ProxyNotifier.createChannels(this)
         reportPreviousExit()
         warmUpCore()
+        observeLogsEnabled()
         observeWidgetState()
+    }
+
+    private fun observeLogsEnabled() {
+        appPreferences.clientConfigFlow
+            .map { it.logsEnabled }
+            .distinctUntilChanged()
+            .onEach(ProxyStore::setLogsEnabled)
+            .launchIn(scope)
     }
 
     // Незакрытая сессия не доказывает причину завершения процесса.

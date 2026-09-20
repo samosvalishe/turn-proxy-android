@@ -8,7 +8,7 @@ import androidx.navigation.compose.navigation
 import com.freeturn.app.ui.screens.addserver.AddServerScreen
 import com.freeturn.app.ui.screens.setup.ServerSetupScreen
 import com.freeturn.app.ui.screens.share.QrScannerScreen
-import com.freeturn.app.viewmodel.settings.SettingsViewModel
+import com.freeturn.app.viewmodel.server.ServerConfigViewModel
 
 /**
  * Вкладка "+": мастер self-hosted живёт целиком в этом графе. Кросс-графовый push
@@ -17,18 +17,17 @@ import com.freeturn.app.viewmodel.settings.SettingsViewModel
  */
 internal fun NavGraphBuilder.addGraph(
     navController: NavHostController,
-    settingsViewModel: SettingsViewModel
+    serverConfigViewModel: ServerConfigViewModel
 ) {
     navigation<AddGraph>(startDestination = AddServer) {
         composable<AddServer> { entry ->
             AddServerScreen(
-                settingsViewModel = settingsViewModel,
                 onSelfHosted = { if (entry.isResumed()) navController.navigate(SelfHostedSetup) },
                 // Ручная настройка: создаём пустой сервер и уводим в его хаб. Хаб живёт в
                 // графе настроек - тот же tab-switch + singleTop-push, что у HomeScreen
                 // (кросс-графовый push ломает restoreState вкладок).
                 onManualCreate = { name ->
-                    settingsViewModel.addManualServer(name) { id ->
+                    serverConfigViewModel.addManualServer(name) { id ->
                         navController.navigateToTab(SettingsGraph)
                         navController.navigate(ServerDetail(id)) { launchSingleTop = true }
                     }

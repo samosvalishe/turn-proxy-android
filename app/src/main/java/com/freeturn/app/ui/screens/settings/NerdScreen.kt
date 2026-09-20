@@ -44,7 +44,7 @@ import com.freeturn.app.domain.proxy.ProxyEngine
 import com.freeturn.app.data.server.Server
 import com.freeturn.app.domain.server.ServerCommand
 import com.freeturn.app.domain.server.ServerStartOptions
-import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.ui.components.SettingsBackButton
 import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.ui.components.SettingsGroup
@@ -53,6 +53,7 @@ import com.freeturn.app.ui.components.SettingsSwitchRow
 import com.freeturn.app.ui.util.redact
 import com.freeturn.app.viewmodel.server.ServerHubState
 import com.freeturn.app.viewmodel.server.ServerViewModel
+import com.freeturn.app.viewmodel.server.ServerConfigViewModel
 import com.freeturn.app.viewmodel.settings.SettingsViewModel
 import com.freeturn.app.ui.theme.Spacing
 import org.koin.compose.koinInject
@@ -64,11 +65,12 @@ private fun versionLabel(version: String): String = "v${version.removePrefix("v"
 fun NerdScreen(
     serverId: String,
     settingsViewModel: SettingsViewModel,
+    serverConfigViewModel: ServerConfigViewModel,
     serverViewModel: ServerViewModel,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val snapshot by settingsViewModel.serversSnapshot.collectAsStateWithLifecycle()
+    val snapshot by serverConfigViewModel.serversSnapshot.collectAsStateWithLifecycle()
     val privacyMode by settingsViewModel.privacyMode.collectAsStateWithLifecycle()
     val coreStatus by serverViewModel.hubState.collectAsStateWithLifecycle()
     val sshLog by serverViewModel.sshLog.collectAsStateWithLifecycle()
@@ -118,10 +120,10 @@ fun NerdScreen(
                         sshLog = sshLog,
                         logsLoading = logsLoading,
                         onDebugModeChange = { v ->
-                            settingsViewModel.updateServerClient(serverId) { it.copy(debugMode = v) }
+                            serverConfigViewModel.updateServerClient(serverId) { it.copy(debugMode = v) }
                         },
                         onLogsEnabledChange = { v ->
-                            settingsViewModel.updateServerClient(serverId) { it.copy(logsEnabled = v) }
+                            serverConfigViewModel.updateServerClient(serverId) { it.copy(logsEnabled = v) }
                         },
                         onFetchJournal = {
                             HapticUtil.perform(context, HapticUtil.Pattern.CLICK)

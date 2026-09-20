@@ -52,25 +52,25 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
 import com.freeturn.app.data.config.SshConfig
 import com.freeturn.app.domain.SshConnectionState
-import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.ui.components.InlineErrorCard
 import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.ui.components.SshFormFields
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.theme.Spacing
 import com.freeturn.app.viewmodel.server.ServerViewModel
-import com.freeturn.app.viewmodel.settings.SettingsViewModel
+import com.freeturn.app.viewmodel.server.ServerConfigViewModel
 
 @Composable
 fun SshSetupScreen(
     serverViewModel: ServerViewModel,
-    settingsViewModel: SettingsViewModel,
+    serverConfigViewModel: ServerConfigViewModel,
     onConnected: () -> Unit,
     onBack: () -> Unit
 ) {
     // Экран не сервер-скоупный (правит активный SSH). Все серверы удалены, пока экран
     // висел в стеке вкладки - выходим назад: иначе форма пишет в осиротевший конфиг.
-    val snapshot by settingsViewModel.serversSnapshot.collectAsStateWithLifecycle()
+    val snapshot by serverConfigViewModel.serversSnapshot.collectAsStateWithLifecycle()
     if (snapshot.loaded && snapshot.list.isEmpty()) {
         LaunchedEffect(Unit) { onBack() }
         return

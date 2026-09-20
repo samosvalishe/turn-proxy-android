@@ -135,7 +135,8 @@ private fun CaptchaWebView(url: String) {
                     }
                     loadUrl(url)
                 }
-            }
+            },
+            onRelease = { it.destroy() }
         )
         if (progress < 1f) {
             LinearProgressIndicator(
