@@ -7,13 +7,6 @@ object ControlResponseParser {
         val text = raw.trim()
         if (text.isEmpty()) return err("internal", "empty output")
 
-        // Транспортная ошибка SSHManager / sudo: JSON в stdout нет.
-        val firstLine = text.lineSequence().firstOrNull()?.trim().orEmpty()
-        if (firstLine.startsWith("ERROR:")) {
-            val m = text.removePrefix("ERROR:").trim()
-            return err(transportCode(m), m)
-        }
-
         // MOTD/banner/.bashrc или sudo-остаток могли попасть ПЕРЕД нашим
         // единственным JSON-объектом - берём последнюю строку, начинающуюся с '{'.
         val jsonLine = text.lineSequence().lastOrNull { it.trimStart().startsWith("{") }
@@ -25,6 +18,8 @@ object ControlResponseParser {
             err("internal", "unparseable control output: ${jsonLine.take(200)}")
         }
     }
+
+    fun transportFailure(message: String): ControlResponse = err(transportCode(message), message)
 
     private fun transportCode(msg: String): String = when {
         msg.contains("sudo", ignoreCase = true) && msg.contains("password", ignoreCase = true) -> "sudo_auth_failed"

@@ -1,6 +1,5 @@
 package com.freeturn.app.viewmodel.server
 
-import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.freeturn.app.data.AppPreferences
@@ -12,7 +11,8 @@ import com.freeturn.app.domain.proxy.ProxyOrchestrator
 import com.freeturn.app.domain.ServerState
 import com.freeturn.app.domain.SshConnectionState
 import com.freeturn.app.domain.ssh.SshRepository
-import com.freeturn.app.data.HapticUtil
+import com.freeturn.app.viewmodel.HapticEvent
+import com.freeturn.app.viewmodel.Haptics
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -25,10 +25,8 @@ class ServerViewModel(
     private val sshRepository: SshRepository,
     private val prefs: AppPreferences,
     private val orchestrator: ProxyOrchestrator,
-    context: Context
+    private val haptics: Haptics
 ) : ViewModel() {
-
-    private val appContext = context.applicationContext
 
     val sshState: StateFlow<SshConnectionState> = sshRepository.sshState
     val serverState: StateFlow<ServerState> = sshRepository.serverState
@@ -65,19 +63,20 @@ class ServerViewModel(
     fun connectSsh(config: SshConfig) {
         viewModelScope.launch {
             prefs.saveSshConfig(config)
-            val (success, fp) = sshRepository.connectSsh(config)
-            if (success) {
-                if (config.hostFingerprint.isEmpty() && fp != null) {
-                    prefs.saveSshFingerprint(fp)
+            if (sshRepository.connectSsh(config)) {
+                val active = sshRepository.activeSshConfig
+                if (config.hostFingerprint.isEmpty()) {
+                    active?.hostFingerprint?.takeIf { it.isNotEmpty() }
+                        ?.let { prefs.saveSshFingerprint(it) }
                 }
                 // Детект rootMode живёт только в сессии; без персиста cleanup/share
                 // (factory, читают сохранённый cfg) упирались бы в stale needs_root.
-                sshRepository.activeSshConfig?.rootMode
+                active?.rootMode
                     ?.takeIf { it != config.rootMode }
                     ?.let { prefs.saveSshRootMode(it) }
-                HapticUtil.perform(appContext, HapticUtil.Pattern.SUCCESS)
+                haptics.perform(HapticEvent.SUCCESS)
             } else {
-                HapticUtil.perform(appContext, HapticUtil.Pattern.ERROR)
+                haptics.perform(HapticEvent.ERROR)
             }
         }
     }

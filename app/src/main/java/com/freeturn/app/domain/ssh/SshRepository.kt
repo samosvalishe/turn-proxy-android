@@ -26,11 +26,9 @@ import kotlinx.serialization.json.contentOrNull
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
-class SshRepository(
-    context: Context,
-    private val sshManager: SSHManager = SSHManager(),
-    private val serverControl: ServerControl = ServerControl(context, sshManager)
-) {
+class SshRepository(context: Context, private val sshManager: SSHManager) {
+
+    private val serverControl = ServerControl(context, sshManager)
 
     // Параллельные команды на одном SSHManager затирали бы fingerprint/_serverState.
     private val mutex = Mutex()
@@ -93,33 +91,40 @@ class SshRepository(
         return result
     }
 
-    private suspend fun runEcho(cfg: SshConfig): String {
+    private suspend fun runEcho(cfg: SshConfig): SshResult {
         logHeader("Подключение", "${cfg.username}@${cfg.ip}:${cfg.port}")
         val result = sshManager.executeSilentCommand(
             cfg.ip, cfg.port, cfg.username, cfg.password, "echo OK",
             knownFingerprint = cfg.hostFingerprint.ifEmpty { null },
             sshKey = if (cfg.authType == SshConfig.AUTH_SSH_KEY) cfg.sshKey else ""
         )
-        appendSshLog(result.lines().filter { it.isNotBlank() })
+        when (result) {
+            is SshResult.Output -> appendSshLog(result.text.lines().filter { it.isNotBlank() })
+            is SshResult.Failure -> appendSshLog("ERROR: ${result.message}")
+        }
         return result
     }
 
-    suspend fun connectSsh(config: SshConfig): Pair<Boolean, String?> = mutex.withLock {
+    suspend fun connectSsh(config: SshConfig): Boolean = mutex.withLock {
         _sshState.value = SshConnectionState.Connecting
         val result = runEcho(config)
         // Сравниваем построчно, а не весь вывод: серверный MOTD/banner или строки
         // из .bashrc могут попасть в stdout перед "OK" и сломать строгое равенство.
-        if (result.lines().any { it.trim() == "OK" }) {
+        if (result is SshResult.Output && result.text.lines().any { it.trim() == "OK" }) {
             val fp = sshManager.lastSeenFingerprint ?: config.hostFingerprint
             // Сохранённый rootMode мог устареть между SSH-сессиями.
             val mode = serverControl.detectRootMode(config) ?: config.rootMode
             activeSshConfig = config.copy(hostFingerprint = fp, rootMode = mode)
             _sshState.value = SshConnectionState.Connected(config.ip)
             checkServerStateLocked(activeSshConfig, silent = false)
-            Pair(true, sshManager.lastSeenFingerprint)
+            true
         } else {
-            _sshState.value = SshConnectionState.Error(result.removePrefix("ERROR: "))
-            Pair(false, null)
+            val message = when (result) {
+                is SshResult.Failure -> result.message
+                is SshResult.Output -> result.text
+            }
+            _sshState.value = SshConnectionState.Error(message)
+            false
         }
     }
 

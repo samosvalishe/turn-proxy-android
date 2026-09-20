@@ -46,16 +46,24 @@ class ControlResponseParserTest {
     }
 
     @Test
-    fun `transport ERROR prefix maps to err`() {
-        val r = ControlResponseParser.parse("ERROR: connection refused")
+    fun `transport failure maps to err`() {
+        val r = ControlResponseParser.transportFailure("connection refused")
         assertFalse(r.isOk)
         assertEquals("transport", r.code)
         assertEquals("connection refused", r.msg)
     }
 
     @Test
+    fun `ERROR prefix in output is kept as output`() {
+        val r = ControlResponseParser.parse("ERROR: something printed by the host")
+        assertFalse(r.isOk)
+        assertEquals("ERROR: something printed by the host", r.msg)
+    }
+
+    // sudo пишет отказ в stderr, он в общем выводе (exec 2>&1) вместо JSON.
+    @Test
     fun `sudo password failure detected`() {
-        val r = ControlResponseParser.parse("ERROR: sudo: a password is required")
+        val r = ControlResponseParser.parse("sudo: a password is required")
         assertEquals("sudo_auth_failed", r.code)
     }
 

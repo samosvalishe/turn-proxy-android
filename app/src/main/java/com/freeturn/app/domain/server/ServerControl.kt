@@ -5,6 +5,7 @@ import com.freeturn.app.data.config.SshConfig
 import com.freeturn.app.data.control.ControlResponse
 import com.freeturn.app.data.control.ControlResponseParser
 import com.freeturn.app.domain.ssh.SSHManager
+import com.freeturn.app.domain.ssh.SshResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -45,7 +46,7 @@ class ServerControl(
         } else {
             script
         }
-        val output = ssh.executeWithStdin(
+        val result = ssh.executeWithStdin(
             ip = cfg.ip,
             port = cfg.port,
             user = cfg.username,
@@ -55,7 +56,10 @@ class ServerControl(
             knownFingerprint = cfg.hostFingerprint.ifEmpty { null },
             sshKey = if (cfg.authType == SshConfig.AUTH_SSH_KEY) cfg.sshKey else ""
         )
-        ControlResponseParser.parse(output)
+        when (result) {
+            is SshResult.Output -> ControlResponseParser.parse(result.text)
+            is SshResult.Failure -> ControlResponseParser.transportFailure(result.message)
+        }
     }
 
     /**
@@ -63,13 +67,13 @@ class ServerControl(
      * null - транспортная ошибка (соединение не удалось).
      */
     suspend fun detectRootMode(cfg: SshConfig): String? = withContext(Dispatchers.IO) {
-        val out = ssh.executeSilentCommand(
+        val result = ssh.executeSilentCommand(
             cfg.ip, cfg.port, cfg.username, cfg.password,
             "id -u; command -v sudo >/dev/null 2>&1 && { sudo -n true 2>/dev/null && echo FT_SUDO_NOPASS || echo FT_SUDO_PASS; }",
             knownFingerprint = cfg.hostFingerprint.ifEmpty { null },
             sshKey = if (cfg.authType == SshConfig.AUTH_SSH_KEY) cfg.sshKey else ""
         )
-        if (out.startsWith("ERROR:")) null else classifyRootMode(out)
+        (result as? SshResult.Output)?.let { classifyRootMode(it.text) }
     }
 
     /**

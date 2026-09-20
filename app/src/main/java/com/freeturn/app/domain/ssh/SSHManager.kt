@@ -15,6 +15,12 @@ import java.util.Properties
 
 private const val CONNECT_TIMEOUT_MS = 5000
 
+sealed interface SshResult {
+    /** stdout+stderr команды (`exec 2>&1`). */
+    data class Output(val text: String) : SshResult
+    data class Failure(val message: String) : SshResult
+}
+
 class SSHManager {
 
     @Volatile var lastSeenFingerprint: String? = null
@@ -25,7 +31,7 @@ class SSHManager {
         knownFingerprint: String? = null,
         sshKey: String = "",
         execTimeoutMs: Int = 30_000
-    ): String = exec(ip, port, user, pass, command, null, knownFingerprint, sshKey, execTimeoutMs)
+    ): SshResult = exec(ip, port, user, pass, command, null, knownFingerprint, sshKey, execTimeoutMs)
 
     suspend fun executeWithStdin(
         ip: String, port: Int, user: String, pass: String,
@@ -33,22 +39,22 @@ class SSHManager {
         knownFingerprint: String? = null,
         sshKey: String = "",
         execTimeoutMs: Int = 180_000
-    ): String = exec(ip, port, user, pass, command, stdin, knownFingerprint, sshKey, execTimeoutMs)
+    ): SshResult = exec(ip, port, user, pass, command, stdin, knownFingerprint, sshKey, execTimeoutMs)
 
     private suspend fun exec(
         ip: String, port: Int, user: String, pass: String,
         command: String, stdin: String?,
         knownFingerprint: String?, sshKey: String, execTimeoutMs: Int
-    ): String = withContext(Dispatchers.IO) {
+    ): SshResult = withContext(Dispatchers.IO) {
         val tofu = TofuHostKeyRepository(knownFingerprint)
         var session: Session? = null
         try {
             session = connectSession(ip, port, user, pass, sshKey, tofu)
             lastSeenFingerprint = verifyConnectedFingerprint(knownFingerprint, tofu.capturedFingerprint)
             session.timeout = execTimeoutMs
-            runCommand(session, command, stdin, execTimeoutMs)
+            SshResult.Output(runCommand(session, command, stdin, execTimeoutMs))
         } catch (e: Exception) {
-            mitmOrError(e, tofu, knownFingerprint)
+            SshResult.Failure(failureMessage(e, tofu, knownFingerprint))
         } finally {
             session?.disconnect()
         }
@@ -96,16 +102,16 @@ class SSHManager {
         return output.trim()
     }
 
-    private fun mitmOrError(e: Exception, tofu: TofuHostKeyRepository, knownFingerprint: String?): String {
+    private fun failureMessage(e: Exception, tofu: TofuHostKeyRepository, knownFingerprint: String?): String {
         val isMitm = tofu.capturedFingerprint != null &&
             knownFingerprint != null &&
             tofu.capturedFingerprint != knownFingerprint
         return if (isMitm) {
-            "ERROR: Отпечаток сервера изменился - возможна MITM-атака\n" +
+            "Отпечаток сервера изменился - возможна MITM-атака\n" +
                 "Ожидался: $knownFingerprint\n" +
                 "Получен:  ${tofu.capturedFingerprint}"
         } else {
-            "ERROR: ${e.message}"
+            e.message ?: e.javaClass.simpleName
         }
     }
 
