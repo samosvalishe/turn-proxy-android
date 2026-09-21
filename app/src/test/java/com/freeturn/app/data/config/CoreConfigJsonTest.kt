@@ -53,6 +53,61 @@ class CoreConfigJsonTest {
         assertEquals(ClientConfig.WG_MTU, tunnel["mtu"]!!.jsonPrimitive.content.toInt())
     }
 
+    @Test
+    fun tunnelSelectsAwgForLegacyAmneziaParameters() {
+        val awg = base.copy(
+            tunnelTransport = TunnelTransport.WIREGUARD,
+            wireGuardConfig = """
+                [Interface]
+                Address = 10.8.0.2/32
+                Jc = 5
+                Jmin = 10
+                Jmax = 50
+                S1 = 78
+
+                [Peer]
+                AllowedIPs = 0.0.0.0/0
+            """.trimIndent(),
+        )
+        val tunnel = parse(awg)["tunnel"]!!.jsonObject
+        assertEquals(CoreConfigJson.TUNNEL_MODE_AWG, tunnel["mode"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun tunnelSelectsAwgForAwg3Parameters() {
+        val awg = base.copy(
+            tunnelTransport = TunnelTransport.WIREGUARD,
+            wireGuardConfig = """
+                [interface]
+                Address = 10.8.0.2/32
+                HeaderProtectionKey = AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+
+                [peer]
+                AllowedIPs = 0.0.0.0/0
+            """.trimIndent(),
+        )
+        val tunnel = parse(awg)["tunnel"]!!.jsonObject
+        assertEquals(CoreConfigJson.TUNNEL_MODE_AWG, tunnel["mode"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun awgMarkersInCommentsOrPeerSectionAreIgnored() {
+        val wg = base.copy(
+            tunnelTransport = TunnelTransport.WIREGUARD,
+            wireGuardConfig = """
+                [Interface]
+                Address = 10.8.0.2/32
+                # Jc = 5
+
+                [Peer]
+                AllowedIPs = 0.0.0.0/0
+                H1 = 123
+            """.trimIndent(),
+        )
+        val tunnel = parse(wg)["tunnel"]!!.jsonObject
+        assertEquals(CoreConfigJson.TUNNEL_MODE_WG, tunnel["mode"]!!.jsonPrimitive.content)
+    }
+
     // Лишний ключ в proxy валит старт ядра (DisallowUnknownFields), а не тест схемы.
     @Test
     fun proxyHasModeAndListen() {
@@ -154,3 +209,4 @@ class CoreConfigJsonTest {
         )
     }
 }
+
