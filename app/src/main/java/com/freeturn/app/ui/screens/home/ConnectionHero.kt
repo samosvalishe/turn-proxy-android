@@ -53,6 +53,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -141,8 +142,6 @@ private fun HeroToggleButton(
     // Форма, размер и цвет тянутся одними и теми же спеками - иначе переход распадается на слои.
     val colorSpec = MaterialTheme.motionScheme.slowEffectsSpec<Color>()
     val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
-    val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val fastEffectsSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
 
     val containerColor by animateColorAsState(
         targetValue = when (kind) {
@@ -171,18 +170,16 @@ private fun HeroToggleButton(
         label = "btn_scale"
     )
 
-    val heroShape = rememberMorphingShape(
-        target = when (kind) {
-            HeroKind.Idle -> MaterialShapes.Cookie12Sided
-            HeroKind.Busy -> MaterialShapes.Sunny
-            HeroKind.Running -> MaterialShapes.Circle
-            HeroKind.Error -> MaterialShapes.SoftBurst
-        },
-        reducedMotion = reducedMotion
-    )
+    val heroTarget = when (kind) {
+        HeroKind.Idle -> MaterialShapes.Cookie12Sided
+        HeroKind.Busy -> MaterialShapes.Sunny
+        HeroKind.Running -> MaterialShapes.Circle
+        HeroKind.Error -> MaterialShapes.SoftBurst
+    }
     val rotation = rememberHeroSpin(spinning = kind == HeroKind.Busy && !reducedMotion)
 
     val handSpin = remember { Animatable(0f) }
+    val handSpinState = handSpin.asState()
     val spinnable = decor && kind == HeroKind.Idle
     val settleSpec = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
     LaunchedEffect(spinnable) {
@@ -201,8 +198,12 @@ private fun HeroToggleButton(
             )
         }
 
-        Surface(
+        MorphingHeroSurface(
+            target = heroTarget,
+            reducedMotion = reducedMotion,
             onClick = onClick,
+            color = containerColor,
+            tonalElevation = if (kind == HeroKind.Running) 3.dp else 1.dp,
             modifier = Modifier
                 .size(HeroButtonSize)
                 .leafSpin(handSpin, spinnable)
@@ -212,38 +213,73 @@ private fun HeroToggleButton(
                     scaleY = scale.value
                     rotationZ = rotation.value + handSpin.value
                 }
-                .semantics { contentDescription = buttonLabel },
-            shape = heroShape,
-            color = containerColor,
-            tonalElevation = if (kind == HeroKind.Running) 3.dp else 1.dp
+                .semantics { contentDescription = buttonLabel }
         ) {
-            Box(
-                // Контр-вращение: крутится только фигура.
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer { rotationZ = -(rotation.value + handSpin.value) },
-                contentAlignment = Alignment.Center
-            ) {
-                if (reducedMotion) {
-                    HeroIcon(kind = kind, tint = contentColor)
-                } else {
-                    AnimatedContent(
-                        targetState = kind,
-                        transitionSpec = {
-                            (fadeIn(effectsSpec) + scaleIn(spatialSpec, initialScale = 0.85f))
-                                .togetherWith(fadeOut(fastEffectsSpec) + scaleOut(fastEffectsSpec, targetScale = 0.85f))
-                        },
-                        label = "hero_icon"
-                    ) { k ->
-                        HeroIcon(kind = k, tint = contentColor)
-                    }
-                }
-            }
+            HeroFace(
+                kind = kind,
+                tint = contentColor,
+                reducedMotion = reducedMotion,
+                rotation = rotation,
+                handSpin = handSpinState
+            )
         }
 
-        // Поверх кнопки: слой без pointerInput, тап проходит насквозь в Surface.
         if (decor) {
             AutumnLeafBurst(burstKey = burstKey, buttonSize = HeroButtonSize)
+        }
+    }
+}
+
+@Composable
+private fun MorphingHeroSurface(
+    target: RoundedPolygon,
+    reducedMotion: Boolean,
+    onClick: () -> Unit,
+    color: Color,
+    tonalElevation: Dp,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier,
+        shape = rememberMorphingShape(target, reducedMotion),
+        color = color,
+        tonalElevation = tonalElevation,
+        content = content
+    )
+}
+
+@Composable
+private fun HeroFace(
+    kind: HeroKind,
+    tint: Color,
+    reducedMotion: Boolean,
+    rotation: State<Float>,
+    handSpin: State<Float>
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer { rotationZ = -(rotation.value + handSpin.value) },
+        contentAlignment = Alignment.Center
+    ) {
+        if (reducedMotion) {
+            HeroIcon(kind = kind, tint = tint)
+        } else {
+            val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+            val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+            val fastEffectsSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+            AnimatedContent(
+                targetState = kind,
+                transitionSpec = {
+                    (fadeIn(effectsSpec) + scaleIn(spatialSpec, initialScale = 0.85f))
+                        .togetherWith(fadeOut(fastEffectsSpec) + scaleOut(fastEffectsSpec, targetScale = 0.85f))
+                },
+                label = "hero_icon"
+            ) { k ->
+                HeroIcon(kind = k, tint = tint)
+            }
         }
     }
 }
