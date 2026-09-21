@@ -53,6 +53,7 @@ class ProxyNotifier(private val service: Service) {
     }
 
     private var shown: ProxyStatus? = null
+    private var shownTunnelMode = false
     private var captchaShown = false
 
     private val openApp: PendingIntent? by lazy {
@@ -75,8 +76,14 @@ class ProxyNotifier(private val service: Service) {
 
     fun update(status: ProxyStatus, tunnelMode: Boolean) {
         if (status.captchaUrl.isNotEmpty()) showCaptcha() else cancelCaptcha()
-        if (status.visible() == shown?.visible()) return
+        val prev = shown
+        if (prev != null && tunnelMode == shownTunnelMode &&
+            prev.phase == status.phase && prev.active == status.active && prev.total == status.total
+        ) {
+            return
+        }
         shown = status
+        shownTunnelMode = tunnelMode
         notify(NOTIF_ID_FG, build(status, tunnelMode))
     }
 
@@ -141,4 +148,3 @@ class ProxyNotifier(private val service: Service) {
     }
 }
 
-private fun ProxyStatus.visible() = listOf(phase, active, total)
