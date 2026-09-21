@@ -2,6 +2,18 @@ package com.freeturn.app.data.config
 
 import java.security.SecureRandom
 
+private val HEX_DIGITS = "0123456789abcdef".toCharArray()
+
+internal fun ByteArray.toHex(): String {
+    val out = CharArray(size * 2)
+    for (i in indices) {
+        val v = this[i].toInt() and 0xFF
+        out[i * 2] = HEX_DIGITS[v ushr 4]
+        out[i * 2 + 1] = HEX_DIGITS[v and 0x0F]
+    }
+    return String(out)
+}
+
 object DnsMode {
     const val AUTO = "auto"
     const val PLAIN = "plain"
@@ -32,7 +44,7 @@ object ObfProfile {
     fun isValidKey(key: String): Boolean = key.matches(KEY_REGEX)
 
     fun generateKey(): String =
-        ByteArray(32).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
+        ByteArray(32).also { SecureRandom().nextBytes(it) }.toHex()
 }
 
 // Ядро не принимает IPv6-адреса в скобках.
@@ -49,7 +61,7 @@ object ClientId {
     fun isValid(id: String): Boolean = id.matches(ID_REGEX)
 
     fun generate(): String =
-        ByteArray(16).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
+        ByteArray(16).also { SecureRandom().nextBytes(it) }.toHex()
 }
 
 /** Режим проброса (-mode): udp - датаграммы WireGuard, tcp - поток Xray/sing-box. */

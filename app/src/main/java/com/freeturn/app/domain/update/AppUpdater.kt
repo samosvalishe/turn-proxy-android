@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.content.pm.Signature
 import android.os.Build
 import androidx.core.content.FileProvider
+import com.freeturn.app.data.config.toHex
 import com.freeturn.app.domain.UpdateState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -195,8 +196,7 @@ class AppUpdater(private val context: Context) {
             info.signatures
         }
         return sigs.orEmpty().map { sig ->
-            MessageDigest.getInstance("SHA-256").digest(sig.toByteArray())
-                .joinToString("") { "%02x".format(it) }
+            MessageDigest.getInstance("SHA-256").digest(sig.toByteArray()).toHex()
         }.toSet()
     }
 
