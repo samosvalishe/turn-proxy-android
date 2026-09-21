@@ -76,6 +76,7 @@ data class CoreConfigJson(
         const val PROXY_MODE_UDP = "udp"
         const val TUNNEL_MODE_NONE = "none"
         const val TUNNEL_MODE_WG = "wg"
+        const val TUNNEL_MODE_AWG = "awg"
         const val PLATFORM_MOBILE = "mobile"
 
         fun encode(cfg: CoreConfigJson): String = json.encodeToString(cfg)
@@ -143,8 +144,11 @@ fun ClientConfig.toCoreJson(
             log = CoreConfigJson.Log(debug = debugMode),
             kcp = if (tcpMode) srv.kcp.toCoreJson() else null,
             tunnel = CoreConfigJson.Tunnel(
-                mode = if (wireGuardActive) CoreConfigJson.TUNNEL_MODE_WG
-                else CoreConfigJson.TUNNEL_MODE_NONE,
+                mode = when {
+                    !wireGuardActive -> CoreConfigJson.TUNNEL_MODE_NONE
+                    wireGuardConfig.usesAmneziaWireGuard() -> CoreConfigJson.TUNNEL_MODE_AWG
+                    else -> CoreConfigJson.TUNNEL_MODE_WG
+                },
                 config = if (wireGuardActive) wireGuardConfig else "",
                 mtu = ClientConfig.WG_MTU,
             ),
