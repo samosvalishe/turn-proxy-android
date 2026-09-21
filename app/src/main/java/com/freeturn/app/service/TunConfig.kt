@@ -3,9 +3,9 @@ package com.freeturn.app.service
 import android.content.Context
 import android.net.VpnService
 import com.freeturn.app.data.config.ClientConfig
-import com.freeturn.app.data.config.SplitTunnelMode
+import com.freeturn.app.data.config.SplitTunnelRule
 import com.freeturn.app.data.config.TunnelTransport
-import com.freeturn.app.data.config.splitTunnelSelection
+import com.freeturn.app.data.config.splitTunnelRule
 import com.freeturn.app.data.isPackageInstalled
 import com.freeturn.app.domain.proxy.TunnelSetup
 
@@ -37,25 +37,17 @@ fun VpnService.Builder.applyTunnel(
     }
     setup.dns.forEach { addDnsServer(it) }
 
-    // Непоставленные пакеты кидают NameNotFoundException и рушат establish.
-    val packages = splitTunnelSelection(cfg.splitTunnelMode, cfg.splitTunnelApps)
-        .filter { context.isPackageInstalled(it) }
-    when (cfg.splitTunnelMode) {
-        // Своё имя не добавляем: сокеты ядра и так вне туннеля через protect().
-        // Исключение - хотспот: в туннель ходит сам SOCKS5-сервер, и своё имя нужно
-        // именно добавить - в пользовательском списке его может не быть вовсе.
-        SplitTunnelMode.INCLUDE -> {
-            val allowed =
-                if (hotspot) packages + context.packageName
-                else packages.filter { it != context.packageName }
-            allowed.distinct().forEach { addAllowedApplication(it) }
-        }
-        // Своё имя пользователь мог выбрать руками - при хотспоте это выключило бы
-        // раздачу, оставив клиентам прямой канал.
-        SplitTunnelMode.EXCLUDE ->
-            packages.filter { !(hotspot && it == context.packageName) }
-                .forEach { addDisallowedApplication(it) }
-        else -> Unit
+    val rule = splitTunnelRule(
+        mode = cfg.splitTunnelMode,
+        apps = cfg.splitTunnelApps,
+        ownPackage = context.packageName,
+        hotspot = hotspot,
+        isInstalled = context::isPackageInstalled,
+    )
+    when (rule) {
+        SplitTunnelRule.All -> Unit
+        is SplitTunnelRule.Allowed -> rule.packages.forEach { addAllowedApplication(it) }
+        is SplitTunnelRule.Disallowed -> rule.packages.forEach { addDisallowedApplication(it) }
     }
 }
 

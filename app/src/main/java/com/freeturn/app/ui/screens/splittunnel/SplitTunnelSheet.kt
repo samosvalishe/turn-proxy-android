@@ -19,7 +19,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SheetValue
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetState
@@ -43,6 +42,7 @@ import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.data.AppChoice
 import com.freeturn.app.data.installedInternetApps
 import com.freeturn.app.ui.components.EmptyState
+import com.freeturn.app.ui.components.InlineNoticeCard
 import com.freeturn.app.ui.theme.Spacing
 
 @Composable
@@ -131,10 +131,16 @@ fun SplitTunnelSheetContent(
         }
 
         if (locked) {
-            LockedBanner(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = HorizontalPadding)
+            InlineNoticeCard(
+                message = stringResource(R.string.split_tunnel_locked),
+                modifier = Modifier.padding(horizontal = HorizontalPadding)
+            )
+        }
+
+        if (splitOn && modeChoice == SplitTunnelMode.INCLUDE && selected.isEmpty()) {
+            InlineNoticeCard(
+                message = stringResource(R.string.split_tunnel_include_empty),
+                modifier = Modifier.padding(horizontal = HorizontalPadding)
             )
         }
 
@@ -195,28 +201,3 @@ private val HorizontalPadding = 16.dp
 
 private val ListHeight = 360.dp
 
-@Composable
-private fun LockedBanner(modifier: Modifier = Modifier) {
-    Surface(
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        shape = MaterialTheme.shapes.medium,
-        modifier = modifier
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                painterResource(R.drawable.info_24px),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-            Text(
-                stringResource(R.string.split_tunnel_locked),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-        }
-    }
-}

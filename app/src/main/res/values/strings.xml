@@ -385,6 +385,7 @@
     <string name="split_tunnel_empty">Приложения не найдены</string>
     <string name="split_tunnel_off_hint">Включите, чтобы выбрать приложения</string>
     <string name="split_tunnel_locked">Остановите подключение, чтобы изменить раздельное туннелирование</string>
+    <string name="split_tunnel_include_empty">Ничего не выбрано - через VPN не пойдёт ни одно приложение</string>
     <string name="split_tunnel_status_off">Раздельное туннелирование выключено</string>
     <string name="split_tunnel_status_on">Раздельное туннелирование включено</string>
 
