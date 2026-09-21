@@ -61,7 +61,7 @@ class ServerConfigViewModel(
     fun addManualServer(name: String, onAdded: (String) -> Unit) {
         viewModelScope.launch {
             val server = Server(name = name, client = ClientConfig(syncServerSwitches = false))
-            onAdded(prefs.addServer(server))
+            prefs.addServer(server)?.let(onAdded)
         }
     }
 

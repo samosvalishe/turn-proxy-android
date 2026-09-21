@@ -96,11 +96,14 @@ class ImportViewModel(
         if (!st.canConfirm) return
         _uiState.update { it.copy(saving = true, saveError = false) }
         viewModelScope.launch {
-            try {
+            val saved = try {
                 prefs.addServer(buildServer(link, st, fallbackName), activate = true)
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
+            } catch (_: Exception) {
+                null
+            }
+            if (saved == null) {
                 haptics.perform(HapticEvent.ERROR)
                 _uiState.update { it.copy(saving = false, saveError = true) }
                 return@launch

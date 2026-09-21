@@ -310,10 +310,14 @@ class ServerSetupViewModel(
 
             // NonCancellable: сервер уже настроен и запущен - уход с экрана не должен
             // оставить его без записи в приложении.
-            withContext(NonCancellable) {
+            val saved = withContext(NonCancellable) {
                 val server = buildServer(cfg, c, backendPort, wgClientConf)
-                prefs.addServer(server, activate = true)
-                orchestrator.restartProxyIfRunning()
+                prefs.addServer(server, activate = true)?.also { orchestrator.restartProxyIfRunning() }
+            }
+
+            if (saved == null) {
+                fail("Сервер запущен, но профиль не сохранён - список серверов повреждён")
+                return@launch
             }
             advance()
 

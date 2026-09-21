@@ -192,15 +192,17 @@ class AppPreferences(context: Context) {
         return changed
     }
 
-    suspend fun addServer(server: Server, activate: Boolean = false): String {
+    suspend fun addServer(server: Server, activate: Boolean = false): String? {
+        var added: String? = null
         context.dataStore.edit { prefs ->
             val list = prefs.serversForWrite() ?: return@edit
             val base = server.name.trim().ifBlank { Server.FALLBACK_NAME }
             val named = server.copy(name = uniqueServerName(base, list))
             prefs[SERVERS_JSON] = ServerJson.encodeList(list + named)
             if (activate || list.isEmpty()) prefs[ACTIVE_SERVER_ID] = named.id
+            added = named.id
         }
-        return server.id
+        return added
     }
 
     suspend fun cloneServer(id: String): String? {
