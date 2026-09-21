@@ -20,7 +20,8 @@ import kotlinx.coroutines.launch
  */
 class AndroidProxyServiceLauncher(
     private val context: Context,
-    private val prefs: AppPreferences
+    private val prefs: AppPreferences,
+    private val store: ProxyStore
 ) : ProxyServiceLauncher {
 
     // Параллелизм 1: START и STOP обязаны уйти в систему в том же порядке, в каком их нажали.
@@ -40,14 +41,14 @@ class AndroidProxyServiceLauncher(
 
     override fun start() {
         prefs.setProxyDesired(true)
-        ProxyStore.starting()
+        store.starting()
         dispatch {
             try {
                 val intent = command(ProxyActions.START)
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent)
                 else context.startService(intent)
             } catch (e: Exception) {
-                ProxyStore.fail(e.message ?: "Не удалось запустить сервис")
+                store.fail(e.message ?: "Не удалось запустить сервис")
             }
         }
     }
@@ -59,7 +60,7 @@ class AndroidProxyServiceLauncher(
      */
     override fun stop() {
         prefs.setProxyDesired(false)
-        ProxyStore.idle()
+        store.idle()
         dispatch {
             try {
                 context.startService(command(ProxyActions.STOP))

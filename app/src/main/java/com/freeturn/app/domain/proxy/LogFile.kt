@@ -17,7 +17,7 @@ import java.util.Locale
  * Пишет отдельным потоком: строки приходят из горутин Go, блокировать их нельзя. Время
  * форматируется там же - SimpleDateFormat не потокобезопасен.
  */
-class LogFile(dir: File) {
+internal class LogFile(dir: File) {
 
     private sealed interface Cmd {
         data class Line(val at: Long, val text: String, val level: LogLevel) : Cmd

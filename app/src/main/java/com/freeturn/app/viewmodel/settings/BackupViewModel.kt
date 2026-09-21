@@ -8,8 +8,8 @@ import androidx.lifecycle.viewModelScope
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.backup.BackupCrypto
 import com.freeturn.app.domain.backup.BackupManager
+import com.freeturn.app.domain.proxy.ProxyLog
 import com.freeturn.app.domain.proxy.ProxyServiceLauncher
-import com.freeturn.app.domain.proxy.ProxyStore
 import com.freeturn.app.domain.ssh.SshRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +35,7 @@ class BackupViewModel(
     private val proxyLauncher: ProxyServiceLauncher,
     private val sshRepository: SshRepository,
     private val backupManager: BackupManager,
+    private val log: ProxyLog,
     context: Context
 ) : ViewModel() {
 
@@ -73,7 +74,7 @@ class BackupViewModel(
                 proxyLauncher.stop()
                 val count = backupManager.restore(data)
                 sshRepository.resetAll()
-                ProxyStore.clearLogs()
+                log.clearAll()
                 BackupEvent.RestoreSuccess(count)
             } catch (e: CancellationException) {
                 throw e
@@ -93,7 +94,7 @@ class BackupViewModel(
             proxyLauncher.stop()
             prefs.resetAll()
             sshRepository.resetAll()
-            ProxyStore.clearLogs()
+            log.clearAll()
 
             val intent = appContext.packageManager.getLaunchIntentForPackage(appContext.packageName)
             if (intent != null) {

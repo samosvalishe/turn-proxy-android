@@ -24,12 +24,13 @@ class ProxyShortcutActivity : ComponentActivity() {
 
     private val prefs: AppPreferences by inject()
     private val launcher: ProxyServiceLauncher by inject()
+    private val store: ProxyStore by inject()
 
     private val consent = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         if (result.resultCode == RESULT_OK) launcher.start()
-        else ProxyStore.fail(getString(R.string.notif_proxy_vpn_denied))
+        else store.fail(getString(R.string.notif_proxy_vpn_denied))
         finish()
     }
 

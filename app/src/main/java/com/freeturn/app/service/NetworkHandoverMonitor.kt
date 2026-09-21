@@ -1,5 +1,4 @@
 package com.freeturn.app.service
-import com.freeturn.app.domain.proxy.ProxyStore
 
 import android.content.Context
 import android.net.ConnectivityManager
@@ -7,6 +6,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.SystemClock
+import com.freeturn.app.domain.proxy.ProxyLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 class NetworkHandoverMonitor(
     private val context: Context,
     private val scope: CoroutineScope,
+    private val log: ProxyLog,
     private val onHandover: () -> Unit,
 ) {
     companion object {
@@ -47,7 +48,7 @@ class NetworkHandoverMonitor(
 
         fun schedule(reason: String) {
             if (SystemClock.elapsedRealtime() - registeredAt < WARMUP_MS) return
-            debounceJob?.cancel()
+            if (debounceJob?.isActive == true) return
             debounceJob = scope.launch {
                 delay(2_000)
                 val oldKey = lastKey
@@ -57,7 +58,7 @@ class NetworkHandoverMonitor(
                 if (oldKey == newKey) return@launch
                 lastKey = newKey
                 if (newKey == null) {
-                    ProxyStore.log("Сеть: физическая сеть недоступна ($reason)")
+                    log.add("Сеть: физическая сеть недоступна ($reason)")
                     return@launch
                 }
                 onHandover()
@@ -70,7 +71,7 @@ class NetworkHandoverMonitor(
                 val caps = cm.getNetworkCapabilities(network)
                 if (caps == null || caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) ||
                     !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)) {
-                    ProxyStore.log("Сеть: VPN-событие проигнорировано")
+                    log.add("Сеть: VPN-событие проигнорировано")
                     return
                 }
                 schedule("available")
@@ -85,7 +86,7 @@ class NetworkHandoverMonitor(
                 if (newKey == null || newKey == lastKey) return
                 debounceJob?.cancel()
                 lastKey = newKey
-                ProxyStore.log("Сеть: уходит через $maxMsToLive мс - переподключение заранее")
+                log.add("Сеть: уходит через $maxMsToLive мс - переподключение заранее")
                 onHandover()
             }
 

@@ -5,8 +5,10 @@ import com.freeturn.app.domain.backup.BackupManager
 import com.freeturn.app.domain.update.AppUpdater
 import com.freeturn.app.domain.share.LinkImportBus
 import com.freeturn.app.domain.proxy.ProxyEngine
+import com.freeturn.app.domain.proxy.ProxyLog
 import com.freeturn.app.domain.proxy.ProxyOrchestrator
 import com.freeturn.app.domain.proxy.ProxyServiceLauncher
+import com.freeturn.app.domain.proxy.ProxyStore
 import com.freeturn.app.service.AndroidProxyServiceLauncher
 import com.freeturn.app.domain.ssh.SSHManager
 import com.freeturn.app.domain.server.ServerSetupRepository
@@ -25,20 +27,23 @@ import com.freeturn.app.viewmodel.Haptics
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
+import java.io.File
 
 val appModule = module {
     single { AppPreferences(androidContext()) }
-    single<ProxyServiceLauncher> { AndroidProxyServiceLauncher(androidContext(), get()) }
+    single { ProxyStore() }
+    single { ProxyLog(File(androidContext().filesDir, "logs")) }
+    single<ProxyServiceLauncher> { AndroidProxyServiceLauncher(androidContext(), get(), get()) }
     // Ядро одно на процесс: сессия переживает пересоздание сервиса.
     // noBackupFilesDir: состояние ядра приватное и не должно уезжать в облачный бэкап.
-    single { ProxyEngine(androidContext().noBackupFilesDir.absolutePath) }
+    single { ProxyEngine(androidContext().noBackupFilesDir.absolutePath, get(), get()) }
     // factory: каждому потребителю свой SSHManager - lastSeenFingerprint (TOFU) не должен
     // делиться между живой сессией и мастером/шарингом.
     factory { SSHManager() }
     single { SshRepository(androidContext(), get()) }
     single { AppUpdater(androidContext()) }
     single { BackupManager(get()) }
-    single { ProxyOrchestrator(get(), get(), get()) }
+    single { ProxyOrchestrator(get(), get(), get(), get()) }
     // factory: своя SSH-сессия на каждый прогон мастера, живой SshRepository не трогаем.
     factory { ServerSetupRepository(androidContext(), get()) }
     // factory по той же причине: SSH-операции шаринга не делят сессию с активным сервером.

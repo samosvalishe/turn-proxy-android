@@ -47,7 +47,7 @@ private fun isLocalCaptchaUrl(url: String): Boolean {
  * Ручная VK-капча во встроенном WebView. Грузит локальный прокси ядра
  * (127.0.0.1:8765), который переписывает VK-страницы так, чтобы весь трафик шёл
  * через loopback. Диалог закрывается, когда ядро отрапортует о решении капчи
- * (onCaptcha("") -> ProxyStore.setCaptcha("")).
+ * (onCaptcha("") -> ProxyStore.setCaptcha("") -> пустой captchaUrl в status).
  */
 @Composable
 fun CaptchaWebViewDialog(

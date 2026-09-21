@@ -39,6 +39,7 @@ import kotlin.coroutines.coroutineContext
  */
 class Socks5Server(
     private val protect: (Socket) -> Boolean,
+    private val log: ProxyLog,
     private val port: Int = DEFAULT_PORT,
 ) {
     private val executor = Executors.newCachedThreadPool()
@@ -55,12 +56,12 @@ class Socks5Server(
         val socket = try {
             ServerSocket(port, BACKLOG, InetAddress.getByName(BIND_ADDRESS))
         } catch (e: Exception) {
-            ProxyStore.log("SOCKS5: не поднялся на $BIND_ADDRESS:$port - ${e.message}", LogLevel.Error)
+            log.add("SOCKS5: не поднялся на $BIND_ADDRESS:$port - ${e.message}", LogLevel.Error)
             return
         }
         serverSocket = socket
         scope.launch { acceptLoop(socket) }
-        ProxyStore.log("SOCKS5: раздача туннеля на $BIND_ADDRESS:$port (только TCP)")
+        log.add("SOCKS5: раздача туннеля на $BIND_ADDRESS:$port (только TCP)")
     }
 
     @Synchronized
@@ -72,7 +73,7 @@ class Socks5Server(
         sockets.clear()
         scope.cancel()
         executor.shutdown()
-        ProxyStore.log("SOCKS5: раздача остановлена")
+        log.add("SOCKS5: раздача остановлена")
     }
 
     private suspend fun acceptLoop(socket: ServerSocket) {
@@ -82,7 +83,7 @@ class Socks5Server(
             } catch (e: Exception) {
                 // Закрытый из stop() сокет - штатный выход, о нём молчим.
                 if (serverSocket != null) {
-                    ProxyStore.log("SOCKS5: приём прерван - ${e.message}", LogLevel.Warning)
+                    log.add("SOCKS5: приём прерван - ${e.message}", LogLevel.Warning)
                 }
                 return
             }

@@ -20,7 +20,7 @@ import com.freeturn.app.data.config.coreDnsServers
 import com.freeturn.app.data.config.toCoreJson
 import com.freeturn.app.domain.proxy.LogLevel
 import com.freeturn.app.domain.proxy.ProxyEngine
-import com.freeturn.app.domain.proxy.ProxyPhase
+import com.freeturn.app.domain.proxy.ProxyLog
 import com.freeturn.app.domain.proxy.ProxyStore
 import com.freeturn.app.domain.proxy.SocketProtector
 import com.freeturn.app.domain.proxy.Socks5Server
@@ -47,6 +47,8 @@ class ProxyService : VpnService() {
 
     private val prefs: AppPreferences by inject()
     private val engine: ProxyEngine by inject()
+    private val store: ProxyStore by inject()
+    private val log: ProxyLog by inject()
 
     private lateinit var scope: CoroutineScope
     private lateinit var notifier: ProxyNotifier
@@ -82,7 +84,7 @@ class ProxyService : VpnService() {
             if (gap < DEEP_SLEEP_KICK_MS) return
             // Длительность сна - опора при разборе отвалов: по ней видно, пережила ли
             // аллокация паузу и не мы ли сами её выбросили.
-            ProxyStore.log("Пробуждение после сна ${gap / 1000} c - пинок ядру")
+            log.add("Пробуждение после сна ${gap / 1000} c - пинок ядру")
             engine.wake()
         }
     }
@@ -95,7 +97,7 @@ class ProxyService : VpnService() {
         super.onCreate()
         scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         notifier = ProxyNotifier(this)
-        network = NetworkHandoverMonitor(applicationContext, scope) { onNetworkHandover() }
+        network = NetworkHandoverMonitor(applicationContext, scope, log) { onNetworkHandover() }
         sleptMillis = SystemClock.elapsedRealtime() - SystemClock.uptimeMillis()
         // Только динамически: SCREEN_ON манифестом не ловится.
         ContextCompat.registerReceiver(
@@ -103,6 +105,7 @@ class ProxyService : VpnService() {
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
         scope.launch { observeStatus() }
+        scope.launch { observeCoreErrors() }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -145,7 +148,7 @@ class ProxyService : VpnService() {
                 // сжигая персону и кредиты VK на каждом витке.
                 if (!fresh && !prefs.proxyDesiredFlow.first()) {
                     if (!isCurrent(next)) return@launch
-                    ProxyStore.log("Сервис возвращён системой, но прокси выключен - не поднимаем")
+                    log.add("Сервис возвращён системой, но прокси выключен - не поднимаем")
                     shutdown("возврат сервиса без намерения")
                     stopSelf(lastStartId)
                     return@launch
@@ -168,10 +171,10 @@ class ProxyService : VpnService() {
         val cfg = prefs.clientConfigFlow.first()
         if (!isCurrent(session)) return
         // Лог рестарта не чистим: строка "Процесс запущен" от App - единственный след того,
-        // что процесс убивали, и после clearLogs от неё ничего бы не осталось.
-        if (fresh) ProxyStore.clearLogs()
+        // что процесс убивали, и после clearScreen от неё ничего бы не осталось.
+        if (fresh) log.clearScreen()
         val startReason = if (fresh) "команда START" else "возврат сервиса"
-        ProxyStore.log("Сессия $session: запуск ($startReason)")
+        log.add("Сессия $session: запуск ($startReason)")
 
         if (cfg.serverAddress.isBlank() || cfg.vkLink.isBlank()) {
             fail("Не заполнены настройки клиента")
@@ -187,7 +190,7 @@ class ProxyService : VpnService() {
             fail("Конфиг отклонён ядром: ${e.message}")
             return
         }
-        ProxyStore.log("Команда: ${CoreCommand.redact(argv, prefs.privacyModeFlow.first())}")
+        log.add("Команда: ${CoreCommand.redact(argv, prefs.privacyModeFlow.first())}")
 
         if (!isCurrent(session)) return
 
@@ -240,7 +243,7 @@ class ProxyService : VpnService() {
         // Порт занимает ровно один сервер: потерянный тут экземпляр держал бы 1080 до
         // смерти процесса.
         socks5?.stop()
-        socks5 = Socks5Server(protect = { socket -> protect(socket) }).also { it.start() }
+        socks5 = Socks5Server(protect = { socket -> protect(socket) }, log = log).also { it.start() }
     }
 
     /** Исход попытки поднять tun. Судьбу сессии решает вызывающий, а не сама попытка. */
@@ -297,7 +300,7 @@ class ProxyService : VpnService() {
         // без проверки рестарт поднимал бы сессию, которую сворачивают.
         if (stopping || !engine.isRunning) return
         val slept = (SystemClock.elapsedRealtime() - SystemClock.uptimeMillis() - sleptMillis) / 1000
-        ProxyStore.log("Смена сети - переподключение (сон с прошлой проверки $slept c)")
+        log.add("Смена сети - переподключение (сон с прошлой проверки $slept c)")
         scope.launch {
             val cfg = prefs.clientConfigFlow.first()
             engine.reconnect(cfg.coreDnsServers { network.physicalDnsServers() }.joinToString(","))
@@ -306,16 +309,18 @@ class ProxyService : VpnService() {
 
     /** Нотификация ведётся тем же состоянием, что видит UI. */
     private suspend fun observeStatus() {
-        ProxyStore.status.collect { status ->
+        store.status.collect { status ->
             // После решения об остановке молчим: нотификация уже снята.
             if (stopping) return@collect
             notifier.update(status, tunnelMode)
-            // Ошибка ядра - сессии больше нет: держать поднятый tun не за чем,
-            // иначе трафик уходит в интерфейс, за которым никого.
-            if (status.phase == ProxyPhase.Error) {
-                shutdown("ошибка ядра: ${status.error}")
-                stopSelf(lastStartId)
-            }
+        }
+    }
+
+    private suspend fun observeCoreErrors() {
+        store.coreErrors.collect { message ->
+            if (stopping || session == 0L) return@collect
+            shutdown("ошибка ядра: $message")
+            stopSelf(lastStartId)
         }
     }
 
@@ -340,7 +345,7 @@ class ProxyService : VpnService() {
      */
     private fun logEnvironment() {
         val pm = getSystemService(POWER_SERVICE) as PowerManager
-        ProxyStore.log(
+        log.add(
             "Окружение: ${Build.MANUFACTURER} ${Build.MODEL}, Android ${Build.VERSION.RELEASE}, " +
                 "батарея-исключение=${pm.isIgnoringBatteryOptimizations(packageName)}, " +
                 "doze=${pm.isDeviceIdleMode}"
@@ -358,7 +363,7 @@ class ProxyService : VpnService() {
             delay(HEARTBEAT_MS)
             if (!isCurrent(session)) return
             val slept = (SystemClock.elapsedRealtime() - SystemClock.uptimeMillis()) / 1000
-            ProxyStore.log(
+            log.add(
                 "hb up=${SystemClock.elapsedRealtime() / 1000}s сон=${slept}s doze=${pm.isDeviceIdleMode}",
                 LogLevel.Plain
             )
@@ -385,8 +390,8 @@ class ProxyService : VpnService() {
         // Сессия не состоялась по своей вине (конфиг, отказ системы) - восстанавливать
         // нечего: без вмешательства пользователя следующая попытка упрётся в то же самое.
         prefs.setProxyDesired(false)
-        ProxyStore.log(message, LogLevel.Error)
-        ProxyStore.fail(message)
+        log.add(message, LogLevel.Error)
+        store.fail(message)
         shutdown(message)
         stopSelf(lastStartId)
         return false
@@ -408,9 +413,9 @@ class ProxyService : VpnService() {
         notifier.cancelCaptcha()
         // Причина обязательна: по логу после гибернации надо отличать команду пользователя
         // от ошибки ядра и от отзыва VPN системой.
-        ProxyStore.log("Сессия $session: остановка ($reason)")
+        log.add("Сессия $session: остановка ($reason)")
         prefs.setCleanExit(true)
-        ProxyStore.finish()
+        store.finish()
         releaseAll()
         releaseWakeLock()
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -452,7 +457,7 @@ class ProxyService : VpnService() {
      */
     override fun onRevoke() {
         prefs.setProxyDesired(false)
-        ProxyStore.log("VPN отключён системой", LogLevel.Warning)
+        log.add("VPN отключён системой", LogLevel.Warning)
         shutdown("VPN отозван системой")
         stopSelf(lastStartId)
     }

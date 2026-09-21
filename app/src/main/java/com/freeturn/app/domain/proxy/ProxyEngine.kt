@@ -48,7 +48,11 @@ data class TunnelSetup(
  * [stateDir] - каталог, где ядро держит состояние между запусками (поколение
  * VK-персоны, кэш TURN-реквизитов). Свои дефолты ядра из app-uid не пишутся.
  */
-class ProxyEngine(private val stateDir: String) {
+class ProxyEngine(
+    private val stateDir: String,
+    private val store: ProxyStore,
+    private val log: ProxyLog,
+) {
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val lock = Mutex()
@@ -113,7 +117,7 @@ class ProxyEngine(private val stateDir: String) {
             running = 0L
             throw e
         }
-        ProxyStore.setTunnelUp(tun != null)
+        store.setTunnelUp(tun != null)
         true
     }
 
@@ -174,7 +178,7 @@ class ProxyEngine(private val stateDir: String) {
         if (running == 0L) return
         scope.launch {
             runCatching { Mobile.wake() }
-                .onFailure { ProxyStore.log("Пробуждение ядра не удалось: ${it.message}", LogLevel.Warning) }
+                .onFailure { log.add("Пробуждение ядра не удалось: ${it.message}", LogLevel.Warning) }
         }
     }
 
@@ -188,7 +192,7 @@ class ProxyEngine(private val stateDir: String) {
             runCatching {
                 Mobile.setDNSServers(dnsServers)
                 Mobile.reconnect()
-            }.onFailure { ProxyStore.log("Переподключение не удалось: ${it.message}", LogLevel.Warning) }
+            }.onFailure { log.add("Переподключение не удалось: ${it.message}", LogLevel.Warning) }
         }
     }
 
@@ -218,17 +222,17 @@ class ProxyEngine(private val stateDir: String) {
 
         override fun onState(state: String, streams: Long, total: Long, errMsg: String) {
             if (running == 0L) return
-            ProxyStore.setPhase(state.toPhase(), streams.toInt(), total.toInt(), errMsg)
+            store.setPhase(state.toPhase(), streams.toInt(), total.toInt(), errMsg)
         }
 
         override fun onLog(level: String, msg: String, unixMillis: Long) {
             if (running == 0L) return
-            ProxyStore.log(msg, level.toLogLevel())
+            log.add(msg, level.toLogLevel())
         }
 
         override fun onCaptcha(url: String) {
             if (running == 0L) return
-            ProxyStore.setCaptcha(url)
+            store.setCaptcha(url)
         }
     }
 }

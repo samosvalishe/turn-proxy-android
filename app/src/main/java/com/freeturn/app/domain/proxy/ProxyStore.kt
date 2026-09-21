@@ -4,40 +4,43 @@ import android.os.SystemClock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Состояние прокси между сервисом (пишет) и UI (читает). Process-global object:
- * сервис живёт вне графа DI, а состояние переживает его пересоздание.
+ * Состояние прокси: пишут ядро ([ProxyEngine]) и хост-сервис, читают UI и внешние
+ * точки входа (тайл, виджет, трамплин ярлыков).
+ *
+ * Koin `single`, а не `object`: сервис и ресиверы живут вне графа, но достают его тем же
+ * `inject()`, что и всё остальное - иначе любое место в приложении могло дотянуться до
+ * состояния чужой сессии (см. [coreErrors]). Единственность на процесс даёт сам Koin,
+ * поэтому пересоздание сервиса состояние не роняет.
  */
-object ProxyStore {
-
-    private const val MAX_LOG_LINES = 200
-    private const val LOG_FLUSH_MS = 120L
-    private const val ERROR_RESET_MS = 4_000L
+class ProxyStore {
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     private val _status = MutableStateFlow(ProxyStatus())
     val status: StateFlow<ProxyStatus> = _status.asStateFlow()
 
-    private val _logs = MutableStateFlow<List<LogEntry>>(emptyList())
-    val logs: StateFlow<List<LogEntry>> = _logs.asStateFlow()
+    // Ошибка именно ОТ ЯДРА, а не любая красная фаза: fail() зовут и снаружи сессии
+    // (отказ от VPN-согласия в трамплине, отлуп startForegroundService), а хост по такой
+    // ошибке сворачивал бы живую чужую сессию.
+    private val _coreErrors = MutableSharedFlow<String>(
+        extraBufferCapacity = 8,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    val coreErrors: SharedFlow<String> = _coreErrors.asSharedFlow()
 
-    private val logSeq = AtomicLong(0)
-    private val logBuffer = ArrayDeque<LogEntry>()
-    private val flushScheduled = AtomicBoolean(false)
-    // Пишется из UI, читается из горутин Go.
-    @Volatile private var logsEnabled = true
-    // Ставится один раз на старте процесса; store живёт вне графа DI.
-    @Volatile private var file: LogFile? = null
     private val captchaSeq = AtomicLong(0)
     // Поколение показанной ошибки: таймер гасит только свою. Ошибки приходят из горутин
     // Go, сервиса и UI - хранить Job и отменять его было гонкой, а ошибку от ядра,
@@ -69,7 +72,10 @@ object ProxyStore {
 
     /** Фаза от ядра. Момент подключения ставится один раз - рестарт его не сбивает. */
     fun setPhase(phase: ProxyPhase, active: Int, total: Int, error: String = "") {
-        if (phase == ProxyPhase.Error) scheduleErrorReset(errorSeq.incrementAndGet())
+        if (phase == ProxyPhase.Error) {
+            scheduleErrorReset(errorSeq.incrementAndGet())
+            _coreErrors.tryEmit(error)
+        }
         _status.update {
             val connected = if (phase == ProxyPhase.Connected) {
                 it.connectedSince ?: SystemClock.elapsedRealtime()
@@ -77,13 +83,6 @@ object ProxyStore {
                 it.connectedSince
             }
             it.copy(phase = phase, active = active, total = total, error = error, connectedSince = connected)
-        }
-    }
-
-    private fun scheduleErrorReset(generation: Long) {
-        scope.launch {
-            delay(ERROR_RESET_MS)
-            if (errorSeq.get() == generation && _status.value.phase == ProxyPhase.Error) idle()
         }
     }
 
@@ -99,52 +98,14 @@ object ProxyStore {
         }
     }
 
-    fun setLogsEnabled(enabled: Boolean) {
-        logsEnabled = enabled
-    }
-
-    fun attachFile(logFile: LogFile) {
-        file = logFile
-    }
-
-    /** Собирает лог в [target] для отправки; false - писать было нечего. */
-    fun exportLogFile(target: java.io.File): Boolean = file?.export(target) ?: false
-
-    fun log(message: String, level: LogLevel = LogLevel.Event) {
-        // Файл ведём всегда: он нужен ровно тогда, когда экран логов был выключен, а
-        // разбирать отвал уже поздно. Флаг гасит только вывод в UI.
-        file?.append(message, level)
-        if (!logsEnabled) return
-        val entry = LogEntry(logSeq.getAndIncrement(), message, level)
-        synchronized(logBuffer) {
-            logBuffer.addLast(entry)
-            while (logBuffer.size > MAX_LOG_LINES) logBuffer.removeFirst()
-        }
-        scheduleFlush()
-    }
-
-    /** Только экран: файл ведёт историю через рестарты, ради которой он и заведён. */
-    fun clearLogs() {
-        synchronized(logBuffer) { logBuffer.clear() }
-        _logs.value = emptyList()
-    }
-
-    /** Явное действие пользователя - единственное, что стирает файл. */
-    fun clearLogFile() {
-        clearLogs()
-        file?.clear()
-    }
-
-    /**
-     * Ядро сыплет строками пачками из своих горутин: публикуем срез не чаще
-     * [LOG_FLUSH_MS]. Флаг снимается до публикации - строка следом закажет новый флаш.
-     */
-    private fun scheduleFlush() {
-        if (!flushScheduled.compareAndSet(false, true)) return
+    private fun scheduleErrorReset(generation: Long) {
         scope.launch {
-            delay(LOG_FLUSH_MS)
-            flushScheduled.set(false)
-            _logs.value = synchronized(logBuffer) { logBuffer.toList() }
+            delay(ERROR_RESET_MS)
+            if (errorSeq.get() == generation && _status.value.phase == ProxyPhase.Error) idle()
         }
+    }
+
+    private companion object {
+        const val ERROR_RESET_MS = 4_000L
     }
 }

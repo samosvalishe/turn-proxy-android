@@ -20,7 +20,8 @@ import kotlinx.coroutines.withContext
 class ProxyOrchestrator(
     private val prefs: AppPreferences,
     private val launcher: ProxyServiceLauncher,
-    private val sshRepository: SshRepository
+    private val sshRepository: SshRepository,
+    private val store: ProxyStore
 ) {
     // Процессный scope: рестарт пары не должен рваться вместе с экраном (VM гибнет с
     // Activity) - между stop и start сервер остался бы погашенным.
@@ -117,7 +118,7 @@ class ProxyOrchestrator(
 
     /** Команда START при живой сессии пересоздаёт её с новым конфигом. */
     fun restartProxyIfRunning() {
-        if (!ProxyStore.status.value.busy) return
+        if (!store.status.value.busy) return
         launcher.start()
     }
 

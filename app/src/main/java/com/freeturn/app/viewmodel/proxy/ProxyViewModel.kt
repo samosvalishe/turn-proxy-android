@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.domain.proxy.LogEntry
 import com.freeturn.app.domain.proxy.ProxyEngine
+import com.freeturn.app.domain.proxy.ProxyLog
 import com.freeturn.app.domain.proxy.ProxyPhase
 import com.freeturn.app.domain.proxy.ProxyServiceLauncher
 import com.freeturn.app.domain.proxy.ProxyStatus
@@ -12,15 +13,18 @@ import com.freeturn.app.domain.proxy.ProxyStore
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.io.File
 
 class ProxyViewModel(
     private val launcher: ProxyServiceLauncher,
     private val prefs: AppPreferences,
-    private val engine: ProxyEngine
+    private val engine: ProxyEngine,
+    private val store: ProxyStore,
+    private val log: ProxyLog
 ) : ViewModel() {
 
-    val status: StateFlow<ProxyStatus> = ProxyStore.status
-    val logs: StateFlow<List<LogEntry>> = ProxyStore.logs
+    val status: StateFlow<ProxyStatus> = store.status
+    val logs: StateFlow<List<LogEntry>> = log.lines
 
     fun start() = launcher.start()
 
@@ -38,24 +42,24 @@ class ProxyViewModel(
      * в WG-режиме стартовать нечем, а спрашивать молча, без действия пользователя, нельзя.
      */
     fun onForeground(vpnConsent: () -> Boolean) {
-        if (ProxyStore.status.value.phase != ProxyPhase.Idle) return
+        if (store.status.value.phase != ProxyPhase.Idle) return
         viewModelScope.launch {
             if (!prefs.autoConnectFlow.first()) return@launch
             if (!prefs.proxyDesiredFlow.first()) return@launch
             val tunnel = prefs.clientConfigFlow.first().wireGuardActive
             // Sticky-старт мог занять сессию, пока читали DataStore.
-            if (engine.isRunning || ProxyStore.status.value.phase != ProxyPhase.Idle) return@launch
+            if (engine.isRunning || store.status.value.phase != ProxyPhase.Idle) return@launch
             if (tunnel && !vpnConsent()) return@launch
             launcher.start()
         }
     }
 
     /** Окно закрыл пользователь; ядро ждёт решения дальше и выдаст новую капчу. */
-    fun dismissCaptcha() = ProxyStore.setCaptcha("")
+    fun dismissCaptcha() = store.setCaptcha("")
 
     /** С экрана чистим и файл: сохранять историю против воли пользователя незачем. */
-    fun clearLogs() = ProxyStore.clearLogFile()
+    fun clearLogs() = log.clearAll()
 
     /** false - отправлять нечего. */
-    fun exportLogs(target: java.io.File): Boolean = ProxyStore.exportLogFile(target)
+    fun exportLogs(target: File): Boolean = log.export(target)
 }

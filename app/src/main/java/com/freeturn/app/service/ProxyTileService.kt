@@ -16,8 +16,12 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 
-class ProxyTileService : TileService() {
+class ProxyTileService : TileService(), KoinComponent {
+
+    private val store: ProxyStore by inject()
 
     private var scope: CoroutineScope? = null
     private var running = false
@@ -28,7 +32,7 @@ class ProxyTileService : TileService() {
         // второй collector на том же тайле.
         scope?.cancel()
         scope = CoroutineScope(Dispatchers.Main + SupervisorJob()).also { s ->
-            ProxyStore.status
+            store.status
                 .map { it.busy }
                 .distinctUntilChanged()
                 .onEach { busy ->

@@ -16,6 +16,7 @@ import com.freeturn.app.domain.proxy.ProxyStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
@@ -30,20 +31,21 @@ import org.koin.core.component.inject
 class ProxyWidgetProvider : AppWidgetProvider(), KoinComponent {
 
     private val appPreferences: AppPreferences by inject()
+    private val store: ProxyStore by inject()
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, ids: IntArray) {
         // goAsync: чтение имени сервера из DataStore асинхронно, держим процесс живым.
         val pending = goAsync()
-        CoroutineScope(Dispatchers.Main + SupervisorJob()).launch {
+        val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+        scope.launch {
             try {
-                // Таймаут: не эмитни DataStore - finish() не вызвался бы, а у ресивера
-                // на всё про всё 10 секунд до ANR. Виджет переживёт имя-заглушку.
                 val serverName = withTimeoutOrNull(WIDGET_READ_TIMEOUT_MS) {
                     appPreferences.serversSnapshot.first().active?.name
                 }
-                manager.updateAppWidget(ids, buildViews(context, ProxyStore.status.value, serverName))
+                manager.updateAppWidget(ids, buildViews(context, store.status.value, serverName))
             } finally {
                 pending.finish()
+                scope.cancel()
             }
         }
     }
