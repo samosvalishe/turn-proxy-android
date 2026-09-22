@@ -1,116 +1,122 @@
 package com.freeturn.app.domain.server
 
 import com.freeturn.app.data.config.KcpProfile
+import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.data.config.ProxyMode
+import com.freeturn.app.data.server.Server
+import com.freeturn.app.data.server.ServerBackend
 
+/** RPC-команды install.sh (proto 3); argv - `<команда> --ключ=значение`. */
 sealed class ServerCommand {
     data object Probe : ServerCommand()
-    data object Install : ServerCommand()
-
-    data class WgSetup(
-        val port: Int,
-        val endpoint: String
+    /**
+     * @param update переустановить сервер, даже если версия не менялась.
+     * @param bin путь на сервере к загруженной локальной сборке - ставится вместо релиза.
+     */
+    data class Apply(
+        val opts: ApplyOptions,
+        val update: Boolean = false,
+        val bin: String = ""
     ) : ServerCommand()
-    data class Start(val opts: ServerStartOptions) : ServerCommand()
     data object Stop : ServerCommand()
-    data class FetchLogs(val lines: Int = 80) : ServerCommand()
-
-    data class Uninstall(
-        val withWgPkg: Boolean = false,
-        val dryRun: Boolean = false
-    ) : ServerCommand()
-
-    data object ShareInfo : ServerCommand()
-
-    data class PeerAdd(
-        val nameB64: String,
-        val endpoint: String,
-        val clientId: String
-    ) : ServerCommand()
-
-    data object ShareList : ServerCommand()
-
-    data class PeerConf(
-        val pubkey: String,
-        val clientId: String,
-        val nameB64: String
-    ) : ServerCommand()
-    data class PeerRemove(val pubkey: String) : ServerCommand()
-
-    data class ClientAdd(val nameB64: String, val clientId: String) : ServerCommand()
-    data class ClientRemove(val clientId: String) : ServerCommand()
+    data class Logs(val tail: Int = 80) : ServerCommand()
+    data object ClientList : ServerCommand()
+    data class ClientAdd(val name: String) : ServerCommand()
+    data class ClientConf(val name: String) : ServerCommand()
+    data class ClientRemove(val name: String) : ServerCommand()
+    data object Uninstall : ServerCommand()
 
     fun toArgv(): List<String> = when (this) {
         is Probe -> listOf("probe")
-        is Install -> listOf("install")
-        is WgSetup -> buildList {
-            add("wg-setup")
-            add("--port=$port")
-            add("--endpoint=$endpoint")
-        }
-        is Start -> buildList {
-            add("start")
-            add("--listen=${opts.listen}")
-            add("--connect=${opts.connect}")
-            if (opts.proxyMode == ProxyMode.TCP) {
-                add("--mode=${ProxyMode.TCP}")
-                addAll(kcpArgs(opts.kcp))
-            }
-            if (opts.obfProfile != "none" && opts.obfKey.isNotBlank()) {
-                add("--obf-profile=${opts.obfProfile}")
-                add("--obf-key=${opts.obfKey}")
-                // Пейсинг без профиля ядро отвергает - только внутри этой ветки.
-                if (opts.obfTimingMs > 0) add("--obf-timing=${opts.obfTimingMs}ms")
-            }
-            if (opts.clientId.isNotBlank()) add("--client-id=${opts.clientId}")
+        is Apply -> buildList {
+            addAll(opts.toArgv())
+            if (update) add("--update")
+            if (bin.isNotEmpty()) add("--bin=$bin")
         }
         is Stop -> listOf("stop")
-        is FetchLogs -> listOf("logs", "--tail=$lines")
-        is ShareInfo -> listOf("share-info")
-        is PeerAdd -> buildList {
-            add("peer-add")
-            add("--name-b64=$nameB64")
-            add("--endpoint=$endpoint")
-            if (clientId.isNotBlank()) add("--client-id=$clientId")
-        }
-        is ShareList -> listOf("share-list")
-        is PeerConf -> buildList {
-            add("peer-conf")
-            add("--pubkey=$pubkey")
-            if (clientId.isNotBlank()) add("--client-id=$clientId")
-            if (nameB64.isNotBlank()) add("--name-b64=$nameB64")
-        }
-        is PeerRemove -> listOf("peer-remove", "--pubkey=$pubkey")
-        is ClientAdd -> listOf("client-add", "--name-b64=$nameB64", "--client-id=$clientId")
-        is ClientRemove -> listOf("client-remove", "--client-id=$clientId")
-        is Uninstall -> buildList {
-            add("uninstall")
-            if (withWgPkg) add("--with-wg-pkg")
-            if (dryRun) add("--dry-run")
-        }
+        is Logs -> listOf("logs", "--tail=$tail")
+        is ClientList -> listOf("client-list")
+        is ClientAdd -> listOf("client-add", "--name=$name")
+        is ClientConf -> listOf("client-conf", "--name=$name")
+        is ClientRemove -> listOf("client-remove", "--name=$name")
+        // Снос целиком: приложение не ведёт серверы, где FreeTurn удалён, а WG оставлен.
+        is Uninstall -> listOf("uninstall", "--target=all", "--purge")
     }
 }
 
-data class ServerStartOptions(
-    val listen: String,
-    val connect: String,
+/**
+ * Полный конфиг сервера для `apply`: скрипт хранит его в install.conf, поэтому шлём
+ * всё, а не дельту - иначе на сервере осталось бы значение прошлой установки.
+ */
+data class ApplyOptions(
+    val method: String,
+    val backend: String,
+    val listenPort: Int,
+    /** host:port чужого VPN; только для [ServerBackend.EXTERNAL]. */
+    val connect: String = "",
+    val wgPort: Int = ServerBackend.DEFAULT_WG_PORT,
+    val wgNet: String = ServerBackend.DEFAULT_WG_NET,
     val proxyMode: String = ProxyMode.UDP,
     val kcp: KcpProfile = KcpProfile.DEFAULT,
-    val obfProfile: String = "none",
-    val obfKey: String = "",
-    val obfTimingMs: Int = 0,
-    val clientId: String = ""
+    val obfProfile: String = ObfProfile.NONE,
+    /** Пусто при включённой обфускации - ключ сгенерирует сервер и вернёт в ответе. */
+    val obfKey: String = ""
+) {
+    fun toArgv(): List<String> = buildList {
+        add("apply")
+        add("--method=$method")
+        add("--backend=$backend")
+        add("--listen-port=$listenPort")
+        if (backend == ServerBackend.EXTERNAL) {
+            add("--connect=$connect")
+        } else {
+            add("--wg-port=$wgPort")
+            add("--wg-net=$wgNet")
+        }
+        add("--mode=$proxyMode")
+        add("--obf-profile=$obfProfile")
+        if (obfProfile != ObfProfile.NONE && obfKey.isNotBlank()) add("--obf-key=$obfKey")
+        if (proxyMode == ProxyMode.TCP) addAll(kcpArgs(kcp))
+    }
+}
+
+/** KCP_ARGS на сервере перезаписываются целиком: шлём весь профиль, не только отличия. */
+private fun kcpArgs(p: KcpProfile): List<String> = listOf(
+    "--kcp-nodelay=${p.noDelay}",
+    "--kcp-interval=${p.interval}",
+    "--kcp-resend=${p.resend}",
+    "--kcp-nc=${p.nc}",
+    "--kcp-sndwnd=${p.sndWnd}",
+    "--kcp-rcvwnd=${p.rcvWnd}",
+    "--kcp-mtu=${p.mtu}",
+    "--kcp-acknodelay=${p.ackNoDelay}"
 )
 
-/** Только отличия от дефолта: остальное сервер возьмёт своё, как и клиент. */
-private fun kcpArgs(p: KcpProfile): List<String> = buildList {
-    val d = KcpProfile.DEFAULT
-    if (p.noDelay != d.noDelay) add("--kcp-nodelay=${p.noDelay}")
-    if (p.interval != d.interval) add("--kcp-interval=${p.interval}")
-    if (p.resend != d.resend) add("--kcp-resend=${p.resend}")
-    if (p.nc != d.nc) add("--kcp-nc=${p.nc}")
-    if (p.sndWnd != d.sndWnd) add("--kcp-sndwnd=${p.sndWnd}")
-    if (p.rcvWnd != d.rcvWnd) add("--kcp-rcvwnd=${p.rcvWnd}")
-    if (p.mtu != d.mtu) add("--kcp-mtu=${p.mtu}")
-    if (p.ackNoDelay != d.ackNoDelay) add("--kcp-acknodelay=${p.ackNoDelay}")
-}
+fun Server.applyOptions(): ApplyOptions = ApplyOptions(
+    method = opts.method,
+    backend = opts.backend,
+    listenPort = proxyListen.substringAfterLast(':').toIntOrNull() ?: DEFAULT_LISTEN_PORT,
+    connect = proxyConnect,
+    wgPort = opts.wgPort,
+    wgNet = opts.wgNet,
+    proxyMode = opts.proxyMode,
+    kcp = opts.kcp,
+    obfProfile = opts.obfProfile,
+    obfKey = opts.obfKey
+)
+
+private const val DEFAULT_LISTEN_PORT = 56000
+
+/** Итог `apply`: что сервер выдал сам и что надо положить в профиль. */
+data class ApplyResult(
+    val ownerClientId: String,
+    /** Клиентский WG-конфиг хозяина; пусто при чужом VPN. */
+    val ownerConf: String,
+    val obfKey: String
+)
+
+/** Client ID хозяина и ключ после apply - иначе клиент не пройдёт allowlist или OBF. */
+fun Server.withApplied(r: ApplyResult): Server = copy(
+    client = client.copy(clientId = r.ownerClientId.ifBlank { client.clientId }),
+    opts = opts.copy(obfKey = r.obfKey)
+)

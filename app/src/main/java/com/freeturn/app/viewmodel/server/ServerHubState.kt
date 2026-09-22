@@ -1,10 +1,12 @@
 package com.freeturn.app.viewmodel.server
 
+import com.freeturn.app.domain.ServerOperation
+
 sealed interface ServerHubState {
     data object Offline : ServerHubState
     data object NotPaired : ServerHubState
     data object Connecting : ServerHubState
-    data class Working(val action: String) : ServerHubState
+    data class Working(val operation: ServerOperation) : ServerHubState
     data class Online(
         val running: Boolean,
         val installed: Boolean,

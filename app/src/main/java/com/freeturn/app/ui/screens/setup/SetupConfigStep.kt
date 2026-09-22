@@ -7,32 +7,20 @@ package com.freeturn.app.ui.screens.setup
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExposedDropdownMenu
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -42,12 +30,18 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
-import com.freeturn.app.data.config.AccessProtocol
+import com.freeturn.app.data.config.HostPort
 import com.freeturn.app.data.config.ObfProfile
+import com.freeturn.app.data.server.ServerBackend
+import com.freeturn.app.data.server.ServerMethod
 import com.freeturn.app.ui.util.HapticUtil
+import com.freeturn.app.ui.components.ChoiceOption
+import com.freeturn.app.ui.components.ConnectedChoiceRow
+import com.freeturn.app.ui.components.OptionDropdown
+import com.freeturn.app.ui.components.obfProfileLabel
 import com.freeturn.app.ui.components.SectionLabel
+import com.freeturn.app.ui.components.SettingsControlLabel
 import com.freeturn.app.ui.components.SettingsCard
-import com.freeturn.app.ui.components.SettingsEntryRow
 import com.freeturn.app.ui.components.SettingsFieldSlot
 import com.freeturn.app.ui.components.SettingsRowDivider
 import com.freeturn.app.ui.components.UdpTcpSegmented
@@ -59,22 +53,22 @@ import com.freeturn.app.ui.theme.Spacing
 @Composable
 fun SetupConfigStep(
     draft: SetupConfigDraft,
-    wgDetectedPort: Int?,
+    reinstall: Boolean,
     duplicateHost: Boolean,
     portsClash: Boolean,
     showErrors: Boolean,
     onDraftChange: (SetupConfigDraft) -> Unit,
-    onRollListenPort: () -> Unit,
-    onRollWgPort: () -> Unit,
-    onLoadWgFile: () -> Unit
+    onRollListenPort: () -> Unit
 ) {
-    val context = LocalContext.current
     val reducedMotion = LocalReducedMotion.current
     val resizeSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
     val cardModifier =
         if (reducedMotion) Modifier else Modifier.animateContentSize(resizeSpec)
 
-    if (duplicateHost) DuplicateHostPanel()
+    when {
+        reinstall -> InfoPanel(stringResource(R.string.setup_reinstall))
+        duplicateHost -> InfoPanel(stringResource(R.string.setup_duplicate_host))
+    }
 
     SectionLabel(stringResource(R.string.server_name_label))
     SettingsCard {
@@ -91,149 +85,102 @@ fun SetupConfigStep(
         }
     }
 
-    SectionLabel(stringResource(R.string.setup_mode_section))
+    SectionLabel(stringResource(R.string.setup_backend_section))
     SettingsCard(modifier = cardModifier) {
         SettingsFieldSlot {
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                SegmentedButton(
-                    selected = draft.vpnMode,
-                    onClick = {
-                        if (!draft.vpnMode) {
-                            HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                            onDraftChange(draft.copy(vpnMode = true))
-                        }
-                    },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                ) { Text(stringResource(R.string.mode_vpn)) }
-                SegmentedButton(
-                    selected = !draft.vpnMode,
-                    onClick = {
-                        if (draft.vpnMode) {
-                            HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                            onDraftChange(draft.copy(vpnMode = false))
-                        }
-                    },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                ) { Text(stringResource(R.string.mode_proxy)) }
-            }
-            Text(
-                stringResource(
-                    if (draft.vpnMode) R.string.setup_mode_vpn_desc
-                    else R.string.setup_mode_proxy_desc
+            SettingsControlLabel(stringResource(R.string.setup_backend_label))
+            ConnectedChoiceRow(
+                options = listOf(
+                    ChoiceOption(ServerBackend.NEW, stringResource(R.string.setup_backend_new)),
+                    ChoiceOption(ServerBackend.EXTERNAL, stringResource(R.string.setup_backend_external))
                 ),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                selected = draft.backend,
+                onSelect = { onDraftChange(draft.copy(backend = it)) }
             )
+            Hint(stringResource(
+                if (draft.ownWg) R.string.setup_backend_new_desc else R.string.setup_backend_external_desc
+            ))
         }
         SettingsRowDivider()
-        if (draft.vpnMode) {
-            SettingsFieldSlot {
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    SegmentedButton(
-                        selected = !draft.wgCustomConf,
-                        onClick = {
-                            if (draft.wgCustomConf) {
-                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                onDraftChange(draft.copy(wgCustomConf = false))
-                            }
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                    ) { Text(stringResource(R.string.setup_wg_source_auto)) }
-                    SegmentedButton(
-                        selected = draft.wgCustomConf,
-                        onClick = {
-                            if (!draft.wgCustomConf) {
-                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                onDraftChange(draft.copy(wgCustomConf = true))
-                            }
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                    ) { Text(stringResource(R.string.setup_wg_source_custom)) }
-                }
-                if (draft.wgCustomConf) {
-                    Text(
-                        stringResource(R.string.setup_wg_custom_desc),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else if (wgDetectedPort != null) {
-                    WgStatusPanel(
-                        found = true,
-                        title = stringResource(R.string.setup_wg_found),
-                        desc = stringResource(R.string.setup_wg_found_desc, wgDetectedPort)
-                    )
-                } else {
-                    WgStatusPanel(
-                        found = false,
-                        title = stringResource(R.string.setup_wg_missing),
-                        desc = stringResource(R.string.setup_wg_missing_desc)
-                    )
-                    PortField(
-                        value = draft.wgPort,
-                        onValueChange = { onDraftChange(draft.copy(wgPort = it)) },
-                        label = stringResource(R.string.setup_wg_port_label),
-                        onRoll = onRollWgPort,
-                        error = if (showErrors && !portOk(draft.wgPort)) {
-                            stringResource(R.string.setup_port_invalid)
-                        } else null
-                    )
-                }
-            }
-            if (draft.wgCustomConf) {
-                val hasConf = draft.wgConfText.isNotBlank()
-                val protocol = remember(draft.wgConfText) { AccessProtocol.of(draft.wgConfText) }
-                SettingsRowDivider()
-                SettingsEntryRow(
-                    iconRes = R.drawable.cloud_download_24px,
-                    title = stringResource(R.string.load_wg_conf),
-                    subtitle = if (hasConf) {
-                        stringResource(
-                            if (protocol == AccessProtocol.AWG) R.string.protocol_awg
-                            else R.string.protocol_wg
-                        )
-                    } else null,
-                    trailingRes = if (hasConf) R.drawable.check_circle_24px else null,
-                    trailingTint = MaterialTheme.extendedColorScheme.success,
-                    onClick = onLoadWgFile
+        SettingsFieldSlot {
+            if (draft.ownWg) {
+                val netInvalid = showErrors && !ServerBackend.isValidNet(draft.wgNet)
+                OutlinedTextField(
+                    value = draft.wgNet,
+                    onValueChange = { v ->
+                        onDraftChange(draft.copy(wgNet = v.filter { it.isDigit() || it == '.' || it == '/' }))
+                    },
+                    label = { Text(stringResource(R.string.setup_wg_net_label)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    isError = netInvalid,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Uri,
+                        imeAction = ImeAction.Next
+                    ),
+                    supportingText = {
+                        Text(stringResource(
+                            if (netInvalid) R.string.setup_wg_net_invalid else R.string.setup_wg_net_desc
+                        ))
+                    }
                 )
-                SettingsRowDivider()
-                SettingsFieldSlot {
-                    OutlinedTextField(
-                        value = draft.wgConfText,
-                        onValueChange = { onDraftChange(draft.copy(wgConfText = it)) },
-                        label = { Text(stringResource(R.string.setup_wg_conf_label)) },
-                        placeholder = { Text(stringResource(R.string.setup_wg_conf_placeholder)) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 160.dp),
-                        isError = showErrors && draft.wgConfText.isBlank(),
-                        supportingText = if (showErrors && draft.wgConfText.isBlank()) {
-                            { Text(stringResource(R.string.setup_field_required)) }
-                        } else null,
-                        maxLines = 10
-                    )
-                    BackendPortField(draft, showErrors, onDraftChange)
-                }
-            }
-        } else {
-            SettingsFieldSlot {
+                PortField(
+                    value = draft.wgPort,
+                    onValueChange = { onDraftChange(draft.copy(wgPort = it)) },
+                    label = stringResource(R.string.setup_wg_port_label),
+                    error = when {
+                        portsClash -> stringResource(R.string.setup_ports_clash)
+                        showErrors && !portOk(draft.wgPort) -> stringResource(R.string.setup_port_invalid)
+                        else -> null
+                    }
+                )
+            } else {
+                val connectInvalid = showErrors && !HostPort.isValid(draft.connect.trim())
+                OutlinedTextField(
+                    value = draft.connect,
+                    onValueChange = { onDraftChange(draft.copy(connect = it.trim())) },
+                    label = { Text(stringResource(R.string.setup_connect_label)) },
+                    placeholder = { Text(stringResource(R.string.setup_connect_placeholder)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    isError = connectInvalid,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Uri,
+                        imeAction = ImeAction.Next
+                    ),
+                    supportingText = {
+                        Text(stringResource(
+                            if (connectInvalid) R.string.setup_connect_invalid else R.string.setup_connect_desc
+                        ))
+                    }
+                )
                 UdpTcpSegmented(
                     tcp = draft.backendTcp,
                     onTcp = { onDraftChange(draft.copy(backendTcp = it)) },
                     label = stringResource(R.string.setup_backend_protocol_label)
                 )
-                Text(
-                    stringResource(R.string.setup_backend_protocol_desc),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                BackendPortField(draft, showErrors, onDraftChange)
+                Hint(stringResource(R.string.setup_backend_protocol_desc))
             }
         }
     }
 
-    SectionLabel(stringResource(R.string.setup_turn_section))
+    SectionLabel(stringResource(R.string.setup_server_section))
     SettingsCard {
+        SettingsFieldSlot {
+            ConnectedChoiceRow(
+                options = listOf(
+                    ChoiceOption(ServerMethod.DOCKER, stringResource(R.string.setup_method_docker)),
+                    ChoiceOption(ServerMethod.SYSTEMD, stringResource(R.string.setup_method_systemd))
+                ),
+                selected = draft.method,
+                onSelect = { onDraftChange(draft.copy(method = it)) }
+            )
+            Hint(stringResource(
+                if (draft.method == ServerMethod.DOCKER) R.string.setup_method_docker_desc
+                else R.string.setup_method_systemd_desc
+            ))
+        }
+        SettingsRowDivider()
         SettingsFieldSlot {
             PortField(
                 value = draft.listenPort,
@@ -241,43 +188,34 @@ fun SetupConfigStep(
                 label = stringResource(R.string.listen_port),
                 supporting = stringResource(R.string.setup_listen_port_desc),
                 onRoll = onRollListenPort,
-                // Конфликт портов показываем сразу, формат - после тапа по submit.
                 error = when {
                     portsClash -> stringResource(R.string.setup_ports_clash)
-                    showErrors && !portOk(draft.listenPort) ->
-                        stringResource(R.string.setup_port_invalid)
+                    showErrors && !portOk(draft.listenPort) -> stringResource(R.string.setup_port_invalid)
                     else -> null
                 }
             )
         }
-    }
-
-    SectionLabel(stringResource(R.string.obf_profile_title))
-    SettingsCard {
+        SettingsRowDivider()
         SettingsFieldSlot {
-            ObfProfileDropdown(
-                obfProfile = draft.obfProfile,
-                onObfProfile = { value -> onDraftChange(draft.copy(obfProfile = value)) }
+            OptionDropdown(
+                label = stringResource(R.string.obf_profile_title),
+                options = ObfProfile.VALUES.map { ChoiceOption(it, obfProfileLabel(it)) },
+                selected = draft.obfProfile,
+                onSelect = { onDraftChange(draft.copy(obfProfile = it)) }
             )
-            Text(
-                stringResource(
-                    when (draft.obfProfile) {
-                        ObfProfile.NONE -> R.string.setup_obf_hint_none
-                        else -> R.string.setup_obf_hint_rtpopus
-                    }
-                ),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Hint(stringResource(
+                if (draft.obfProfile == ObfProfile.NONE) R.string.setup_obf_hint_none
+                else R.string.setup_obf_hint_rtpopus
+            ))
         }
     }
 
-    SectionLabel(stringResource(R.string.provider_vk_calls))
+    SectionLabel(stringResource(R.string.provider_relay))
     SettingsCard {
         SettingsFieldSlot {
             OutlinedTextField(
-                value = draft.vkLink,
-                onValueChange = { onDraftChange(draft.copy(vkLink = it)) },
+                value = draft.callLink,
+                onValueChange = { onDraftChange(draft.copy(callLink = it)) },
                 label = { Text(stringResource(R.string.call_link_label)) },
                 placeholder = { Text(stringResource(R.string.call_link_placeholder)) },
                 modifier = Modifier.fillMaxWidth(),
@@ -292,36 +230,19 @@ fun SetupConfigStep(
     }
 }
 
-private fun portOk(p: String): Boolean = p.toIntOrNull()?.let { it in 1..65535 } == true
-
 @Composable
-private fun BackendPortField(
-    draft: SetupConfigDraft,
-    showErrors: Boolean,
-    onDraftChange: (SetupConfigDraft) -> Unit
-) {
-    val invalid = showErrors && !portOk(draft.backendPort)
-    OutlinedTextField(
-        value = draft.backendPort,
-        onValueChange = { v -> onDraftChange(draft.copy(backendPort = v.filter { it.isDigit() })) },
-        label = { Text(stringResource(R.string.setup_backend_port_label)) },
-        modifier = Modifier.fillMaxWidth(),
-        singleLine = true,
-        isError = invalid,
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.Number,
-            imeAction = ImeAction.Done
-        ),
-        supportingText = {
-            Text(stringResource(
-                if (invalid) R.string.setup_port_invalid else R.string.setup_backend_port_desc
-            ))
-        }
+private fun Hint(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 }
 
+private fun portOk(p: String): Boolean = p.toIntOrNull()?.let { it in 1..65535 } == true
+
 @Composable
-private fun DuplicateHostPanel() {
+private fun InfoPanel(text: String) {
     Surface(
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -338,44 +259,10 @@ private fun DuplicateHostPanel() {
                 modifier = Modifier.size(20.dp)
             )
             Text(
-                stringResource(R.string.setup_duplicate_host),
+                text,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-        }
-    }
-}
-
-@Composable
-private fun WgStatusPanel(found: Boolean, title: String, desc: String) {
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(Spacing.md),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.md)
-        ) {
-            Icon(
-                painterResource(if (found) R.drawable.check_circle_24px else R.drawable.cloud_download_24px),
-                contentDescription = null,
-                tint = if (found) MaterialTheme.extendedColorScheme.success
-                       else MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp)
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xxs)) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Text(
-                    desc,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
         }
     }
 }
@@ -385,7 +272,7 @@ private fun PortField(
     value: String,
     onValueChange: (String) -> Unit,
     label: String,
-    onRoll: () -> Unit,
+    onRoll: (() -> Unit)? = null,
     supporting: String? = null,
     error: String? = null
 ) {
@@ -402,65 +289,18 @@ private fun PortField(
             imeAction = ImeAction.Done
         ),
         supportingText = (error ?: supporting)?.let { { Text(it) } },
-        trailingIcon = {
-            IconButton(onClick = {
-                HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                onRoll()
-            }) {
-                Icon(
-                    painterResource(R.drawable.refresh_24px),
-                    contentDescription = stringResource(R.string.setup_port_roll)
-                )
+        trailingIcon = onRoll?.let { roll ->
+            {
+                IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
+                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                    roll()
+                }) {
+                    Icon(
+                        painterResource(R.drawable.refresh_24px),
+                        contentDescription = stringResource(R.string.setup_port_roll)
+                    )
+                }
             }
         }
     )
-}
-
-@Composable
-private fun obfProfileLabel(value: String): String = when (value) {
-    ObfProfile.NONE -> stringResource(R.string.obf_none)
-    ObfProfile.RTPOPUS -> stringResource(R.string.obf_rtpopus)
-    ObfProfile.RTPOPUS2 -> stringResource(R.string.obf_rtpopus2)
-    ObfProfile.RTPOPUS3 -> stringResource(R.string.obf_rtpopus3)
-    else -> value
-}
-
-@Composable
-private fun ObfProfileDropdown(
-    obfProfile: String,
-    onObfProfile: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    var expanded by remember { mutableStateOf(false) }
-    val current = obfProfileLabel(obfProfile)
-
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = !expanded },
-        modifier = modifier
-    ) {
-        OutlinedTextField(
-            value = current,
-            onValueChange = {},
-            readOnly = true,
-            label = { Text(stringResource(R.string.obf_profile_title)) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier
-                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true)
-                .fillMaxWidth()
-        )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            ObfProfile.VALUES.forEach { value ->
-                DropdownMenuItem(
-                    text = { Text(obfProfileLabel(value)) },
-                    onClick = {
-                        HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
-                        expanded = false
-                        onObfProfile(value)
-                    }
-                )
-            }
-        }
-    }
 }

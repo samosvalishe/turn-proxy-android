@@ -18,7 +18,8 @@ private const val CONNECT_TIMEOUT_MS = 5000
 sealed interface SshResult {
     /** stdout+stderr команды (`exec 2>&1`). */
     data class Output(val text: String) : SshResult
-    data class Failure(val message: String) : SshResult
+    /** [hostKeyChanged] - ключ хоста не совпал с сохранённым (возможна подмена). */
+    data class Failure(val message: String, val hostKeyChanged: Boolean = false) : SshResult
 }
 
 class SSHManager {
@@ -39,11 +40,23 @@ class SSHManager {
         knownFingerprint: String? = null,
         sshKey: String = "",
         execTimeoutMs: Int = 180_000
+    ): SshResult = exec(
+        ip, port, user, pass, command, stdin.toLf().toByteArray(Charsets.UTF_8),
+        knownFingerprint, sshKey, execTimeoutMs
+    )
+
+    /** Бинарный stdin как есть, без LF-нормализации. */
+    suspend fun executeWithBytes(
+        ip: String, port: Int, user: String, pass: String,
+        command: String, stdin: ByteArray,
+        knownFingerprint: String? = null,
+        sshKey: String = "",
+        execTimeoutMs: Int = 180_000
     ): SshResult = exec(ip, port, user, pass, command, stdin, knownFingerprint, sshKey, execTimeoutMs)
 
     private suspend fun exec(
         ip: String, port: Int, user: String, pass: String,
-        command: String, stdin: String?,
+        command: String, stdin: ByteArray?,
         knownFingerprint: String?, sshKey: String, execTimeoutMs: Int
     ): SshResult = withContext(Dispatchers.IO) {
         val tofu = TofuHostKeyRepository(knownFingerprint)
@@ -54,7 +67,7 @@ class SSHManager {
             session.timeout = execTimeoutMs
             SshResult.Output(runCommand(session, command, stdin, execTimeoutMs))
         } catch (e: Exception) {
-            SshResult.Failure(failureMessage(e, tofu, knownFingerprint))
+            failure(e, tofu, knownFingerprint)
         } finally {
             session?.disconnect()
         }
@@ -67,7 +80,7 @@ class SSHManager {
         val jsch = JSch()
         if (sshKey.isNotBlank()) addKeyIdentity(jsch, sshKey, pass)
         val session = jsch.getSession(user, ip, port)
-        if (sshKey.isBlank()) session.setPassword(pass)
+        if (sshKey.isBlank()) session.setPassword(pass.toByteArray(Charsets.UTF_8))
         configureTofuHostKeyChecking(session, tofu)
         try {
             session.connect(CONNECT_TIMEOUT_MS)
@@ -79,14 +92,12 @@ class SSHManager {
     }
 
     private fun runCommand(
-        session: Session, command: String, stdin: String?, execTimeoutMs: Int
+        session: Session, command: String, stdin: ByteArray?, execTimeoutMs: Int
     ): String {
         val channel = session.openChannel("exec") as ChannelExec
         // stderr объединяется с stdout для единого ответа управляющего скрипта.
         channel.setCommand("exec 2>&1\n${command.toLf()}")
-        if (stdin != null) {
-            channel.inputStream = ByteArrayInputStream(stdin.toLf().toByteArray(Charsets.UTF_8))
-        }
+        if (stdin != null) channel.inputStream = ByteArrayInputStream(stdin)
 
         val inStream = channel.inputStream
         channel.connect(execTimeoutMs)
@@ -102,16 +113,13 @@ class SSHManager {
         return output.trim()
     }
 
-    private fun failureMessage(e: Exception, tofu: TofuHostKeyRepository, knownFingerprint: String?): String {
-        val isMitm = tofu.capturedFingerprint != null &&
-            knownFingerprint != null &&
-            tofu.capturedFingerprint != knownFingerprint
-        return if (isMitm) {
-            "Отпечаток сервера изменился - возможна MITM-атака\n" +
-                "Ожидался: $knownFingerprint\n" +
-                "Получен:  ${tofu.capturedFingerprint}"
+    private fun failure(e: Exception, tofu: TofuHostKeyRepository, knownFingerprint: String?): SshResult.Failure {
+        val captured = tofu.capturedFingerprint
+        // Отпечатки - в сообщение для журнала SSH; UI показывает свой текст по флагу.
+        return if (captured != null && knownFingerprint != null && captured != knownFingerprint) {
+            SshResult.Failure("host key изменился: ожидался $knownFingerprint, получен $captured", hostKeyChanged = true)
         } else {
-            e.message ?: e.javaClass.simpleName
+            SshResult.Failure(e.message ?: e.javaClass.simpleName)
         }
     }
 
@@ -150,10 +158,10 @@ internal fun verifyConnectedFingerprint(
     capturedFingerprint: String?
 ): String {
     val received = checkNotNull(capturedFingerprint) {
-        "SSH-сервер не предоставил ключ для проверки"
+        "сервер не предъявил host key"
     }
     check(knownFingerprint == null || knownFingerprint == received) {
-        "Отпечаток SSH-сервера изменился"
+        "host key не совпал с сохранённым"
     }
     return received
 }

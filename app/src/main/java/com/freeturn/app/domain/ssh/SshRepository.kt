@@ -1,20 +1,21 @@
 package com.freeturn.app.domain.ssh
 
 import android.content.Context
-import com.freeturn.app.data.config.KcpProfile
 import com.freeturn.app.data.config.ProxyMode
 import com.freeturn.app.data.config.SshConfig
 import com.freeturn.app.data.control.ControlResponse
-import com.freeturn.app.data.control.InstallData
+import com.freeturn.app.data.control.LogsData
 import com.freeturn.app.data.control.ProbeData
+import com.freeturn.app.domain.ServerOperation
 import com.freeturn.app.domain.ServerState
 import com.freeturn.app.domain.SshConnectionState
+import com.freeturn.app.domain.server.ApplyOptions
+import com.freeturn.app.domain.server.ApplyResult
 import com.freeturn.app.domain.server.ServerCommand
 import com.freeturn.app.domain.server.ServerControl
-import com.freeturn.app.domain.server.ServerStartOptions
+import com.freeturn.app.domain.server.applyResult
 import com.freeturn.app.domain.server.errorText
 import com.freeturn.app.domain.server.requireData
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -72,10 +73,10 @@ class SshRepository(context: Context, private val sshManager: SSHManager) {
         val batch = buildList {
             addAll(result.logs)
             if (result.isOk) {
-                // Примитивы - без кавычек JsonElement.toString (version=1.6.0, а не "1.6.0");
-                // объекты/массивы (wg, conflicts) остаются компактным JSON.
+                // Только примитивы: в объектах (config, owner) лежат obf-ключ и приватный WG-конфиг.
                 result.data.forEach { (k, v) ->
-                    add("  $k=" + ((v as? JsonPrimitive)?.contentOrNull ?: v.toString()))
+                    val p = v as? JsonPrimitive ?: return@forEach
+                    if (k != "obf_key") add("  $k=" + (p.contentOrNull ?: p.toString()))
                 }
             } else {
                 add("ERROR: ${result.errorText()}")
@@ -119,11 +120,10 @@ class SshRepository(context: Context, private val sshManager: SSHManager) {
             checkServerStateLocked(activeSshConfig, silent = false)
             true
         } else {
-            val message = when (result) {
-                is SshResult.Failure -> result.message
-                is SshResult.Output -> result.text
+            _sshState.value = when (result) {
+                is SshResult.Failure -> SshConnectionState.Error(result.message, result.hostKeyChanged)
+                is SshResult.Output -> SshConnectionState.Error(result.text)
             }
-            _sshState.value = SshConnectionState.Error(message)
             false
         }
     }
@@ -153,91 +153,52 @@ class SshRepository(context: Context, private val sshManager: SSHManager) {
         val r = runCmd(cfg, "Проверка состояния", ServerCommand.Probe)
         r.requireData<ProbeData>()
             .onSuccess { d ->
+                val c = d.config
                 _serverState.value = ServerState.Known(
-                    installed = d.installed,
+                    installed = d.installed && c != null,
                     running = d.running,
-                    mode = if (d.running) d.mode ?: ProxyMode.UDP else null,
-                    obfProfile = if (d.running) d.obf else null,
+                    mode = if (d.running) c?.mode?.ifBlank { null } ?: ProxyMode.UDP else null,
+                    obfProfile = if (d.running) c?.obfProfile else null,
                     version = d.version
                 )
             }
             .onFailure { e -> _serverState.value = ServerState.Error(e.message ?: r.errorText()) }
     }
 
-    suspend fun installServer(): InstallResult = mutex.withLock {
-        val cfg = activeSshConfig ?: return@withLock InstallResult.Failed("not connected")
-        if (cfg.ip.isEmpty()) return@withLock InstallResult.Failed("no SSH config")
-        _serverState.value = ServerState.Working("Установка free-turn-proxy...")
-
-        val result = runCmd(cfg, "Установка", ServerCommand.Install)
-        result.requireData<InstallData>().fold(
-            onSuccess = { d ->
-                // Работающий процесс остаётся на старом бинарнике до перезапуска.
-                if (d.needsRestart) {
-                    appendSshLog("  needs_restart -> авто-рестарт сервера")
-                    runCmd(cfg, "Авто-остановка перед рестартом", ServerCommand.Stop)
-                }
-                delay(300)
-                checkServerStateLocked(cfg, silent = true)
-                InstallResult.Success(stage = d.stage, version = d.version, needsRestart = d.needsRestart)
-            },
-            onFailure = { e ->
-                val msg = e.message ?: result.errorText()
+    suspend fun applyServer(opts: ApplyOptions, update: Boolean = false): ApplyResult? = mutex.withLock {
+        val cfg = activeSshConfig ?: return@withLock null
+        if (cfg.ip.isEmpty()) return@withLock null
+        var bin = ""
+        if (update && serverControl.hasLocalBinaries) {
+            _serverState.value = ServerState.Working(ServerOperation.UPLOAD_BUILD)
+            logHeader("Загрузка локальной сборки сервера", "${cfg.username}@${cfg.ip}:${cfg.port}")
+            bin = serverControl.uploadLocalBinary(cfg).getOrElse { e ->
+                val msg = e.message ?: e.toString()
+                appendSshLog("ERROR: $msg")
                 _serverState.value = ServerState.Error(msg)
-                InstallResult.Failed(msg)
+                return@withLock null
             }
-        )
-    }
-
-    suspend fun startServer(
-        listen: String,
-        connect: String,
-        proxyMode: String = ProxyMode.UDP,
-        kcp: KcpProfile = KcpProfile.DEFAULT,
-        obfProfile: String = "none",
-        obfKey: String = "",
-        obfTimingMs: Int = 0,
-        clientId: String = ""
-    ): Boolean = mutex.withLock {
-        val cfg = activeSshConfig ?: return@withLock false
-        if (cfg.ip.isEmpty()) return@withLock false
-
-        _serverState.value = ServerState.Working("Запуск сервера...")
-        val result = runCmd(
-            cfg, "Запуск",
-            ServerCommand.Start(
-                ServerStartOptions(
-                    listen = listen,
-                    connect = connect,
-                    proxyMode = proxyMode,
-                    kcp = kcp,
-                    obfProfile = obfProfile,
-                    obfKey = obfKey,
-                    obfTimingMs = obfTimingMs,
-                    clientId = clientId
-                )
-            )
-        )
-        if (!result.isOk) {
-            _serverState.value = ServerState.Error(result.errorText())
-            return@withLock false
+            appendSshLog("  bin=$bin")
         }
-        delay(1500)
-        checkServerStateLocked(cfg, silent = true)
-        true
+        _serverState.value = ServerState.Working(
+            if (update) ServerOperation.UPDATE else ServerOperation.APPLY
+        )
+        val result = runCmd(cfg, if (update) "Обновление" else "Применение", ServerCommand.Apply(opts, update, bin))
+        result.applyResult()
+            .onSuccess { checkServerStateLocked(cfg, silent = true) }
+            .onFailure { _serverState.value = ServerState.Error(result.errorText()) }
+            .getOrNull()
     }
 
     suspend fun stopServer() = mutex.withLock {
         val cfg = activeSshConfig ?: return@withLock
         if (cfg.ip.isEmpty()) return@withLock
-        _serverState.value = ServerState.Working("Остановка сервера...")
-
+        _serverState.value = ServerState.Working(ServerOperation.STOP)
         val result = runCmd(cfg, "Остановка", ServerCommand.Stop)
         if (!result.isOk) {
             _serverState.value = ServerState.Error(result.errorText())
             return@withLock
         }
-        delay(1000)
         checkServerStateLocked(cfg, silent = true)
     }
 
@@ -246,7 +207,11 @@ class SshRepository(context: Context, private val sshManager: SSHManager) {
         if (cfg.ip.isEmpty()) return@withLock
         _logsLoading.value = true
         try {
-            runCmd(cfg, "server.log", ServerCommand.FetchLogs(lines))
+            logHeader("Журнал сервера", "${cfg.username}@${cfg.ip}:${cfg.port}")
+            val result = serverControl.run(cfg, ServerCommand.Logs(lines))
+            result.requireData<LogsData>()
+                .onSuccess { appendSshLog(it.lines) }
+                .onFailure { appendSshLog("ERROR: ${result.errorText()}") }
         } finally {
             _logsLoading.value = false
         }
@@ -268,19 +233,5 @@ class SshRepository(context: Context, private val sshManager: SSHManager) {
     fun resetAll() {
         disconnect()
         _sshLog.value = emptyList()
-    }
-
-    sealed class InstallResult {
-        /**
-         * stage: cached | downloaded; version - только если ядро вернуло.
-         * needsRestart - true, если бинарь был переустановлен поверх работающего
-         * процесса; перед использованием новой версии нужен start.
-         */
-        data class Success(
-            val stage: String,
-            val version: String?,
-            val needsRestart: Boolean = false
-        ) : InstallResult()
-        data class Failed(val message: String) : InstallResult()
     }
 }

@@ -24,6 +24,33 @@ class ServerJsonTest {
     }
 
     @Test
+    fun `install opts round trip`() {
+        val srv = Server(
+            name = "s",
+            opts = ServerOpts(
+                method = ServerMethod.SYSTEMD,
+                backend = ServerBackend.EXTERNAL,
+                wgPort = 51999,
+                wgNet = "10.20.0.0/16"
+            )
+        )
+        val o = ServerJson.decodeList(ServerJson.encodeList(listOf(srv))).single().opts
+        assertEquals(ServerMethod.SYSTEMD, o.method)
+        assertEquals(ServerBackend.EXTERNAL, o.backend)
+        assertEquals(51999, o.wgPort)
+        assertEquals("10.20.0.0/16", o.wgNet)
+    }
+
+    @Test
+    fun `snapshot without install opts falls back to defaults`() {
+        val raw = """[{"id":"1","name":"s","opts":{"backend":"bogus"}}]"""
+        val o = ServerJson.decodeList(raw).single().opts
+        assertEquals(ServerMethod.DOCKER, o.method)
+        assertEquals(ServerBackend.NEW, o.backend)
+        assertEquals(ServerBackend.DEFAULT_WG_NET, o.wgNet)
+    }
+
+    @Test
     fun `snapshot without mode and kcp falls back to defaults`() {
         val raw = """[{"id":"1","name":"s","opts":{"obfProfile":"none","obfKey":""}}]"""
         val decoded = ServerJson.decodeList(raw).single()

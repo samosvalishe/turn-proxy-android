@@ -42,6 +42,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
+import com.freeturn.app.data.config.Provider
 import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.domain.SshConnectionState
 import com.freeturn.app.ui.components.SectionLabel
@@ -52,6 +53,7 @@ import com.freeturn.app.ui.components.SettingsEntryRow
 import com.freeturn.app.ui.components.SettingsGroup
 import com.freeturn.app.ui.components.SettingsGroupItem
 import com.freeturn.app.ui.components.SettingsSwitchRow
+import com.freeturn.app.ui.components.providerLabel
 import com.freeturn.app.ui.navigation.NAV_SLIDE_MS
 import com.freeturn.app.ui.theme.Spacing
 import com.freeturn.app.ui.util.redact
@@ -140,6 +142,10 @@ fun ServerDetailScreen(
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                         serverViewModel.installServer()
                     },
+                    onUpdate = {
+                        HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
+                        serverViewModel.updateServer()
+                    },
                     onStart = {
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                         serverViewModel.startServer()
@@ -201,7 +207,7 @@ fun ServerDetailScreen(
                     }
                 }
 
-                SectionLabel(stringResource(R.string.provider_vk_calls))
+                SectionLabel(providerLabel(server?.client?.provider ?: Provider.RELAY))
                 // "Настройки сервера": при sync ON правки пушатся на сервер -> нужен живой
                 // SSH; при sync OFF клиент-локальны -> вход доступен и оффлайн. Правило
                 // общее с ServerManagementScreen - serverSettingsAvailable.
@@ -334,6 +340,7 @@ fun ServerDetailScreen(
 private fun ServerHubActionsFab(
     online: ServerHubState.Online?,
     onInstall: () -> Unit,
+    onUpdate: () -> Unit,
     onStart: () -> Unit,
     onStop: () -> Unit,
     onRename: () -> Unit,
@@ -361,7 +368,7 @@ private fun ServerHubActionsFab(
     ) {
         if (online != null) {
             FloatingActionButtonMenuItem(
-                onClick = { expanded = false; onInstall() },
+                onClick = { expanded = false; if (online.installed) onUpdate() else onInstall() },
                 icon = { Icon(painterResource(R.drawable.cloud_download_24px), contentDescription = null) },
                 text = {
                     Text(stringResource(

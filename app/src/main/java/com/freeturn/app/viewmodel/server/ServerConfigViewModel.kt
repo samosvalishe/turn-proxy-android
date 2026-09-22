@@ -7,7 +7,6 @@ import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.config.ClientConfig
 import com.freeturn.app.data.config.KcpProfile
 import com.freeturn.app.data.config.ObfProfile
-import com.freeturn.app.data.control.UninstallData
 import com.freeturn.app.data.server.Server
 import com.freeturn.app.data.server.ServerOpts
 import com.freeturn.app.data.server.ServersSnapshot
@@ -25,7 +24,7 @@ import kotlinx.coroutines.launch
 sealed interface ServerCleanupState {
     data object Idle : ServerCleanupState
     data object Running : ServerCleanupState
-    data class Done(val data: UninstallData) : ServerCleanupState
+    data object Done : ServerCleanupState
     data class Error(val message: String) : ServerCleanupState
 }
 
@@ -96,8 +95,8 @@ class ServerConfigViewModel(
             _cleanupState.value = ServerCleanupState.Running
             // Перед удалением обновляем rootMode: сохранённое значение могло устареть.
             val mode = serverSetup.detectRootMode(cfg) ?: cfg.rootMode
-            serverSetup.uninstall(cfg.copy(rootMode = mode), withWgPkg = true)
-                .onSuccess { _cleanupState.value = ServerCleanupState.Done(it) }
+            serverSetup.uninstall(cfg.copy(rootMode = mode))
+                .onSuccess { _cleanupState.value = ServerCleanupState.Done }
                 .onFailure { _cleanupState.value = ServerCleanupState.Error(it.uiError(appContext)) }
         }
     }
@@ -114,7 +113,9 @@ class ServerConfigViewModel(
         }
     }
 
-    fun setActiveVkLink(link: String) = updateActiveClient { it.copy(vkLink = link.trim()) }
+    fun setActiveCallLink(link: String) = updateActiveClient { it.copy(callLink = link.trim()) }
+
+    fun setActiveProvider(provider: String) = updateActiveClient { it.copy(provider = provider) }
 
     fun setSplitTunnelMode(value: String) = updateActiveClient { it.copy(splitTunnelMode = value) }
 

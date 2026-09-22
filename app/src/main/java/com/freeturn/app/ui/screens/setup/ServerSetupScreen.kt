@@ -6,8 +6,6 @@
 package com.freeturn.app.ui.screens.setup
 
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
@@ -42,6 +40,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeFlexibleTopAppBar
@@ -55,7 +54,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -76,9 +74,6 @@ import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.viewmodel.server.ServerSetupViewModel
 import com.freeturn.app.viewmodel.server.SetupStep
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import org.koin.androidx.compose.koinViewModel
 import com.freeturn.app.ui.theme.Spacing
 
@@ -114,35 +109,18 @@ fun ServerSetupScreen(
             title = { Text(stringResource(R.string.setup_abort_title)) },
             text = { Text(stringResource(R.string.setup_abort_text)) },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                     HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                     showAbortDialog = false
                     viewModel.backToConfig()
                 }) { Text(stringResource(R.string.setup_abort_confirm)) }
             },
             dismissButton = {
-                TextButton(onClick = { showAbortDialog = false }) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showAbortDialog = false }) {
                     Text(stringResource(R.string.setup_abort_stay))
                 }
             }
         )
-    }
-
-    val scope = rememberCoroutineScope()
-    val wgFilePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        if (uri != null) {
-            scope.launch {
-                val text = withContext(Dispatchers.IO) {
-                    runCatching {
-                        context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
-                    }.getOrNull()
-                }
-                if (!text.isNullOrBlank()) {
-                    HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
-                    viewModel.setConfig(viewModel.uiState.value.config.copy(wgConfText = text))
-                }
-            }
-        }
     }
 
     val fab: SetupFab? = when {
@@ -267,14 +245,12 @@ fun ServerSetupScreen(
                         )
                         SetupStep.Config -> SetupConfigStep(
                             draft = state.config,
-                            wgDetectedPort = state.wgDetectedPort,
+                            reinstall = state.reinstall,
                             duplicateHost = state.duplicateHost,
                             portsClash = state.portsClash,
                             showErrors = highlightErrors,
                             onDraftChange = viewModel::setConfig,
-                            onRollListenPort = viewModel::rollListenPort,
-                            onRollWgPort = viewModel::rollWgPort,
-                            onLoadWgFile = { wgFilePicker.launch("*/*") }
+                            onRollListenPort = viewModel::rollListenPort
                         )
                         SetupStep.Install -> SetupInstallStep(
                             install = state.install,

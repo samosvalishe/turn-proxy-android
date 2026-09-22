@@ -140,42 +140,10 @@ dependencies {
     testImplementation(libs.koin.test)
 }
 
-abstract class AssembleControlScript : DefaultTask() {
-    @get:InputDirectory
-    abstract val srcDir: DirectoryProperty
-
-    @get:OutputDirectory
-    abstract val outDir: DirectoryProperty
-
-    @TaskAction
-    fun assemble() {
-        val out = outDir.get().file("free-turn-control.sh").asFile
-        out.parentFile.mkdirs()
-        val parts = srcDir.get().asFile.listFiles { f -> f.isFile && f.extension == "sh" }
-            ?.sortedBy { it.name } ?: emptyList()
-        require(parts.isNotEmpty()) { "no .sh modules in ${srcDir.get().asFile}" }
-        out.writeText(parts.joinToString("\n") { it.readText().trimEnd('\n') } + "\n")
-    }
-}
-
-val assembleControlScript = tasks.register<AssembleControlScript>("assembleControlScript") {
-    description = "Склеивает server-control/src/*.sh в free-turn-control.sh"
-    group = "build"
-    srcDir.set(rootProject.layout.projectDirectory.dir("server-control/src"))
-}
-
-androidComponents {
-    onVariants { variant ->
-        variant.sources.assets?.addGeneratedSourceDirectory(
-            assembleControlScript,
-            AssembleControlScript::outDir
-        )
-    }
-}
-
 /**
- * Тянет `freeturn.aar` (ядро + gomobile-биндинг) из релизов free-turn-proxy
- * в app/libs. Версия `local` - брать уже лежащий файл и в сеть не ходить.
+ * Тянет из релиза free-turn-proxy `freeturn.aar` (ядро + gomobile-биндинг) и `install.sh`
+ * (серверный RPC, стримится по SSH) в app/libs. Версия общая: протокол скрипта - часть релиза.
+ * `local` - брать уже лежащие app/libs/freeturn.aar и app/libs/install.sh, в сеть не ходить.
  */
 abstract class FetchFreeturnAar : DefaultTask() {
     @get:Input
@@ -196,15 +164,25 @@ abstract class FetchFreeturnAar : DefaultTask() {
     @get:OutputFile
     abstract val aarFile: RegularFileProperty
 
+    @get:OutputFile
+    abstract val scriptFile: RegularFileProperty
+
+    /** Generated assets варианта; путь задаёт AGP. */
+    @get:OutputDirectory
+    abstract val assetsDir: DirectoryProperty
+
     @TaskAction
     fun fetch() {
         val aar = aarFile.get().asFile
+        val script = scriptFile.get().asFile
         val stamp = File(aar.parentFile, ".aar-version")
         val installed = if (stamp.isFile) stamp.readText().trim() else null
 
         if (version.get().trim().equals("local", ignoreCase = true)) {
-            if (!aar.isFile) throw GradleException("FreeTurn aar: freeturnAar=local, но ${aar.path} нет")
-            didWork = false
+            listOf(aar, script).firstOrNull { !it.isFile }?.let {
+                throw GradleException("FreeTurn: freeturnAar=local, но ${it.path} нет")
+            }
+            publishScript(script)
             return
         }
 
@@ -212,15 +190,16 @@ abstract class FetchFreeturnAar : DefaultTask() {
             resolveTag()
         } catch (e: Exception) {
             // Оффлайн со скачанным ядром - не повод ронять сборку
-            if (aar.isFile && installed != null) {
-                logger.warn("FreeTurn aar: не удалось узнать версию (${e.message}), оставляю $installed")
+            if (aar.isFile && script.isFile && installed != null) {
+                logger.warn("FreeTurn: не удалось узнать версию (${e.message}), оставляю $installed")
+                publishScript(script)
                 return
             }
-            throw GradleException("FreeTurn aar: не удалось определить версию из ${repo.get()}: ${e.message}", e)
+            throw GradleException("FreeTurn: не удалось определить версию из ${repo.get()}: ${e.message}", e)
         }
 
-        if (tag == installed && aar.isFile) {
-            didWork = false
+        if (tag == installed && aar.isFile && script.isFile) {
+            publishScript(script)
             return
         }
 
@@ -233,19 +212,26 @@ abstract class FetchFreeturnAar : DefaultTask() {
                 if (p.size == 2) p[1].removePrefix("*") to p[0] else null
             }.toMap()
 
-        val src = cachedFile(File(cache, ASSET), "$base/$ASSET")
-        val expected = sums[ASSET]
-            ?: throw GradleException("FreeTurn aar: $ASSET нет в checksums.txt релиза $tag")
-        val actual = sha256(src)
-        if (!actual.equals(expected, ignoreCase = true)) {
-            src.delete()
-            throw GradleException("FreeTurn aar: sha256 не сошёлся ($actual != $expected)")
+        for ((asset, dest) in listOf(AAR to aar, SCRIPT to script)) {
+            val src = cachedFile(File(cache, asset), "$base/$asset")
+            val expected = sums[asset]
+                ?: throw GradleException("FreeTurn: $asset нет в checksums.txt релиза $tag")
+            val actual = sha256(src)
+            if (!actual.equals(expected, ignoreCase = true)) {
+                src.delete()
+                throw GradleException("FreeTurn: sha256 $asset не сошёлся ($actual != $expected)")
+            }
+            dest.parentFile.mkdirs()
+            src.copyTo(dest, overwrite = true)
         }
-        aar.parentFile.mkdirs()
-        src.copyTo(aar, overwrite = true)
 
         stamp.writeText(tag)
-        logger.lifecycle("FreeTurn aar: $tag -> ${aar.path}")
+        publishScript(script)
+        logger.lifecycle("FreeTurn: $tag -> ${aar.parentFile.path}")
+    }
+
+    private fun publishScript(script: File) {
+        script.copyTo(assetsDir.get().file(SCRIPT).asFile, overwrite = true)
     }
 
     private fun resolveTag(): String {
@@ -313,22 +299,70 @@ abstract class FetchFreeturnAar : DefaultTask() {
     }
 
     private companion object {
-        const val ASSET = "freeturn.aar"
+        const val AAR = "freeturn.aar"
+        const val SCRIPT = "install.sh"
     }
 }
 
+/**
+ * `app/libs/server-linux-*` -> assets/server debug-сборки с `freeturnAar=local`: "Обновить"
+ * в хабе сервера загружает их по SSH вместо релиза (отладка серверной части ядра).
+ */
+abstract class LocalServerBinaries : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NAME_ONLY)
+    abstract val binaries: ConfigurableFileCollection
+
+    @get:OutputDirectory
+    abstract val assetsDir: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        val out = assetsDir.get().dir("server").asFile
+        out.deleteRecursively()
+        out.mkdirs()
+        for (f in binaries.files) {
+            val asset = assetName(f.name)
+            if (asset == null) {
+                logger.warn("FreeTurn: ${f.name} - неизвестная архитектура, пропускаю")
+                continue
+            }
+            f.copyTo(File(out, asset), overwrite = true)
+            logger.lifecycle("FreeTurn: ${f.name} -> assets/server/$asset")
+        }
+        if (out.list().isNullOrEmpty()) {
+            logger.warn("FreeTurn: в app/libs нет server-linux-* - \"Обновить\" поставит релиз")
+        }
+    }
+
+    // Имя ассета релиза (как server_asset в install.sh), в т.ч. из имён dist/ goreleaser:
+    // server_linux_arm64_v8.0, server_linux_amd64_v1, server_linux_arm_7.
+    private fun assetName(name: String): String? {
+        val arch = Regex("^server[-_]linux[-_](.+)$").find(name)?.groupValues?.get(1) ?: return null
+        return "server-linux-" + when {
+            arch.startsWith("amd64") -> "amd64"
+            arch.startsWith("arm64") -> "arm64"
+            arch == "armv7" || arch.startsWith("arm_7") -> "armv7"
+            arch.startsWith("386") -> "386"
+            arch.startsWith("riscv64") -> "riscv64"
+            else -> return null
+        }
+    }
+}
+
+val freeturnAarVersion: Provider<String> = providers.gradleProperty("freeturnAar")
+    .orElse(providers.environmentVariable("FREETURN_AAR_VERSION"))
+    .orElse("latest")
+
 val fetchFreeturnAar = tasks.register<FetchFreeturnAar>("fetchFreeturnAar") {
-    description = "Качает freeturn.aar из релизов free-turn-proxy в app/libs"
+    description = "Качает freeturn.aar и install.sh из релизов free-turn-proxy в app/libs"
     group = "build"
     repo.set(providers.gradleProperty("freeturnAarRepo").orElse("samosvalishe/free-turn-proxy"))
-    version.set(
-        providers.gradleProperty("freeturnAar")
-            .orElse(providers.environmentVariable("FREETURN_AAR_VERSION"))
-            .orElse("latest")
-    )
+    version.set(freeturnAarVersion)
     token.set(providers.environmentVariable("GITHUB_TOKEN"))
     cacheDir.set(layout.dir(provider { File(gradle.gradleUserHomeDir, "caches/freeturn-core") }))
     aarFile.set(layout.projectDirectory.file("libs/freeturn.aar"))
+    scriptFile.set(layout.projectDirectory.file("libs/install.sh"))
     // Версия резолвится в рантайме - актуальность решает stamp-файл внутри таски
     outputs.upToDateWhen { false }
 }
@@ -336,3 +370,18 @@ val fetchFreeturnAar = tasks.register<FetchFreeturnAar>("fetchFreeturnAar") {
 // AAR нужен на компиляции, а не на упаковке - качаем в любой сборке.
 // matching, а не named - таски вариантов AGP создаёт позже конфигурации скрипта.
 tasks.matching { it.name == "preBuild" }.configureEach { dependsOn(fetchFreeturnAar) }
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(
+            fetchFreeturnAar,
+            FetchFreeturnAar::assetsDir
+        )
+        if (variant.buildType == "debug" && freeturnAarVersion.get().trim().equals("local", ignoreCase = true)) {
+            val bins = tasks.register<LocalServerBinaries>("${variant.name}LocalServerBinaries") {
+                binaries.from(fileTree("libs") { include("server-linux*", "server_linux*") })
+            }
+            variant.sources.assets?.addGeneratedSourceDirectory(bins, LocalServerBinaries::assetsDir)
+        }
+    }
+}

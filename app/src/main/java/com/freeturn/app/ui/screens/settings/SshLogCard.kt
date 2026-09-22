@@ -23,6 +23,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
@@ -96,6 +98,7 @@ internal fun SshLogCard(
                 ) {
                     if (canFetchJournal) {
                         FilledTonalButton(
+                            shapes = ButtonDefaults.shapes(),
                             onClick = onFetchJournal,
                             enabled = !logsLoading,
                             modifier = Modifier.weight(1f)
@@ -115,14 +118,14 @@ internal fun SshLogCard(
                     }
                     if (lines.isNotEmpty()) {
                         if (canFetchJournal) {
-                            FilledTonalIconButton(onClick = onClear) {
+                            FilledTonalIconButton(shapes = IconButtonDefaults.shapes(), onClick = onClear) {
                                 Icon(
                                     painterResource(R.drawable.delete_24px),
                                     contentDescription = stringResource(R.string.clear)
                                 )
                             }
                         } else {
-                            FilledTonalButton(onClick = onClear, modifier = Modifier.weight(1f)) {
+                            FilledTonalButton(shapes = ButtonDefaults.shapes(), onClick = onClear, modifier = Modifier.weight(1f)) {
                                 Icon(
                                     painterResource(R.drawable.delete_24px),
                                     contentDescription = null,

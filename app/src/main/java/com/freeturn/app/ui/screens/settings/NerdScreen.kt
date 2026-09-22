@@ -38,12 +38,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
 import com.freeturn.app.data.CoreCommand
-import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.data.config.toCoreJson
 import com.freeturn.app.domain.proxy.ProxyEngine
 import com.freeturn.app.data.server.Server
 import com.freeturn.app.domain.server.ServerCommand
-import com.freeturn.app.domain.server.ServerStartOptions
+import com.freeturn.app.domain.server.applyOptions
 import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.ui.components.SettingsBackButton
 import com.freeturn.app.ui.components.SettingsContentMaxWidth
@@ -288,23 +287,14 @@ private fun clientCommandLine(engine: ProxyEngine, server: Server, privacy: Bool
         )
 
 private fun serverCommandLine(server: Server, privacy: Boolean): String {
-    val opts = ServerStartOptions(
-        listen = server.proxyListen,
-        connect = server.proxyConnect,
-        proxyMode = server.opts.proxyMode,
-        kcp = server.opts.kcp,
-        obfProfile = if (server.opts.obfEnabled) server.opts.obfProfile else ObfProfile.NONE,
-        obfKey = if (server.opts.obfEnabled) server.opts.obfKey else "",
-        obfTimingMs = server.opts.obfTimingMs
-    )
-    // Серверные флаги в форме --flag=value: маскируем хвост после '=' у секретов.
-    val shown = ServerCommand.Start(opts).toArgv().joinToString(" ") { tok ->
+    // Флаги в форме --flag=value: маскируем хвост после '=' у секретов.
+    val shown = ServerCommand.Apply(server.applyOptions()).toArgv().joinToString(" ") { tok ->
         val eq = tok.indexOf('=')
         if (eq > 0 && tok.substring(0, eq) == "--obf-key")
             tok.substring(0, eq + 1) + tok.substring(eq + 1).redact(privacy)
         else tok
     }
-    return "free-turn-control.sh $shown"
+    return "install.sh $shown"
 }
 
 @Composable

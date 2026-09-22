@@ -3,13 +3,13 @@ package com.freeturn.app.viewmodel.server
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.freeturn.app.data.AppPreferences
-import com.freeturn.app.data.config.HostPort
-import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.data.server.ServerOpts
 import com.freeturn.app.data.config.SshConfig
 import com.freeturn.app.domain.proxy.ProxyOrchestrator
 import com.freeturn.app.domain.ServerState
 import com.freeturn.app.domain.SshConnectionState
+import com.freeturn.app.domain.server.applyOptions
+import com.freeturn.app.domain.server.withApplied
 import com.freeturn.app.domain.ssh.SshRepository
 import com.freeturn.app.viewmodel.HapticEvent
 import com.freeturn.app.viewmodel.Haptics
@@ -45,7 +45,7 @@ class ServerViewModel(
             when {
                 ssh is SshConnectionState.Error -> ServerHubState.Failed
                 server is ServerState.Error -> ServerHubState.Failed
-                server is ServerState.Working -> ServerHubState.Working(server.action)
+                server is ServerState.Working -> ServerHubState.Working(server.operation)
                 ssh is SshConnectionState.Connected && server is ServerState.Known ->
                     ServerHubState.Online(
                         running = server.running,
@@ -90,39 +90,20 @@ class ServerViewModel(
         }
     }
 
-    fun installServer() {
-        viewModelScope.launch {
-            val outcome = sshRepository.installServer()
-            if (outcome is SshRepository.InstallResult.Success) {
-                if (outcome.stage == "downloaded" && prefs.serverOptsFlow.first().obfKey.isBlank()) {
-                    prefs.updateActiveServer { it.copy(opts = it.opts.copy(obfKey = ObfProfile.generateKey())) }
-                }
-                if (outcome.needsRestart) {
-                    startServer()
-                    orchestrator.restartProxyIfRunning()
-                }
-            }
-        }
-    }
+    // Установка и запуск - один apply: правки, сделанные пока сервер стоял, иначе
+    // остались бы только в профиле, а сервер поднялся бы со старым install.conf.
+    fun installServer() = applyActive()
 
-    fun startServer() {
+    fun startServer() = applyActive()
+
+    fun updateServer() = applyActive(update = true)
+
+    private fun applyActive(update: Boolean = false) {
         viewModelScope.launch {
-            val l = prefs.proxyListenFlow.first()
-            val c = prefs.proxyConnectFlow.first()
-            if (!HostPort.isValid(l) || !HostPort.isValid(c)) {
-                sshRepository.updateServerState(ServerState.Error("Неверный формат адреса (ожидается host:port)"))
-                return@launch
-            }
-            val opts = prefs.serverOptsFlow.first()
-            sshRepository.startServer(
-                listen = l, connect = c,
-                proxyMode = opts.proxyMode,
-                kcp = opts.kcp,
-                obfProfile = if (opts.obfEnabled) opts.obfProfile else "none",
-                obfKey = if (opts.obfEnabled) opts.obfKey else "",
-                obfTimingMs = opts.obfTimingMs,
-                clientId = prefs.ownClientId()
-            )
+            val server = prefs.serversSnapshot.first().active ?: return@launch
+            val applied = sshRepository.applyServer(server.applyOptions(), update) ?: return@launch
+            orchestrator.saveApplied(server.withApplied(applied))
+            orchestrator.restartProxyIfRunning()
         }
     }
 

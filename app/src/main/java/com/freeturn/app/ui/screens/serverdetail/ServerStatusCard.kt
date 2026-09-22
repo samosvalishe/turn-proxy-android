@@ -5,6 +5,7 @@
 
 package com.freeturn.app.ui.screens.serverdetail
 
+import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
@@ -27,6 +28,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -44,6 +46,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import com.freeturn.app.R
+import com.freeturn.app.domain.ServerOperation
 import com.freeturn.app.ui.components.BusyProgressIndicator
 import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.theme.extendedColorScheme
@@ -93,7 +96,7 @@ internal fun ServerStatusCard(
                 when (s) {
                     is ServerHubState.Online -> OnlineContent(s)
                     ServerHubState.Connecting -> BusyContent(stringResource(R.string.pill_connecting))
-                    is ServerHubState.Working -> BusyContent(s.action)
+                    is ServerHubState.Working -> BusyContent(stringResource(s.operation.labelRes()))
                     ServerHubState.Failed -> FailedContent(onRetry)
                     ServerHubState.Offline -> OfflineContent(onActivate)
                     ServerHubState.NotPaired -> NotPairedContent()
@@ -206,7 +209,7 @@ private fun FailedContent(onRetry: () -> Unit) {
         color = MaterialTheme.colorScheme.error,
         title = stringResource(R.string.hub_connect_failed)
     )
-    Button(onClick = onRetry, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+    Button(shapes = ButtonDefaults.shapes(), onClick = onRetry, modifier = Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.reconnect))
     }
 }
@@ -218,7 +221,7 @@ private fun OfflineContent(onActivate: () -> Unit) {
         title = stringResource(R.string.pill_offline),
         subtitle = stringResource(R.string.server_inactive_desc)
     )
-    Button(onClick = onActivate, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+    Button(shapes = ButtonDefaults.shapes(), onClick = onActivate, modifier = Modifier.fillMaxWidth()) {
         Text(stringResource(R.string.make_active))
     }
 }
@@ -230,4 +233,12 @@ private fun NotPairedContent() {
         title = stringResource(R.string.pill_not_paired),
         subtitle = stringResource(R.string.not_paired_hint)
     )
+}
+
+@StringRes
+private fun ServerOperation.labelRes(): Int = when (this) {
+    ServerOperation.APPLY -> R.string.hub_op_apply
+    ServerOperation.UPDATE -> R.string.hub_op_update
+    ServerOperation.UPLOAD_BUILD -> R.string.hub_op_upload_build
+    ServerOperation.STOP -> R.string.hub_op_stop
 }

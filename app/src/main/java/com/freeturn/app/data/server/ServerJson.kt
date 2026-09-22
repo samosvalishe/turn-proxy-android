@@ -56,7 +56,7 @@ internal object ServerJson {
         })
         put("client", JSONObject().apply {
             put("serverAddress", p.client.serverAddress)
-            put("vkLink", p.client.vkLink)
+            put("callLink", p.client.callLink)
             put("provider", p.client.provider)
             put("threads", p.client.threads)
             put("streamsPerCred", p.client.streamsPerCred)
@@ -86,6 +86,10 @@ internal object ServerJson {
             put("obfTimingMs", p.opts.obfTimingMs)
             put("proxyMode", p.opts.proxyMode)
             put("kcp", encodeKcp(p.opts.kcp))
+            put("method", p.opts.method)
+            put("backend", p.opts.backend)
+            put("wgPort", p.opts.wgPort)
+            put("wgNet", p.opts.wgNet)
         })
     }
 
@@ -95,7 +99,7 @@ internal object ServerJson {
         val optsO = o.optJSONObject("opts") ?: JSONObject()
         return Server(
             id = o.optString("id").ifBlank { UUID.randomUUID().toString() },
-            name = o.optString("name").ifBlank { Server.FALLBACK_NAME },
+            name = o.optString("name"),
             ssh = SshConfig(
                 ip = sshO.optString("ip"),
                 port = sshO.optInt("port", 22),
@@ -109,9 +113,9 @@ internal object ServerJson {
             ),
             client = ClientConfig(
                 serverAddress = cliO.optString("serverAddress"),
-                vkLink = cliO.optString("vkLink"),
-                provider = cliO.optString("provider", Provider.VK).let {
-                    if (it in Provider.VALUES) it else Provider.VK
+                callLink = cliO.optString("callLink"),
+                provider = cliO.optString("provider", Provider.RELAY).let {
+                    if (it in Provider.VALUES) it else Provider.RELAY
                 },
                 threads = cliO.optInt("threads", ClientConfig.DEFAULT_THREADS),
                 streamsPerCred = cliO.optInt("streamsPerCred", ClientConfig.DEFAULT_STREAMS_PER_CRED),
@@ -150,7 +154,15 @@ internal object ServerJson {
                 proxyMode = optsO.optString("proxyMode", ProxyMode.UDP).let {
                     if (it in ProxyMode.VALUES) it else ProxyMode.UDP
                 },
-                kcp = decodeKcp(optsO.optJSONObject("kcp"))
+                kcp = decodeKcp(optsO.optJSONObject("kcp")),
+                method = optsO.optString("method", ServerMethod.DOCKER).let {
+                    if (it in ServerMethod.VALUES) it else ServerMethod.DOCKER
+                },
+                backend = optsO.optString("backend", ServerBackend.NEW).let {
+                    if (it in ServerBackend.VALUES) it else ServerBackend.NEW
+                },
+                wgPort = optsO.optInt("wgPort", ServerBackend.DEFAULT_WG_PORT),
+                wgNet = optsO.optString("wgNet").ifBlank { ServerBackend.DEFAULT_WG_NET }
             )
         )
     }

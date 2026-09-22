@@ -28,6 +28,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
@@ -120,7 +122,7 @@ fun SshSetupScreen(
                 title = { Text(stringResource(R.string.connect_to_server)) },
                 scrollBehavior = scrollBehavior,
                 navigationIcon = {
-                    IconButton(onClick = {
+                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
                         HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
                         onBack()
                     }) {
@@ -193,8 +195,11 @@ fun SshSetupScreen(
                         onSudoPasswordChange = { sudoPassword = it },
                         showSudoPassword = true
                     )
-                    // Ошибка подключения - тональная карточка в тон ошибки.
-                    (sshState as? SshConnectionState.Error)?.let { InlineErrorCard(it.message) }
+                    (sshState as? SshConnectionState.Error)?.let {
+                        InlineErrorCard(
+                            if (it.hostKeyChanged) stringResource(R.string.error_ssh_host_key_changed) else it.message
+                        )
+                    }
                 } else {
                     ConnectionProgressCard(step = stringResource(R.string.ssh_connecting))
                 }

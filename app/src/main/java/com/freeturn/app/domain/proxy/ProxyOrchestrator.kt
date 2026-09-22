@@ -1,9 +1,10 @@
 package com.freeturn.app.domain.proxy
 
 import com.freeturn.app.data.AppPreferences
-import com.freeturn.app.data.config.HostPort
 import com.freeturn.app.data.server.Server
 import com.freeturn.app.domain.ServerState
+import com.freeturn.app.domain.server.applyOptions
+import com.freeturn.app.domain.server.withApplied
 import com.freeturn.app.domain.ssh.SshRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -97,23 +98,29 @@ class ProxyOrchestrator(
             sshRepository.logNote("рестарт сервера пропущен: $reason")
             return
         }
-        val l = prefs.proxyListenFlow.first()
-        val c = prefs.proxyConnectFlow.first()
-        if (!HostPort.isValid(l) || !HostPort.isValid(c)) {
-            sshRepository.logNote("рестарт сервера пропущен: некорректный listen/connect ($l -> $c)")
-            return
-        }
-        val opts = prefs.serverOptsFlow.first()
-        sshRepository.stopServer()
-        sshRepository.startServer(
-            listen = l, connect = c,
-            proxyMode = opts.proxyMode,
-            kcp = opts.kcp,
-            obfProfile = if (opts.obfEnabled) opts.obfProfile else "none",
-            obfKey = if (opts.obfEnabled) opts.obfKey else "",
-            obfTimingMs = opts.obfTimingMs,
-            clientId = prefs.ownClientId()
-        )
+        val server = prefs.serversSnapshot.first().active ?: return
+        val applied = sshRepository.applyServer(server.applyOptions()) ?: return
+        saveApplied(server.withApplied(applied))
+    }
+
+    /**
+     * Профили одного VPS (relay и direct из мастера) делят серверный конфиг: без синхронизации
+     * второй остался бы со старым ключом/режимом и получил бы отлуп сервера.
+     */
+    suspend fun saveApplied(server: Server) {
+        prefs.serversSnapshot.first().list
+            .filter { it.id == server.id || it.ssh.sameHost(server.ssh) }
+            .forEach { s ->
+                prefs.updateServer(s.id) {
+                    it.copy(
+                        proxyListen = server.proxyListen,
+                        proxyConnect = server.proxyConnect,
+                        // obf-timing - пейсинг клиента, серверу его не шлём.
+                        opts = server.opts.copy(obfTimingMs = it.opts.obfTimingMs),
+                        client = it.client.copy(clientId = server.client.clientId)
+                    )
+                }
+            }
     }
 
     /** Команда START при живой сессии пересоздаёт её с новым конфигом. */

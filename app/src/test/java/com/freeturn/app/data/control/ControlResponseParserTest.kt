@@ -10,38 +10,46 @@ class ControlResponseParserTest {
 
     @Test
     fun `parses ok probe envelope`() {
-        val raw = """{"proto":2,"result":"ok","data":{"installed":true,"running":false,"runtime":"systemd","euid":0,"wg":{"present":true,"port":51820},"virt":"kvm","wg_kernel":true,"conflicts":{"warp":true,"x3ui":false,"wgeasy":false,"tailscale":false,"other_ifaces":["CloudflareWARP"]}},"logs":[]}"""
+        val raw = """{"proto":3,"result":"ok","data":{"installed":true,"running":true,"euid":0,"arch":"x86_64","method":"docker","version":"latest","config":{"method":"docker","backend":"new","connect":"","host":"203.0.113.7","listen_port":56000,"wg_port":51820,"wg_net":"10.13.13.0/24","mode":"udp","obf_profile":"rtpopus3","obf_key":"ab","version":"latest"}},"logs":[]}"""
         val r = ControlResponseParser.parse(raw)
         assertTrue(r.isOk)
-        assertEquals(2, r.proto)
         val d = ControlJson.decode<ProbeData>(r.data)
         assertTrue(d.installed)
-        assertEquals("systemd", d.runtime)
-        assertEquals(51820, d.wg.port)
-        assertTrue(d.conflicts.warp)
-        assertEquals(listOf("CloudflareWARP"), d.conflicts.otherIfaces)
+        assertEquals("docker", d.method)
+        val c = d.config!!
+        assertEquals("new", c.backend)
+        assertEquals(56000, c.listenPort)
+        assertEquals("10.13.13.0/24", c.wgNet)
+        assertEquals("rtpopus3", c.obfProfile)
     }
 
     @Test
-    fun `wg port null decodes to null`() {
-        val raw = """{"proto":2,"result":"ok","data":{"wg":{"present":false,"port":null}},"logs":[]}"""
+    fun `probe without install conf has no config`() {
+        val raw = """{"proto":3,"result":"ok","data":{"installed":false,"running":false,"euid":0,"arch":"aarch64"},"logs":[]}"""
         val d = ControlJson.decode<ProbeData>(ControlResponseParser.parse(raw).data)
-        assertFalse(d.wg.present)
-        assertNull(d.wg.port)
+        assertFalse(d.installed)
+        assertNull(d.config)
     }
 
     @Test
     fun `parses err envelope with code`() {
-        val raw = """{"proto":2,"result":"err","code":"wg_port_busy","msg":"udp 51820 busy","stage":"wg_setup","logs":["x"]}"""
+        val raw = """{"proto":3,"result":"err","code":"port_busy","msg":"порт 51820/udp занят","stage":"apply","logs":["x"]}"""
         val r = ControlResponseParser.parse(raw)
         assertFalse(r.isOk)
-        assertEquals("wg_port_busy", r.code)
-        assertEquals("udp 51820 busy", r.msg)
+        assertEquals("port_busy", r.code)
+        assertEquals("порт 51820/udp занят", r.msg)
+    }
+
+    @Test
+    fun `other proto is proto_mismatch`() {
+        val r = ControlResponseParser.parse("""{"proto":2,"result":"ok","data":{},"logs":[]}""")
+        assertFalse(r.isOk)
+        assertEquals(ControlResponseParser.PROTO_MISMATCH, r.code)
     }
 
     @Test
     fun `banner before json is tolerated`() {
-        val raw = "Welcome to Ubuntu\nLast login: ...\n{\"proto\":2,\"result\":\"ok\",\"data\":{},\"logs\":[]}"
+        val raw = "Welcome to Ubuntu\nLast login: ...\n{\"proto\":3,\"result\":\"ok\",\"data\":{},\"logs\":[]}"
         assertTrue(ControlResponseParser.parse(raw).isOk)
     }
 
@@ -74,12 +82,23 @@ class ControlResponseParserTest {
     }
 
     @Test
-    fun `share-list arrays decode`() {
-        val raw = """{"proto":2,"result":"ok","data":{"peers":[{"pub":"a=","ip":"10.0.0.2","has_conf":true}],"self_pub":"a=","clients":[{"id":"deadbeef"}]},"logs":[]}"""
-        val d = ControlJson.decode<ShareListData>(ControlResponseParser.parse(raw).data)
-        assertEquals(1, d.peers.size)
-        assertEquals("a=", d.peers[0].pub)
-        assertTrue(d.peers[0].hasConf)
-        assertEquals("deadbeef", d.clients[0].id)
+    fun `client-list decodes clients and share`() {
+        val raw = """{"proto":3,"result":"ok","data":{"clients":[{"name":"owner","client_id":"aa","self":true,"ip":"10.13.13.2","pub":"p=","hs":1700000000},{"name":"phone","client_id":"bb","self":false}],"share":{"backend":"new","host":"203.0.113.7","port":56000,"mode":"udp","obf_profile":"rtpopus3","obf_key":"k"}},"logs":[]}"""
+        val d = ControlJson.decode<ClientListData>(ControlResponseParser.parse(raw).data)
+        assertEquals(2, d.clients.size)
+        assertTrue(d.clients[0].self)
+        assertEquals("p=", d.clients[0].pub)
+        assertEquals("", d.clients[1].pub)
+        assertEquals("new", d.share.backend)
+        assertEquals(56000, d.share.port)
+    }
+
+    @Test
+    fun `apply decodes owner and key`() {
+        val raw = """{"proto":3,"result":"ok","data":{"owner":{"client_id":"aa","pub":"p=","conf_b64":"W0ludGVyZmFjZV0=","link":"freeturn://x"},"obf_key":"kk","needs_restart":false},"logs":[]}"""
+        val d = ControlJson.decode<ApplyData>(ControlResponseParser.parse(raw).data)
+        assertEquals("aa", d.owner.clientId)
+        assertEquals("[Interface]", decodeBase64(d.owner.confB64))
+        assertEquals("kk", d.obfKey)
     }
 }

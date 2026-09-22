@@ -3,26 +3,32 @@ package com.freeturn.app.viewmodel.server
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.freeturn.app.R
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.config.ClientConfig
+import com.freeturn.app.data.config.HostPort
 import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.data.config.ProxyMode
-import com.freeturn.app.data.server.Server
-import com.freeturn.app.data.server.ServerOpts
 import com.freeturn.app.data.config.SshConfig
 import com.freeturn.app.data.config.TunnelTransport
+import com.freeturn.app.data.control.RemoteConfig
+import com.freeturn.app.data.server.Server
+import com.freeturn.app.data.server.ServerBackend
+import com.freeturn.app.data.server.ServerMethod
+import com.freeturn.app.data.server.ServerOpts
 import com.freeturn.app.domain.proxy.ProxyOrchestrator
+import com.freeturn.app.domain.server.ApplyOptions
+import com.freeturn.app.domain.server.ApplyResult
 import com.freeturn.app.domain.server.ServerSetupRepository
-import com.freeturn.app.domain.server.ServerStartOptions
 import com.freeturn.app.viewmodel.HapticEvent
 import com.freeturn.app.viewmodel.Haptics
 import com.freeturn.app.viewmodel.uiError
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -30,7 +36,7 @@ import kotlin.random.Random
 
 enum class SetupStep { Ssh, Config, Install }
 
-enum class SetupTaskKind { InstallCore, WireGuard, StartServer, Persist }
+enum class SetupTaskKind { Apply, Persist }
 
 data class SetupSshDraft(
     val ip: String = "",
@@ -64,16 +70,22 @@ data class SetupSshDraft(
 
 data class SetupConfigDraft(
     val name: String = "",
-    val vpnMode: Boolean = true,
-    val obfProfile: String = ObfProfile.RTPOPUS,
-    val listenPort: String = "",
-    val wgPort: String = "",
-    val wgCustomConf: Boolean = false,
-    val wgConfText: String = "",
-    val backendPort: String = "",
+    val backend: String = ServerBackend.NEW,
+    val wgNet: String = ServerBackend.DEFAULT_WG_NET,
+    val wgPort: String = ServerBackend.DEFAULT_WG_PORT.toString(),
+    /** Адрес своего VPN (host:port) для backend=external. */
+    val connect: String = "",
+    /** Мой VPN слушает TCP (Xray/sing-box) - проброс в tcp-режиме. */
     val backendTcp: Boolean = false,
-    val vkLink: String = ""
-)
+    val method: String = ServerMethod.DOCKER,
+    val obfProfile: String = ObfProfile.RTPOPUS3,
+    val listenPort: String = "",
+    val callLink: String = ""
+) {
+    val ownWg: Boolean get() = backend == ServerBackend.NEW
+
+    val proxyMode: String get() = if (!ownWg && backendTcp) ProxyMode.TCP else ProxyMode.UDP
+}
 
 data class SetupInstallState(
     val tasks: List<SetupTaskKind>,
@@ -86,10 +98,9 @@ data class SetupInstallState(
 data class SetupSummary(
     val serverName: String,
     val serverAddress: String,
-    val vpnMode: Boolean,
+    val ownWg: Boolean,
     val obfProfile: String,
-    val wgConfImported: Boolean,
-    val usedExistingWg: Boolean
+    val wgConfImported: Boolean
 )
 
 data class SetupUiState(
@@ -97,43 +108,29 @@ data class SetupUiState(
     val ssh: SetupSshDraft = SetupSshDraft(),
     val checkingSsh: Boolean = false,
     val sshError: String? = null,
-    val wgDetectedPort: Int? = null,
+    /** На хосте уже есть установка: поля заполнены её конфигом. */
+    val reinstall: Boolean = false,
     val duplicateHost: Boolean = false,
     val config: SetupConfigDraft = SetupConfigDraft(),
     val install: SetupInstallState? = null
 ) {
-    /**
-     * Внешний порт совпал с UDP-портом бэкенда на том же хосте - оба бинда
-     * конфликтуют. TCP-бэкенд (Xray/sing-box) с UDP-listen не пересекается.
-     */
+    /** Свой WG и FreeTurn на одном UDP-порту хоста не уживутся. */
     val portsClash: Boolean
-        get() {
-            val listen = config.listenPort.toIntOrNull() ?: return false
-            val backend = when {
-                config.vpnMode && config.wgCustomConf -> config.backendPort.toIntOrNull()
-                config.vpnMode && wgDetectedPort == null -> config.wgPort.toIntOrNull()
-                config.vpnMode -> wgDetectedPort
-                !config.backendTcp -> config.backendPort.toIntOrNull()
-                else -> null
-            }
-            return backend != null && backend == listen
-        }
+        get() = config.ownWg && config.wgPort.isNotBlank() && config.wgPort == config.listenPort
 
     val configValid: Boolean
         get() {
             fun ok(p: String) = p.toIntOrNull()?.let { it in 1..65535 } == true
             if (!ok(config.listenPort) || portsClash) return false
-            return when {
-                config.vpnMode && config.wgCustomConf ->
-                    config.wgConfText.isNotBlank() && ok(config.backendPort)
-                config.vpnMode && wgDetectedPort == null -> ok(config.wgPort)
-                !config.vpnMode -> ok(config.backendPort)
-                else -> true
+            return if (config.ownWg) {
+                ok(config.wgPort) && ServerBackend.isValidNet(config.wgNet)
+            } else {
+                HostPort.isValid(config.connect.trim())
             }
         }
 }
 
-// Сервер сохраняется только после успешного завершения удалённых шагов.
+// Сервер сохраняется только после успешного apply.
 class ServerSetupViewModel(
     private val repo: ServerSetupRepository,
     private val prefs: AppPreferences,
@@ -145,23 +142,21 @@ class ServerSetupViewModel(
     private val appContext = context.applicationContext
 
     private val _uiState = MutableStateFlow(
-        SetupUiState(
-            config = SetupConfigDraft(
-                listenPort = randomListenPort(),
-                wgPort = randomWgPort()
-            )
-        )
+        SetupUiState(config = SetupConfigDraft(listenPort = randomListenPort()))
     )
     val uiState: StateFlow<SetupUiState> = _uiState.asStateFlow()
 
-    // Obf-ключ мастера: генерится один раз и уходит и в start, и в снимок сервера.
-    private val obfKey: String = ObfProfile.generateKey()
     private var fingerprint: String = ""
     private var serverName: String = ""
     private var installJob: Job? = null
+    // Apply прошёл, а профиль не сохранился: повтор не должен гонять apply заново.
+    private var applied: ApplyResult? = null
 
     fun setSsh(draft: SetupSshDraft) =
-        _uiState.update { it.copy(ssh = draft, sshError = null) }
+        _uiState.update {
+            // Другой хост - его конфиг подтянет следующий probe.
+            it.copy(ssh = draft, sshError = null, reinstall = it.reinstall && draft.ip == it.ssh.ip)
+        }
 
     fun setConfig(draft: SetupConfigDraft) =
         _uiState.update { it.copy(config = draft) }
@@ -169,15 +164,13 @@ class ServerSetupViewModel(
     fun rollListenPort() =
         _uiState.update { it.copy(config = it.config.copy(listenPort = randomListenPort())) }
 
-    fun rollWgPort() =
-        _uiState.update { it.copy(config = it.config.copy(wgPort = randomWgPort())) }
-
     fun backToSsh() = _uiState.update { it.copy(step = SetupStep.Ssh) }
 
     fun backToConfig() {
         // Гонка с диалогом прерывания: установка успела завершиться - не сбрасываем.
         if (_uiState.value.install?.done == true) return
         installJob?.cancel()
+        applied = null
         _uiState.update { it.copy(step = SetupStep.Config, install = null) }
     }
 
@@ -198,18 +191,15 @@ class ServerSetupViewModel(
                     val duplicate = prefs.serversSnapshot.first().list
                         .any { it.ssh.ip.isNotBlank() && it.ssh.ip.equals(ip, ignoreCase = true) }
                     haptics.perform(HapticEvent.SUCCESS)
-                    _uiState.update {
-                        it.copy(
+                    _uiState.update { st ->
+                        // Повторный probe не перетирает ручной ввод.
+                        val prefill = probe.config.takeUnless { st.reinstall }
+                        st.copy(
                             checkingSsh = false,
                             step = SetupStep.Config,
-                            wgDetectedPort = probe.wgPort,
+                            reinstall = st.reinstall || probe.config != null,
                             duplicateHost = duplicate,
-                            // Повторный probe не перетирает ручной ввод.
-                            config = it.config.copy(
-                                backendPort = it.config.backendPort.ifBlank {
-                                    (probe.wgPort ?: DEFAULT_WG_PORT).toString()
-                                }
-                            )
+                            config = prefill?.let { st.config.from(it) } ?: st.config
                         )
                     }
                 }
@@ -226,20 +216,20 @@ class ServerSetupViewModel(
         val s = _uiState.value
         if (s.step != SetupStep.Config || !s.configValid) return
         serverName = s.config.name.trim().ifBlank { fallbackName }
-        val tasks = buildList {
-            add(SetupTaskKind.InstallCore)
-            if (s.config.vpnMode && !s.config.wgCustomConf) add(SetupTaskKind.WireGuard)
-            add(SetupTaskKind.StartServer)
-            add(SetupTaskKind.Persist)
+        applied = null
+        _uiState.update {
+            it.copy(
+                step = SetupStep.Install,
+                install = SetupInstallState(listOf(SetupTaskKind.Apply, SetupTaskKind.Persist))
+            )
         }
-        _uiState.update { it.copy(step = SetupStep.Install, install = SetupInstallState(tasks)) }
         runInstall()
     }
 
     fun retryInstall() {
         val st = _uiState.value.install ?: return
         if (st.error == null) return
-        _uiState.update { it.copy(install = st.copy(current = 0, error = null)) }
+        _uiState.update { it.copy(install = st.copy(error = null)) }
         runInstall()
     }
 
@@ -253,11 +243,9 @@ class ServerSetupViewModel(
         }
     }
 
-    private fun fail(message: String?) {
+    private fun fail(message: String) {
         haptics.perform(HapticEvent.ERROR)
-        _uiState.update { s ->
-            s.copy(install = s.install?.copy(error = message ?: "unknown error"))
-        }
+        _uiState.update { s -> s.copy(install = s.install?.copy(error = message)) }
     }
 
     private fun runInstall() {
@@ -267,56 +255,18 @@ class ServerSetupViewModel(
             val cfg = s.ssh.toSshConfig().copy(hostFingerprint = fingerprint)
             val c = s.config
 
-            repo.install(cfg).onFailure { fail(it.message); return@launch }
-            advance()
-
-            var wgClientConf: String? = null
-            var backendPort = when {
-                c.vpnMode && !c.wgCustomConf ->
-                    s.wgDetectedPort ?: c.wgPort.toIntOrNull() ?: DEFAULT_WG_PORT
-                else -> c.backendPort.toIntOrNull() ?: DEFAULT_WG_PORT
-            }
-            if (c.vpnMode && c.wgCustomConf) {
-                wgClientConf = c.wgConfText.trim()
-            } else if (c.vpnMode) {
-                // Endpoint клиентского конфига = локальный прокси устройства; рантайм
-                // туннеля всё равно подменяет его при подъёме. wg-setup идемпотентно
-                // поднимает НАШ ft-wg0 (создаёт или докручивает) и возвращает порт+conf.
-                val wg = repo.wgSetup(
-                    cfg,
-                    port = backendPort,
-                    endpoint = ClientConfig.DEFAULT_LOCAL_PORT
-                ).getOrElse { fail(it.message); return@launch }
-                wgClientConf = wg.clientConf
-                backendPort = wg.port
-                advance()
-            }
-
-            val obfOn = c.obfProfile != ObfProfile.NONE
-            repo.start(
-                cfg,
-                ServerStartOptions(
-                    listen = "0.0.0.0:${c.listenPort}",
-                    connect = "127.0.0.1:$backendPort",
-                    proxyMode = if (!c.vpnMode && c.backendTcp) ProxyMode.TCP else ProxyMode.UDP,
-                    obfProfile = c.obfProfile,
-                    obfKey = if (obfOn) obfKey else "",
-                    // Авторизация по allowlist с первого запуска: владелец сидится
-                    // в clients.json, сервер стартует с -clients-file.
-                    clientId = prefs.ownClientId()
-                )
-            ).onFailure { fail(it.message); return@launch }
-            advance()
+            val result = applied ?: repo.apply(cfg, c.toApplyOptions())
+                .getOrElse { fail(it.uiError(appContext)); return@launch }
+                .also {
+                    applied = it
+                    advance()
+                }
 
             // NonCancellable: сервер уже настроен и запущен - уход с экрана не должен
             // оставить его без записи в приложении.
-            val saved = withContext(NonCancellable) {
-                val server = buildServer(cfg, c, backendPort, wgClientConf)
-                prefs.addServer(server, activate = true)?.also { orchestrator.restartProxyIfRunning() }
-            }
-
-            if (saved == null) {
-                fail("Сервер запущен, но профиль не сохранён - список серверов повреждён")
+            val saved = withContext(NonCancellable) { persist(cfg, c, result) }
+            if (!saved) {
+                fail(appContext.getString(R.string.setup_persist_failed))
                 return@launch
             }
             advance()
@@ -329,10 +279,9 @@ class ServerSetupViewModel(
                         summary = SetupSummary(
                             serverName = serverName,
                             serverAddress = "${cfg.ip}:${c.listenPort}",
-                            vpnMode = c.vpnMode,
+                            ownWg = c.ownWg,
                             obfProfile = c.obfProfile,
-                            wgConfImported = !c.wgCustomConf && wgClientConf != null,
-                            usedExistingWg = c.vpnMode && !c.wgCustomConf && s.wgDetectedPort != null
+                            wgConfImported = result.ownerConf.isNotBlank()
                         )
                     )
                 )
@@ -340,35 +289,61 @@ class ServerSetupViewModel(
         }
     }
 
-    private fun buildServer(
-        cfg: SshConfig,
-        c: SetupConfigDraft,
-        backendPort: Int,
-        wgClientConf: String?
-    ): Server = Server(
+    // Провайдер (relay или direct) не выбирается тут: сервер один, переключатель - в листе серверов.
+    private suspend fun persist(cfg: SshConfig, c: SetupConfigDraft, r: ApplyResult): Boolean {
+        prefs.addServer(buildServer(cfg, c, r), activate = true) ?: return false
+        orchestrator.restartProxyIfRunning()
+        return true
+    }
+
+    private fun buildServer(cfg: SshConfig, c: SetupConfigDraft, r: ApplyResult): Server = Server(
         name = serverName,
         ssh = cfg,
         client = ClientConfig(
             serverAddress = "${cfg.ip}:${c.listenPort}",
-            vkLink = c.vkLink.trim(),
-            tunnelTransport = if (c.vpnMode && !wgClientConf.isNullOrBlank())
-                TunnelTransport.WIREGUARD else TunnelTransport.NONE,
-            wireGuardConfig = wgClientConf.orEmpty()
+            callLink = c.callLink.trim(),
+            tunnelTransport = if (r.ownerConf.isNotBlank()) TunnelTransport.WIREGUARD
+                else TunnelTransport.NONE,
+            wireGuardConfig = r.ownerConf,
+            clientId = r.ownerClientId
         ),
         proxyListen = "0.0.0.0:${c.listenPort}",
-        proxyConnect = "127.0.0.1:$backendPort",
+        proxyConnect = if (c.ownWg) "127.0.0.1:${c.wgPort}" else c.connect.trim(),
         opts = ServerOpts(
             obfProfile = c.obfProfile,
-            obfKey = if (c.obfProfile != ObfProfile.NONE) obfKey else "",
-            proxyMode = if (!c.vpnMode && c.backendTcp) ProxyMode.TCP else ProxyMode.UDP
+            obfKey = r.obfKey,
+            proxyMode = c.proxyMode,
+            method = c.method,
+            backend = c.backend,
+            wgPort = c.wgPort.toIntOrNull() ?: ServerBackend.DEFAULT_WG_PORT,
+            wgNet = c.wgNet.trim()
         )
     )
 
     private fun randomListenPort(): String = Random.nextInt(56000, 57000).toString()
-
-    private fun randomWgPort(): String = Random.nextInt(51000, 52000).toString()
-
-    companion object {
-        private const val DEFAULT_WG_PORT = 51820
-    }
 }
+
+// Ключ не шлём: на чистом хосте его сгенерирует сервер, на переустановке оставит свой -
+// выданные гостям ссылки не протухнут.
+private fun SetupConfigDraft.toApplyOptions() = ApplyOptions(
+    method = method,
+    backend = backend,
+    listenPort = listenPort.toInt(),
+    connect = connect.trim(),
+    wgPort = wgPort.toIntOrNull() ?: ServerBackend.DEFAULT_WG_PORT,
+    wgNet = wgNet.trim(),
+    proxyMode = proxyMode,
+    obfProfile = obfProfile
+)
+
+/** Черновик по конфигу прошлой установки: подсеть WG менять нельзя, остальное - как было. */
+private fun SetupConfigDraft.from(r: RemoteConfig) = copy(
+    backend = r.backend.takeIf { it in ServerBackend.VALUES } ?: backend,
+    wgNet = r.wgNet.ifBlank { wgNet },
+    wgPort = r.wgPort.takeIf { it > 0 }?.toString() ?: wgPort,
+    connect = r.connect.ifBlank { connect },
+    backendTcp = r.mode == ProxyMode.TCP,
+    method = r.method.takeIf { it in ServerMethod.VALUES } ?: method,
+    obfProfile = r.obfProfile.takeIf { it in ObfProfile.VALUES } ?: obfProfile,
+    listenPort = r.listenPort.takeIf { it > 0 }?.toString() ?: listenPort
+)

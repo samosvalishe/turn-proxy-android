@@ -13,6 +13,8 @@ data class SshConfig(
     /** Пароль sudo для key-auth + SUDO_PASS. Пусто -> при password-auth берётся [password]. */
     val sudoPassword: String = ""
 ) {
+    fun sameHost(o: SshConfig): Boolean = ip.isNotBlank() && ip.equals(o.ip, ignoreCase = true) && port == o.port
+
     companion object {
         // Значения authType - контракт хранения (ServerJson).
         const val AUTH_PASSWORD = "PASSWORD"

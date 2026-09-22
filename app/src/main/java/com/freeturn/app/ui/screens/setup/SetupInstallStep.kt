@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
@@ -78,20 +79,20 @@ fun SetupInstallStep(
             modifier = Modifier.fillMaxWidth()
         ) {
             Button(
+                shapes = ButtonDefaults.shapes(),
                 onClick = {
                     HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                     onRetry()
                 },
-                modifier = Modifier.weight(1f),
-                shape = MaterialTheme.shapes.large
+                modifier = Modifier.weight(1f)
             ) { Text(stringResource(R.string.setup_retry)) }
             TextButton(
+                shapes = ButtonDefaults.shapes(),
                 onClick = {
                     HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
                     onBackToConfig()
                 },
-                modifier = Modifier.weight(1f),
-                shape = MaterialTheme.shapes.large
+                modifier = Modifier.weight(1f)
             ) { Text(stringResource(R.string.setup_back_to_config)) }
         }
     }
@@ -254,8 +255,10 @@ private fun SetupDoneCard(summary: SetupSummary) {
                     mono = true
                 )
                 SummaryRow(
-                    stringResource(R.string.setup_summary_mode),
-                    stringResource(if (summary.vpnMode) R.string.mode_vpn else R.string.mode_proxy)
+                    stringResource(R.string.setup_backend_section),
+                    stringResource(
+                        if (summary.ownWg) R.string.setup_backend_new else R.string.setup_backend_external
+                    )
                 )
                 SummaryRow(
                     stringResource(R.string.setup_summary_obf),
@@ -264,10 +267,10 @@ private fun SetupDoneCard(summary: SetupSummary) {
                 )
             }
 
-            // VPN-режим: либо конфиг уже подставлен, либо нужен ручной импорт .conf.
             when {
                 summary.wgConfImported -> SetupDoneHint(stringResource(R.string.setup_done_wg_imported))
-                summary.usedExistingWg -> SetupDoneHint(stringResource(R.string.setup_done_wg_manual))
+                // Чужой VPN: клиентский конфиг выдаёт его панель, не мы.
+                !summary.ownWg -> SetupDoneHint(stringResource(R.string.setup_done_external))
             }
         }
     }
@@ -313,8 +316,6 @@ private fun SummaryRow(label: String, value: String, mono: Boolean = false) {
 }
 
 private fun SetupTaskKind.labelRes(): Int = when (this) {
-    SetupTaskKind.InstallCore -> R.string.setup_task_install
-    SetupTaskKind.WireGuard -> R.string.setup_task_wireguard
-    SetupTaskKind.StartServer -> R.string.setup_task_start
+    SetupTaskKind.Apply -> R.string.setup_task_apply
     SetupTaskKind.Persist -> R.string.setup_task_persist
 }

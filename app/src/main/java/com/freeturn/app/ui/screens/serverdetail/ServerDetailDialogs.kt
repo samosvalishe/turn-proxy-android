@@ -20,7 +20,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.freeturn.app.R
 import com.freeturn.app.ui.util.HapticUtil
-import com.freeturn.app.data.control.UninstallData
 import com.freeturn.app.ui.components.BusyProgressIndicator
 import com.freeturn.app.ui.theme.Spacing
 import com.freeturn.app.viewmodel.server.ServerCleanupState
@@ -39,6 +38,7 @@ internal fun DeleteServerDialog(
         text = { Text(stringResource(R.string.server_delete_confirm_desc, serverName)) },
         confirmButton = {
             TextButton(
+                shapes = ButtonDefaults.shapes(),
                 onClick = {
                     HapticUtil.perform(context, HapticUtil.Pattern.ERROR)
                     onConfirm()
@@ -47,7 +47,7 @@ internal fun DeleteServerDialog(
             ) { Text(stringResource(R.string.server_delete)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }
@@ -76,12 +76,12 @@ internal fun ServerCleanupDialog(
             },
             confirmButton = {}
         )
-        is ServerCleanupState.Done -> AlertDialog(
+        ServerCleanupState.Done -> AlertDialog(
             onDismissRequest = {},
             title = { Text(stringResource(R.string.server_delete_done_title)) },
-            text = { CleanupResult(state.data) },
+            text = { Text(stringResource(R.string.server_delete_done_desc)) },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                     HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                     onClose()
                 }) { Text(stringResource(R.string.server_delete_done_confirm)) }
@@ -107,6 +107,7 @@ internal fun ServerCleanupDialog(
                 },
                 confirmButton = {
                     TextButton(
+                        shapes = ButtonDefaults.shapes(),
                         onClick = {
                             HapticUtil.perform(context, HapticUtil.Pattern.ERROR)
                             onConfirm()
@@ -117,7 +118,7 @@ internal fun ServerCleanupDialog(
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = onClose) { Text(stringResource(R.string.cancel)) }
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = onClose) { Text(stringResource(R.string.cancel)) }
                 }
             )
         }
@@ -146,6 +147,7 @@ internal fun RenameServerDialog(
         },
         confirmButton = {
             TextButton(
+                shapes = ButtonDefaults.shapes(),
                 onClick = {
                     HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                     onSave(newName)
@@ -154,67 +156,7 @@ internal fun RenameServerDialog(
             ) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
-}
-
-/** Итог удалённой очистки: что снесли с сервера и что не тронули. */
-@Composable
-private fun CleanupResult(data: UninstallData) {
-    Column {
-        Text(
-            stringResource(R.string.server_delete_done_desc),
-            style = MaterialTheme.typography.bodyMedium
-        )
-        Spacer(Modifier.height(Spacing.md))
-
-        val r = data.removed
-        val removed = buildList {
-            if (r.binary) add(R.string.cleanup_item_binary)
-            if (r.unit || r.legacyUnit) add(R.string.cleanup_item_service)
-            if (r.wgIface) add(R.string.cleanup_item_wg)
-            if (data.wgPkgRemoved) add(R.string.cleanup_item_wg_pkg)
-            if (r.ufw) add(R.string.cleanup_item_firewall)
-            if (r.prefix) add(R.string.cleanup_item_files)
-        }
-        if (removed.isEmpty()) {
-            Text(
-                stringResource(R.string.cleanup_nothing),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            Text(
-                stringResource(R.string.cleanup_removed_label),
-                style = MaterialTheme.typography.labelLarge
-            )
-            removed.forEach {
-                Text("•  " + stringResource(it), style = MaterialTheme.typography.bodySmall)
-            }
-        }
-
-        if (data.kept.isNotEmpty()) {
-            Spacer(Modifier.height(Spacing.md))
-            Text(
-                stringResource(R.string.cleanup_kept_label),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            data.kept.forEach { token ->
-                // kept-токены - контракт _kept_add (80-cmd.sh); незнакомый показываем как есть.
-                val label = when (token) {
-                    "foreign_ft_wg0" -> stringResource(R.string.cleanup_kept_foreign_wg)
-                    "wireguard-tools" -> stringResource(R.string.cleanup_kept_wg_tools)
-                    "ip_forward" -> stringResource(R.string.cleanup_kept_ip_forward)
-                    else -> token
-                }
-                Text(
-                    "•  $label",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
 }

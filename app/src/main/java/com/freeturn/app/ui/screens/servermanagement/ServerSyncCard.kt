@@ -3,28 +3,24 @@
 package com.freeturn.app.ui.screens.servermanagement
 
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExposedDropdownMenu
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import com.freeturn.app.R
 import com.freeturn.app.data.config.ObfProfile
+import com.freeturn.app.ui.components.ChoiceOption
+import com.freeturn.app.ui.components.OptionDropdown
 import com.freeturn.app.ui.components.SectionLabel
+import com.freeturn.app.ui.components.obfProfileLabel
 import com.freeturn.app.ui.components.SettingsCard
 import com.freeturn.app.ui.components.SettingsControlLabel
 import com.freeturn.app.ui.components.SettingsFieldSlot
@@ -70,7 +66,12 @@ internal fun ServerSyncCard(
         SettingsRowDivider()
         SettingsFieldSlot {
             SettingsControlLabel(stringResource(R.string.obf_profile_title))
-            ObfProfileDropdown(obfProfile = obfProfile, onObfProfile = onObfProfile)
+            OptionDropdown(
+                label = stringResource(R.string.obf_profile_title),
+                options = ObfProfile.VALUES.map { ChoiceOption(it, obfProfileLabel(it)) },
+                selected = obfProfile,
+                onSelect = onObfProfile
+            )
         }
         SettingsRowDivider()
         if (obfProfile != ObfProfile.NONE) {
@@ -85,7 +86,7 @@ internal fun ServerSyncCard(
                     isError = keyDraft.isNotBlank() && !ObfProfile.isValidKey(keyDraft),
                     trailingIcon = {
                         if (savedObfKey.isNotBlank() && !privacyMode) {
-                            IconButton(onClick = onCopyKey) {
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = onCopyKey) {
                                 Icon(
                                     painterResource(R.drawable.content_copy_24px),
                                     contentDescription = stringResource(R.string.copy)
@@ -105,6 +106,7 @@ internal fun ServerSyncCard(
                 )
                 if (!privacyMode) {
                     TextButton(
+                        shapes = ButtonDefaults.shapes(),
                         onClick = onRegenKey,
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -138,53 +140,6 @@ internal fun ServerSyncCard(
                     stringResource(R.string.obf_select_profile_hint),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun obfProfileLabel(value: String): String = when (value) {
-    ObfProfile.NONE -> stringResource(R.string.obf_none)
-    ObfProfile.RTPOPUS -> stringResource(R.string.obf_rtpopus)
-    ObfProfile.RTPOPUS2 -> stringResource(R.string.obf_rtpopus2)
-    ObfProfile.RTPOPUS3 -> stringResource(R.string.obf_rtpopus3)
-    else -> value
-}
-
-@Composable
-private fun ObfProfileDropdown(
-    obfProfile: String,
-    onObfProfile: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val current = obfProfileLabel(obfProfile)
-
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = !expanded },
-        modifier = modifier
-    ) {
-        OutlinedTextField(
-            value = current,
-            onValueChange = {},
-            readOnly = true,
-            label = { Text(stringResource(R.string.obf_profile_title)) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier
-                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true)
-                .fillMaxWidth()
-        )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            ObfProfile.VALUES.forEach { value ->
-                DropdownMenuItem(
-                    text = { Text(obfProfileLabel(value)) },
-                    onClick = {
-                        expanded = false
-                        onObfProfile(value)
-                    }
                 )
             }
         }

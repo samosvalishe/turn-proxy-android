@@ -1,16 +1,16 @@
 package com.freeturn.app.domain.server
 
+import com.freeturn.app.data.control.ApplyData
 import com.freeturn.app.data.control.ControlJson
 import com.freeturn.app.data.control.ControlResponse
+import com.freeturn.app.data.control.decodeBase64
 
-/** Машиночитаемый код ошибки control-скрипта (см. server-control ERR_CODE). */
+/** Код ошибки RPC install.sh (список - в шапке скрипта) плюс транспортные коды приложения. */
 enum class ServerErrorCode {
-    BAD_ARG, NOT_WRITABLE, LOCK_FAILED, UNSUPPORTED_ARCH,
-    NOT_INSTALLED, DOWNLOAD_FAILED, VERSION_RESOLVE_FAILED, NOT_ELF, TOO_SMALL, SHA_MISMATCH,
-    WG_TOOLS_MISSING, WG_KERNEL_MISSING, WG_USERSPACE_MISSING, WG_UP_FAILED, WG_PORT_BUSY,
-    NO_WG_BACKEND, PEER_ADD_FAILED, CONF_REWRITE_FAILED, NO_STORED_CONF, BASE64_MISSING,
-    LISTEN_PORT_BUSY, START_FAILED, CLIENTS_CMD_FAILED,
-    NEEDS_ROOT, SUDO_AUTH_FAILED, SUDO_REQUIRETTY, SUDO_UNAVAILABLE,
+    BAD_ARG, NEEDS_ROOT, NOT_INSTALLED, UNSUPPORTED_ARCH, NO_SYSTEMD, DOCKER_FAILED,
+    DOWNLOAD_FAILED, WG_UNSUPPORTED, WG_INSTALL_FAILED, WG_CONFLICT, BACKEND_LOCKED, PORT_BUSY,
+    SUBNET_CONFLICT, SUBNET_FULL, HOST_UNKNOWN, EXISTS, NOT_FOUND, OWNER_PROTECTED, START_FAILED,
+    SUDO_AUTH_FAILED, SUDO_REQUIRETTY, PROTO_MISMATCH, HOST_KEY_CHANGED,
     TRANSPORT, INTERNAL, UNKNOWN;
 
     companion object {
@@ -43,3 +43,8 @@ fun ControlResponse.asUnit(): Result<Unit> =
 /** ok -> декодируем data в [T]; err -> failure с кодом/текстом. */
 inline fun <reified T> ControlResponse.requireData(): Result<T> =
     if (isOk) runCatching { ControlJson.decode<T>(data) } else toFailure()
+
+fun ControlResponse.applyResult(): Result<ApplyResult> =
+    requireData<ApplyData>().map {
+        ApplyResult(it.owner.clientId, decodeBase64(it.owner.confB64).orEmpty(), it.obfKey)
+    }

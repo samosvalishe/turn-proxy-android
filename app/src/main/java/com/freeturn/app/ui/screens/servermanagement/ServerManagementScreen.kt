@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -95,9 +97,6 @@ fun ServerManagementScreen(
     val effClient = if (isActive) clientCfg else (server?.client ?: clientCfg)
     val effServer = if (isActive) serverOpts else (server?.opts ?: serverOpts)
 
-    var proxyListenIp by rememberSaveable(savedListen) {
-        mutableStateOf(savedListen.substringBeforeLast(":", "0.0.0.0").ifBlank { "0.0.0.0" })
-    }
     var proxyListenPort by rememberSaveable(savedListen) { mutableStateOf(savedListen.substringAfterLast(":", "56000")) }
     var proxyConnect by rememberSaveable(savedConnect) { mutableStateOf(savedConnect) }
     var tcpDraft by rememberSaveable(effServer.tcpMode) { mutableStateOf(effServer.tcpMode) }
@@ -114,7 +113,8 @@ fun ServerManagementScreen(
     val isWorking = serverState is ServerState.Working || serverState is ServerState.Checking
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
-    val listenFull = "${proxyListenIp.ifBlank { "0.0.0.0" }}:$proxyListenPort"
+    // install.sh слушает на всех интерфейсах: настраивается только порт.
+    val listenFull = "0.0.0.0:$proxyListenPort"
     val proxyDirty = listenFull != savedListen || proxyConnect != savedConnect
     val configDirty = proxyDirty ||
         tcpDraft != effServer.tcpMode ||
@@ -123,7 +123,8 @@ fun ServerManagementScreen(
         timingDraft != effServer.obfTimingMs
     val keyOkForApply = obfDraft == ObfProfile.NONE || keyDraft.isBlank() ||
         ObfProfile.isValidKey(keyDraft)
-    val addressesOk = HostPort.isValid(listenFull) && HostPort.isValid(proxyConnect)
+    // При своём WG connect выводит сервер (127.0.0.1:wg-port) - поле скрыто и не проверяется.
+    val addressesOk = HostPort.isValid(listenFull) && (effServer.ownWg || HostPort.isValid(proxyConnect))
 
     val applyVisible = serverSettingsAvailable(isConnected, syncOn) && configDirty
     val applyBlocked = when {
@@ -153,7 +154,7 @@ fun ServerManagementScreen(
             LargeFlexibleTopAppBar(
                 title = { Text(stringResource(R.string.provider_server_settings)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = onBack) {
                         Icon(
                             painterResource(R.drawable.arrow_back_24px),
                             contentDescription = stringResource(R.string.back)
@@ -164,7 +165,7 @@ fun ServerManagementScreen(
                 actions = {
                     if (isActive && onEditConnection != null) {
                         Box {
-                            IconButton(onClick = { showServerMenu = true }) {
+                            IconButton(shapes = IconButtonDefaults.shapes(), onClick = { showServerMenu = true }) {
                                 Icon(
                                     painterResource(R.drawable.more_vert_24px),
                                     contentDescription = stringResource(R.string.change_server)
@@ -272,11 +273,9 @@ fun ServerManagementScreen(
 
                 if (isConnected) {
                     ServerConfigCard(
-                        listenIp = proxyListenIp,
-                        onListenIp = { proxyListenIp = it },
                         listenPort = proxyListenPort,
                         onListenPort = { proxyListenPort = it },
-                        connect = proxyConnect,
+                        connect = proxyConnect.takeUnless { effServer.ownWg },
                         onConnect = { proxyConnect = it }
                     )
                 }
@@ -286,9 +285,10 @@ fun ServerManagementScreen(
                     ServerSyncCard(
                         tcp = tcpDraft,
                         onTcp = { tcpDraft = it },
-                        tcpBlocked = effClient.wireGuardActive,
+                        // Свой WG на сервере живёт только в udp (install.sh отвергнет tcp).
+                        tcpBlocked = effClient.wireGuardActive || effServer.ownWg,
                         obfProfile = obfDraft,
-                        onObfProfile = { HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON); obfDraft = it },
+                        onObfProfile = { obfDraft = it },
                         keyDraft = keyDraft,
                         onKeyDraft = { keyDraft = it },
                         savedObfKey = effServer.obfKey,

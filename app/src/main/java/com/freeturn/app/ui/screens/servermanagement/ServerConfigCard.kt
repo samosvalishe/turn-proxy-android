@@ -11,29 +11,19 @@ import com.freeturn.app.ui.components.SettingsCard
 import com.freeturn.app.ui.components.SettingsFieldSlot
 import com.freeturn.app.ui.components.SettingsRowDivider
 
-/** Серверный конфиг прокси: listen-IP/порт и TURN-адрес. SSH-only, показывается при живом подключении. */
+/**
+ * Серверный конфиг прокси: внешний порт и адрес чужого VPN. SSH-only, при живом подключении.
+ * [connect] null - свой WG, адрес бэкенда выводит сервер.
+ */
 @Composable
 internal fun ServerConfigCard(
-    listenIp: String,
-    onListenIp: (String) -> Unit,
     listenPort: String,
     onListenPort: (String) -> Unit,
-    connect: String,
+    connect: String?,
     onConnect: (String) -> Unit
 ) {
     SectionLabel(stringResource(R.string.server_config))
     SettingsCard {
-        SettingsFieldSlot {
-            LabeledTextField(
-                value = listenIp,
-                onValueChange = { v -> onListenIp(v.filter { c -> c.isDigit() || c == '.' || c == ':' }) },
-                labelRes = R.string.listen_ip,
-                placeholderRes = R.string.listen_ip_placeholder,
-                supportingRes = R.string.listen_ip_desc,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)
-            )
-        }
-        SettingsRowDivider()
         SettingsFieldSlot {
             LabeledTextField(
                 value = listenPort,
@@ -44,16 +34,18 @@ internal fun ServerConfigCard(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
             )
         }
-        SettingsRowDivider()
-        SettingsFieldSlot {
-            LabeledTextField(
-                value = connect,
-                onValueChange = onConnect,
-                labelRes = R.string.turn_client_address,
-                placeholderRes = R.string.turn_client_placeholder,
-                supportingRes = R.string.turn_client_desc,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)
-            )
+        if (connect != null) {
+            SettingsRowDivider()
+            SettingsFieldSlot {
+                LabeledTextField(
+                    value = connect,
+                    onValueChange = onConnect,
+                    labelRes = R.string.setup_connect_label,
+                    placeholderRes = R.string.setup_connect_placeholder,
+                    supportingRes = R.string.setup_connect_desc,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)
+                )
+            }
         }
     }
 }

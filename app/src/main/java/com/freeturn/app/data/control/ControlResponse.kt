@@ -8,7 +8,7 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import java.util.Base64
 
 /**
- * Envelope протокола v2 control-скрипта (см. server-control/src/10-proto.sh).
+ * Envelope RPC install.sh (proto [PROTO_VERSION]).
  * Один JSON-объект на запуск: либо result=ok + data, либо result=err + code/msg.
  */
 @Serializable
@@ -22,6 +22,11 @@ data class ControlResponse(
     val logs: List<String> = emptyList(),
 ) {
     val isOk: Boolean get() = result == "ok"
+
+    companion object {
+        /** = PROTO_VERSION install.sh; другое значение - скрипт не той версии. */
+        const val PROTO_VERSION = 3
+    }
 }
 
 /** Единый Json для протокола: незнакомые ключи игнорим (forward-compat). */
