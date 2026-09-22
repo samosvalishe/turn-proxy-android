@@ -12,14 +12,14 @@ import com.freeturn.app.ui.components.SettingsFieldSlot
 import com.freeturn.app.ui.components.SettingsRowDivider
 import com.freeturn.app.ui.util.redact
 
-/** Адреса подключения: сервер, ссылка звонка (только VK), локальный listen. */
+/** Адреса подключения: сервер, ссылка звонка (только relay), локальный listen. */
 @Composable
 internal fun ConnectionCard(
     serverAddress: String,
     onServerAddress: (String) -> Unit,
-    showVkLink: Boolean,
-    vkLink: String,
-    onVkLink: (String) -> Unit,
+    showCallLink: Boolean,
+    callLink: String,
+    onCallLink: (String) -> Unit,
     localPort: String,
     onLocalPort: (String) -> Unit,
     privacyMode: Boolean
@@ -37,12 +37,12 @@ internal fun ConnectionCard(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)
             )
         }
-        if (showVkLink) {
+        if (showCallLink) {
             SettingsRowDivider()
             SettingsFieldSlot {
                 LabeledTextField(
-                    value = vkLink.redact(privacyMode),
-                    onValueChange = { if (!privacyMode) onVkLink(it) },
+                    value = callLink.redact(privacyMode),
+                    onValueChange = { if (!privacyMode) onCallLink(it) },
                     labelRes = R.string.call_link_label,
                     placeholderRes = R.string.call_link_placeholder,
                     supportingRes = R.string.call_link_support,

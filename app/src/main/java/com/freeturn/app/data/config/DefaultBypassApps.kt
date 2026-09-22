@@ -17,7 +17,7 @@ val DEFAULT_BYPASS_APPS: Set<String> = linkedSetOf(
     "ru.yandex.yandexmaps",
     "ru.yandex.music",
     "ru.kinopoisk",
-    // VK / соцсети / медиа
+    // Соцсети / медиа
     "ru.oneme.app",
     "ru.vk.store",
     "ru.ok.android",

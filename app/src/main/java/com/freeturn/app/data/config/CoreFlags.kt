@@ -22,8 +22,11 @@ object DnsMode {
 }
 
 object Provider {
-    const val VK = "vk"
-    val VALUES = listOf(VK)
+    // Через TURN-реле звонков. "vk" - wire-значение ядра (config.ClientJSON, freeturn://).
+    const val RELAY = "vk"
+    /** Без реле: DTLS+OBF прямо на peer; не спасает, если IP VPS недоступен. */
+    const val DIRECT = "direct"
+    val VALUES = listOf(RELAY, DIRECT)
 }
 
 object ObfProfile {

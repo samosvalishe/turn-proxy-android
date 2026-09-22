@@ -17,7 +17,7 @@ class CoreConfigJsonTest {
 
     private val base = ClientConfig(
         serverAddress = "1.2.3.4:56000",
-        vkLink = "https://vk.com/x",
+        callLink = "https://call.example/x",
         clientId = "0123456789abcdef0123456789abcdef",
     )
 
@@ -28,7 +28,7 @@ class CoreConfigJsonTest {
     fun mapsFlatFields() {
         val o = parse(base)
         assertEquals("1.2.3.4:56000", o["peer"]!!.jsonPrimitive.content)
-        assertEquals(Provider.VK, o["provider"]!!.jsonPrimitive.content)
+        assertEquals(Provider.RELAY, o["provider"]!!.jsonPrimitive.content)
         // Маршрутами рулит VpnService, подписок в приложении нет.
         assertEquals(false, o["routes"]!!.jsonPrimitive.content.toBoolean())
         assertEquals("", o["subUrl"]!!.jsonPrimitive.content)

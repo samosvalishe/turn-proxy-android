@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.Scaffold
@@ -84,7 +86,7 @@ fun ClientSetupScreen(
     // remember (не rememberSaveable), чтобы не восстанавливать stale-поля из bundle.
     val fieldsKey = serverId ?: snapshot.activeId
     var serverAddress by remember(fieldsKey) { mutableStateOf(saved.serverAddress) }
-    var vkLink       by remember(fieldsKey) { mutableStateOf(saved.vkLink) }
+    var callLink       by remember(fieldsKey) { mutableStateOf(saved.callLink) }
     var threads      by remember(fieldsKey) { mutableFloatStateOf(saved.threads.toFloat()) }
     var streamsPerCred by remember(fieldsKey) { mutableFloatStateOf(saved.streamsPerCred.toFloat()) }
     var localPort    by remember(fieldsKey) { mutableStateOf(saved.localPort) }
@@ -97,7 +99,7 @@ fun ClientSetupScreen(
     LaunchedEffect(fieldsKey, saved) {
         if (fieldsDirty) return@LaunchedEffect
         serverAddress = saved.serverAddress
-        vkLink = saved.vkLink
+        callLink = saved.callLink
         threads = saved.threads.toFloat()
         streamsPerCred = saved.streamsPerCred.toFloat()
         localPort = saved.localPort
@@ -118,7 +120,7 @@ fun ClientSetupScreen(
         clientEdit { current ->
             current.copy(
                 serverAddress = serverAddress.trim(),
-                vkLink        = vkLink.trim(),
+                callLink        = callLink.trim(),
                 threads       = threads.roundToInt(),
                 streamsPerCred = streamsPerCred.roundToInt(),
                 localPort     = localPort.trim(),
@@ -130,7 +132,7 @@ fun ClientSetupScreen(
 
     var pendingSave by remember(fieldsKey) { mutableStateOf(false) }
     LaunchedEffect(
-        fieldsKey, serverAddress, vkLink, threads, streamsPerCred, localPort, magicTurn, customDns
+        fieldsKey, serverAddress, callLink, threads, streamsPerCred, localPort, magicTurn, customDns
     ) {
         if (!fieldsDirty) return@LaunchedEffect
         pendingSave = true
@@ -152,7 +154,7 @@ fun ClientSetupScreen(
                 title = { Text(stringResource(R.string.provider_connection_settings)) },
                 navigationIcon = {
                     if (onBack != null) {
-                        IconButton(onClick = onBack) {
+                        IconButton(shapes = IconButtonDefaults.shapes(), onClick = onBack) {
                             Icon(
                                 painterResource(R.drawable.arrow_back_24px),
                                 contentDescription = stringResource(R.string.back)
@@ -183,53 +185,53 @@ fun ClientSetupScreen(
                 ConnectionCard(
                     serverAddress = serverAddress,
                     onServerAddress = { serverAddress = it; fieldsDirty = true },
-                    showVkLink = saved.provider == Provider.VK,
-                    vkLink = vkLink,
-                    onVkLink = { vkLink = it; fieldsDirty = true },
+                    showCallLink = saved.provider == Provider.RELAY,
+                    callLink = callLink,
+                    onCallLink = { callLink = it; fieldsDirty = true },
                     localPort = localPort,
                     onLocalPort = { localPort = it; fieldsDirty = true },
                     privacyMode = privacyMode
                 )
 
-                PerformanceCard(
-                    threads = threads,
-                    // потоки-на-аккаунт не могут превышать общее число потоков
-                    onThreads = {
-                        threads = it
-                        if (streamsPerCred > it) streamsPerCred = it
-                        fieldsDirty = true
-                    },
-                    streamsPerCred = streamsPerCred,
-                    onStreamsPerCred = { streamsPerCred = it.coerceAtMost(threads); fieldsDirty = true },
-                    onTick = { HapticUtil.perform(context, HapticUtil.Pattern.SELECTION) }
-                )
+                // В direct поток всегда один (toCoreJson) - настраивать нечего.
+                if (saved.provider == Provider.RELAY) {
+                    PerformanceCard(
+                        threads = threads,
+                        // потоки-на-аккаунт не могут превышать общее число потоков
+                        onThreads = {
+                            threads = it
+                            if (streamsPerCred > it) streamsPerCred = it
+                            fieldsDirty = true
+                        },
+                        streamsPerCred = streamsPerCred,
+                        onStreamsPerCred = { streamsPerCred = it.coerceAtMost(threads); fieldsDirty = true },
+                        onTick = { HapticUtil.perform(context, HapticUtil.Pattern.SELECTION) }
+                    )
+                }
 
                 DnsCard(
                     dnsMode = saved.dnsMode,
-                    onDnsMode = { mode ->
-                        HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                        clientEdit { it.copy(dnsMode = mode) }
-                    },
+                    onDnsMode = { mode -> clientEdit { it.copy(dnsMode = mode) } },
                     customDns = customDns,
                     onCustomDns = { customDns = it; fieldsDirty = true },
                     useCarrierDns = saved.useCarrierDns,
                     onUseCarrierDns = { v -> clientEdit { it.copy(useCarrierDns = v) } }
                 )
 
-                AdvancedSection(
-                    useUdp = saved.useUdp,
-                    onUseUdp = { v ->
-                        HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                        clientEdit { it.copy(useUdp = v) }
-                    },
-                    manualCaptcha = saved.manualCaptcha,
-                    onManualCaptcha = { v -> clientEdit { it.copy(manualCaptcha = v) } },
-                    magicSwitch = saved.magicSwitch,
-                    onMagicSwitch = { v -> clientEdit { it.copy(magicSwitch = v) } },
-                    magicTurn = magicTurn,
-                    onMagicTurn = { magicTurn = it; fieldsDirty = true },
-                    privacyMode = privacyMode
-                )
+                // Транспорт до реле, captcha и свой TURN - всё про relay; direct их игнорирует.
+                if (saved.provider == Provider.RELAY) {
+                    AdvancedSection(
+                        useUdp = saved.useUdp,
+                        onUseUdp = { v -> clientEdit { it.copy(useUdp = v) } },
+                        manualCaptcha = saved.manualCaptcha,
+                        onManualCaptcha = { v -> clientEdit { it.copy(manualCaptcha = v) } },
+                        magicSwitch = saved.magicSwitch,
+                        onMagicSwitch = { v -> clientEdit { it.copy(magicSwitch = v) } },
+                        magicTurn = magicTurn,
+                        onMagicTurn = { magicTurn = it; fieldsDirty = true },
+                        privacyMode = privacyMode
+                    )
+                }
 
                 Spacer(Modifier.height(24.dp))
             }

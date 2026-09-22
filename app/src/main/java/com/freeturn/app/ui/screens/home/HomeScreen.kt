@@ -127,9 +127,8 @@ fun HomeScreen(
                 ServersSheetContent(
                     snapshot = serversSnapshot,
                     privacyMode = privacyMode,
-                    callLink = clientConfig.vkLink,
-                    // Правка ссылки только пока прокси стоит (новая комната = реконнект).
-                    callLinkLocked = status.busy,
+                    callLink = clientConfig.callLink,
+                    providerLocked = status.busy,
                     onApplyServer = { id ->
                         serverConfigViewModel.applyServer(id)
                         scope.launch { sheetScaffoldState.bottomSheetState.partialExpand() }
@@ -139,7 +138,8 @@ fun HomeScreen(
                         scope.launch { sheetScaffoldState.bottomSheetState.partialExpand() }
                         onOpenServerSettings(id)
                     },
-                    onSaveCallLink = { serverConfigViewModel.setActiveVkLink(it) }
+                    onSaveCallLink = { serverConfigViewModel.setActiveCallLink(it) },
+                    onSetProvider = { serverConfigViewModel.setActiveProvider(it) }
                 )
             },
             snackbarHost = { SnackbarHost(snackbarHostState) }

@@ -4,12 +4,12 @@
         <!-- DataStore хранит профили с SSH-секретами в открытом виде - в облако не отдаём.
              Перенос на новое устройство - через зашифрованный паролем экспорт/импорт. -->
         <exclude domain="file" path="datastore/"/>
-        <!-- Лог сессии: при выключенной приватности в нём peer, ссылка VK, obf-ключ. -->
+        <!-- Лог сессии: при выключенной приватности в нём peer, ссылка звонка, obf-ключ. -->
         <exclude domain="file" path="logs/"/>
     </cloud-backup>
     <device-transfer>
         <exclude domain="file" path="datastore/"/>
-        <!-- Лог сессии: при выключенной приватности в нём peer, ссылка VK, obf-ключ. -->
+        <!-- Лог сессии: при выключенной приватности в нём peer, ссылка звонка, obf-ключ. -->
         <exclude domain="file" path="logs/"/>
     </device-transfer>
 </data-extraction-rules>

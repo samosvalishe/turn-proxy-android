@@ -2,8 +2,8 @@ package com.freeturn.app.data.config
 
 data class ClientConfig(
     val serverAddress: String = "",
-    val vkLink: String = "",
-    val provider: String = Provider.VK,
+    val callLink: String = "",
+    val provider: String = Provider.RELAY,
     val threads: Int = DEFAULT_THREADS,
     val streamsPerCred: Int = DEFAULT_STREAMS_PER_CRED,
     val useUdp: Boolean = false,
@@ -34,10 +34,12 @@ data class ClientConfig(
     companion object {
         const val DEFAULT_LOCAL_PORT = "127.0.0.1:9000"
         const val DEFAULT_THREADS = 12
+        // Без реле нет лимитов на аллокацию: второй поток только делит очередь и добавляет handshake.
+        const val DIRECT_THREADS = 1
         const val DEFAULT_STREAMS_PER_CRED = 12
         // Не настройка, а константа транспорта: WG идёт поверх TURN (STUN-обёртка +
         // UDP + IP), дефолтные 1420 фрагментируются. 1280 - минимум IPv6, живёт везде.
-        // Серверная сторона держит то же значение (control.sh, WG_MTU).
+        // Серверная сторона держит то же значение (install.sh, WG_MTU).
         const val WG_MTU = 1280
     }
 }

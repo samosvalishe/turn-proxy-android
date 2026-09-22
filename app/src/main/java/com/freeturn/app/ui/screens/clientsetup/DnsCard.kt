@@ -5,9 +5,6 @@ package com.freeturn.app.ui.screens.clientsetup
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -16,6 +13,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import com.freeturn.app.R
 import com.freeturn.app.data.DnsList
 import com.freeturn.app.data.config.DnsMode
+import com.freeturn.app.ui.components.ChoiceOption
+import com.freeturn.app.ui.components.ConnectedChoiceRow
 import com.freeturn.app.ui.components.SectionLabel
 import com.freeturn.app.ui.components.SettingsCard
 import com.freeturn.app.ui.components.SettingsControlLabel
@@ -46,20 +45,15 @@ internal fun DnsCard(
                 title = stringResource(R.string.dns_mode_title),
                 desc = stringResource(R.string.dns_mode_desc)
             )
-            val dnsOptions = listOf(
-                DnsMode.AUTO to stringResource(R.string.dns_mode_auto),
-                DnsMode.PLAIN to stringResource(R.string.dns_mode_udp),
-                DnsMode.DOH to stringResource(R.string.dns_mode_doh)
+            ConnectedChoiceRow(
+                options = listOf(
+                    ChoiceOption(DnsMode.AUTO, stringResource(R.string.dns_mode_auto)),
+                    ChoiceOption(DnsMode.PLAIN, stringResource(R.string.dns_mode_udp)),
+                    ChoiceOption(DnsMode.DOH, stringResource(R.string.dns_mode_doh))
+                ),
+                selected = dnsMode,
+                onSelect = onDnsMode
             )
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                dnsOptions.forEachIndexed { idx, (value, label) ->
-                    SegmentedButton(
-                        selected = dnsMode == value,
-                        onClick = { onDnsMode(value) },
-                        shape = SegmentedButtonDefaults.itemShape(index = idx, count = dnsOptions.size)
-                    ) { Text(label) }
-                }
-            }
         }
         SettingsRowDivider()
         SettingsFieldSlot {

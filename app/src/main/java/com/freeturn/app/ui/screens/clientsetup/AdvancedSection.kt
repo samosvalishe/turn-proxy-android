@@ -2,14 +2,13 @@ package com.freeturn.app.ui.screens.clientsetup
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.freeturn.app.R
+import com.freeturn.app.ui.components.ChoiceOption
+import com.freeturn.app.ui.components.ConnectedChoiceRow
 import com.freeturn.app.ui.components.SectionLabel
 import com.freeturn.app.ui.components.SettingsCard
 import com.freeturn.app.ui.components.SettingsControlLabel
@@ -42,18 +41,14 @@ internal fun AdvancedSection(
                 title = stringResource(R.string.transport_protocol),
                 desc = stringResource(R.string.transport_protocol_desc)
             )
-            SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                SegmentedButton(
-                    selected = !useUdp,
-                    onClick = { onUseUdp(false) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                ) { Text(stringResource(R.string.tcp)) }
-                SegmentedButton(
-                    selected = useUdp,
-                    onClick = { onUseUdp(true) },
-                    shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                ) { Text(stringResource(R.string.udp)) }
-            }
+            ConnectedChoiceRow(
+                options = listOf(
+                    ChoiceOption(false, stringResource(R.string.tcp)),
+                    ChoiceOption(true, stringResource(R.string.udp))
+                ),
+                selected = useUdp,
+                onSelect = onUseUdp
+            )
         }
     }
 

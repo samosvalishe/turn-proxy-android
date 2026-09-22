@@ -5,14 +5,19 @@
 
 package com.freeturn.app.ui.screens.home
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,9 +27,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -55,6 +59,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
+import com.freeturn.app.ui.components.ChoiceOption
+import com.freeturn.app.ui.components.ConnectedChoiceRow
+import com.freeturn.app.ui.components.SettingsEntryRow
+import com.freeturn.app.ui.components.providerIcon
+import com.freeturn.app.ui.components.providerLabel
+import com.freeturn.app.ui.theme.LocalReducedMotion
 import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.data.config.Provider
 import com.freeturn.app.data.server.ServersSnapshot
@@ -69,15 +79,15 @@ internal fun ServersSheetContent(
     snapshot: ServersSnapshot,
     privacyMode: Boolean = false,
     callLink: String = "",
-    // Прокси запущен - правку ссылки на звонок блокируем (новая комната = реконнект).
-    callLinkLocked: Boolean = false,
+    // Прокси запущен - провайдер и ссылку не меняем (иначе реконнект).
+    providerLocked: Boolean = false,
     onApplyServer: (String) -> Unit = {},
     onOpenServerSettings: (String) -> Unit = {},
-    onSaveCallLink: (String) -> Unit = {}
+    onSaveCallLink: (String) -> Unit = {},
+    onSetProvider: (String) -> Unit = {}
 ) {
     val active = snapshot.active
-    // Менять ссылку можно только у сохранённого активного сервера и пока прокси стоит.
-    val callLinkEditable = active != null && !callLinkLocked
+    val providerEditable = active != null && !providerLocked
     var showCallLinkDialog by rememberSaveable { mutableStateOf(false) }
 
     Column(
@@ -125,11 +135,14 @@ internal fun ServersSheetContent(
 
         Spacer(Modifier.height(16.dp))
 
-        ProviderChip(
-            current = active?.client?.provider ?: Provider.VK,
-            editable = callLinkEditable,
-            onClick = { showCallLinkDialog = true },
-            modifier = Modifier.align(Alignment.CenterHorizontally)
+        ProviderPicker(
+            current = active?.client?.provider ?: Provider.RELAY,
+            editable = providerEditable,
+            showLockHint = active != null && providerLocked,
+            callLink = callLink,
+            onProvider = onSetProvider,
+            onEditCallLink = { showCallLinkDialog = true },
+            modifier = Modifier.padding(horizontal = Spacing.lg)
         )
 
         Spacer(Modifier.height(20.dp))
@@ -160,7 +173,7 @@ internal fun ServersSheetContent(
                     inactiveContainer = MaterialTheme.colorScheme.surfaceContainerHigh,
                     onClick = { if (!isActive) onApplyServer(p.id) },
                     trailing = {
-                        IconButton(onClick = { onOpenServerSettings(p.id) }) {
+                        IconButton(shapes = IconButtonDefaults.shapes(), onClick = { onOpenServerSettings(p.id) }) {
                             Icon(
                                 painterResource(R.drawable.settings_outlined_24px),
                                 contentDescription = stringResource(R.string.nav_settings),
@@ -183,71 +196,56 @@ internal fun ServersSheetContent(
     }
 }
 
+/** Провайдер активного сервера и ссылка звонка под ним (только relay). */
 @Composable
-private fun ProviderChip(
+private fun ProviderPicker(
     current: String,
-    editable: Boolean = false,
-    onClick: () -> Unit = {},
+    editable: Boolean,
+    showLockHint: Boolean,
+    callLink: String,
+    onProvider: (String) -> Unit,
+    onEditCallLink: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val chipPadding = PaddingValues(start = Spacing.sm, end = Spacing.lg, top = Spacing.sm, bottom = Spacing.sm)
-    if (editable) {
-        Button(
-            onClick = onClick,
-            shapes = ButtonDefaults.shapes(),
-            colors = ButtonDefaults.filledTonalButtonColors(),
-            contentPadding = chipPadding,
-            modifier = modifier
-        ) {
-            ProviderChipContent(current, showEdit = true)
+    val reducedMotion = LocalReducedMotion.current
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        ConnectedChoiceRow(
+            options = Provider.VALUES.map { ChoiceOption(it, providerLabel(it), providerIcon(it)) },
+            selected = current,
+            onSelect = onProvider,
+            enabled = editable
+        )
+        if (showLockHint) {
+            Text(
+                stringResource(R.string.provider_locked),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
-    } else {
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.secondaryContainer,
-            modifier = modifier
+        AnimatedVisibility(
+            visible = current == Provider.RELAY,
+            enter = if (reducedMotion) EnterTransition.None
+                else expandVertically(MaterialTheme.motionScheme.defaultSpatialSpec()) +
+                    fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()),
+            exit = if (reducedMotion) ExitTransition.None
+                else shrinkVertically(MaterialTheme.motionScheme.fastSpatialSpec()) +
+                    fadeOut(MaterialTheme.motionScheme.fastEffectsSpec())
         ) {
-            Row(
-                modifier = Modifier.padding(chipPadding),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+            Surface(
+                shape = settingsItemShape(0, 1),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh
             ) {
-                ProviderChipContent(current, showEdit = false)
+                SettingsEntryRow(
+                    iconRes = R.drawable.link_24px,
+                    title = stringResource(R.string.call_link_label),
+                    trailingRes = if (editable) R.drawable.edit_24px else null,
+                    enabled = editable,
+                    onClick = onEditCallLink
+                )
             }
         }
-    }
-}
-
-@Composable
-private fun RowScope.ProviderChipContent(current: String, showEdit: Boolean) {
-    Box(
-        modifier = Modifier
-            .size(24.dp)
-            .background(MaterialTheme.colorScheme.primary, MaterialShapes.Sunny.toShape()),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            painterResource(R.drawable.nearby_24px),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.size(14.dp)
-        )
-    }
-    Text(
-        providerLabel(current),
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSecondaryContainer,
-        modifier = Modifier.padding(start = Spacing.sm)
-    )
-    if (showEdit) {
-        Icon(
-            painterResource(R.drawable.edit_24px),
-            contentDescription = stringResource(R.string.call_link_edit),
-            tint = MaterialTheme.colorScheme.onSecondaryContainer,
-            modifier = Modifier
-                .padding(start = Spacing.sm)
-                .size(18.dp)
-        )
     }
 }
 
@@ -287,7 +285,7 @@ private fun CallLinkDialog(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                 trailingIcon = {
-                    IconButton(onClick = {
+                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
                         context.pasteFromClipboard()?.takeIf { it.isNotBlank() }?.let {
                             link = it.trim()
                             HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
@@ -304,6 +302,7 @@ private fun CallLinkDialog(
         },
         confirmButton = {
             TextButton(
+                shapes = ButtonDefaults.shapes(),
                 onClick = {
                     HapticUtil.perform(context, HapticUtil.Pattern.SUCCESS)
                     onSave(link.trim())
@@ -312,14 +311,8 @@ private fun CallLinkDialog(
             ) { Text(stringResource(R.string.save)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
-}
-
-@Composable
-private fun providerLabel(value: String): String = when (value) {
-    Provider.VK -> stringResource(R.string.provider_vk)
-    else -> value
 }
 

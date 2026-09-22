@@ -2,6 +2,7 @@ package com.freeturn.app.data.config
 
 import com.freeturn.app.data.DnsList
 import com.freeturn.app.data.server.ServerOpts
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -19,7 +20,7 @@ data class CoreConfigJson(
     val routes: Boolean,
     val turn: Turn,
     val proxy: Proxy,
-    val vk: Vk,
+    @SerialName("vk") val relay: Relay,
     val obf: Obf,
     val dns: Dns,
     val log: Log,
@@ -46,7 +47,7 @@ data class CoreConfigJson(
     )
 
     @Serializable
-    data class Vk(
+    data class Relay(
         val links: List<String>,
         val streamsPerCred: Int,
         val manualCaptcha: Boolean,
@@ -128,7 +129,8 @@ fun ClientConfig.toCoreJson(
             routes = false,
             turn = CoreConfigJson.Turn(
                 // Поле обязательное, а CLI без -n брал свой дефолт.
-                n = threads.takeIf { it > 0 } ?: ClientConfig.DEFAULT_THREADS,
+                n = if (provider == Provider.DIRECT) ClientConfig.DIRECT_THREADS
+                else threads.takeIf { it > 0 } ?: ClientConfig.DEFAULT_THREADS,
                 transport = if (useUdp) CoreConfigJson.TRANSPORT_UDP else CoreConfigJson.TRANSPORT_TCP,
                 host = if (magicSwitch) magicTurn.trim() else "",
                 port = "",
@@ -139,8 +141,8 @@ fun ClientConfig.toCoreJson(
                 // но валидацию проходит и нужен прокси-режиму.
                 listen = localPort,
             ),
-            vk = CoreConfigJson.Vk(
-                links = listOf(vkLink),
+            relay = CoreConfigJson.Relay(
+                links = listOf(callLink),
                 streamsPerCred = streamsPerCred.takeIf { it > 0 }
                     ?: ClientConfig.DEFAULT_STREAMS_PER_CRED,
                 manualCaptcha = manualCaptcha,

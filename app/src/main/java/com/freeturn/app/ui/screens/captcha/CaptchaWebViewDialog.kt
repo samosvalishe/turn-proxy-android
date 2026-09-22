@@ -12,9 +12,8 @@ import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -35,6 +34,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.net.toUri
 import com.freeturn.app.R
+import com.freeturn.app.ui.components.BusyProgressIndicator
 
 /** Только локальный captcha-прокси ядра допускается к загрузке в WebView. */
 private fun isLocalCaptchaUrl(url: String): Boolean {
@@ -44,8 +44,8 @@ private fun isLocalCaptchaUrl(url: String): Boolean {
 }
 
 /**
- * Ручная VK-капча во встроенном WebView. Грузит локальный прокси ядра
- * (127.0.0.1:8765), который переписывает VK-страницы так, чтобы весь трафик шёл
+ * Ручная капча провайдера во встроенном WebView. Грузит локальный прокси ядра
+ * (127.0.0.1:8765), который переписывает страницы провайдера так, чтобы весь трафик шёл
  * через loopback. Диалог закрывается, когда ядро отрапортует о решении капчи
  * (onCaptcha("") -> ProxyStore.setCaptcha("") -> пустой captchaUrl в status).
  */
@@ -81,7 +81,7 @@ fun CaptchaWebViewDialog(
                         }
                     },
                     actions = {
-                        TextButton(onClick = onDismiss) {
+                        TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) {
                             Text(stringResource(R.string.captcha_close))
                         }
                     }
@@ -139,9 +139,9 @@ private fun CaptchaWebView(url: String) {
             onRelease = { it.destroy() }
         )
         if (progress < 1f) {
-            LinearProgressIndicator(
+            BusyProgressIndicator(
                 progress = { progress },
-                modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter)
+                modifier = Modifier.align(Alignment.TopCenter)
             )
         }
     }
