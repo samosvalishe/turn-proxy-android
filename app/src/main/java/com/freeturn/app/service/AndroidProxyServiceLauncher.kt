@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Looper
+import com.freeturn.app.R
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.domain.proxy.ProxyServiceLauncher
 import com.freeturn.app.domain.proxy.ProxyStore
@@ -48,7 +49,7 @@ class AndroidProxyServiceLauncher(
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) context.startForegroundService(intent)
                 else context.startService(intent)
             } catch (e: Exception) {
-                store.fail(e.message ?: "Не удалось запустить сервис")
+                store.fail(context.getString(R.string.proxy_error_service, e.detail()))
             }
         }
     }

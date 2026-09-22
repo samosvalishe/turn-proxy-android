@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
+import com.freeturn.app.R
 import com.freeturn.app.data.backup.BackupData
 import com.freeturn.app.data.config.ClientConfig
 import com.freeturn.app.data.config.ClientId
@@ -54,6 +55,7 @@ class AppPreferences(context: Context) {
         val PROXY_DESIRED = booleanPreferencesKey("proxy_desired")
         val AUTO_CONNECT = booleanPreferencesKey("auto_connect")
         val CLEAN_EXIT = booleanPreferencesKey("clean_exit")
+        val REPORTED_PROCESS_EXITS = stringSetPreferencesKey("reported_process_exits")
     }
 
     // Намерение пользователя переживает смерть процесса, поэтому пишется своим scope:
@@ -75,6 +77,13 @@ class AppPreferences(context: Context) {
     }
 
     suspend fun previousSessionUnclean(): Boolean = previousUncleanExit.await()
+
+    suspend fun reportedProcessExits(): Set<String> =
+        context.dataStore.data.first()[REPORTED_PROCESS_EXITS].orEmpty()
+
+    suspend fun setReportedProcessExits(ids: Set<String>) {
+        context.dataStore.edit { it[REPORTED_PROCESS_EXITS] = ids }
+    }
 
     private fun <T> prefFlow(transform: (Preferences) -> T): Flow<T> =
         context.dataStore.data
@@ -196,7 +205,7 @@ class AppPreferences(context: Context) {
         var added: String? = null
         context.dataStore.edit { prefs ->
             val list = prefs.serversForWrite() ?: return@edit
-            val base = server.name.trim().ifBlank { Server.FALLBACK_NAME }
+            val base = server.name.trim().ifBlank { context.getString(R.string.server_unnamed) }
             val named = server.copy(name = uniqueServerName(base, list))
             prefs[SERVERS_JSON] = ServerJson.encodeList(list + named)
             if (activate || list.isEmpty()) prefs[ACTIVE_SERVER_ID] = named.id

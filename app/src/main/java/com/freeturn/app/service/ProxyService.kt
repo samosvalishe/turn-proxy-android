@@ -16,6 +16,7 @@ import com.freeturn.app.R
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.CoreCommand
 import com.freeturn.app.data.config.ClientConfig
+import com.freeturn.app.data.config.Provider
 import com.freeturn.app.data.config.coreDnsServers
 import com.freeturn.app.data.config.toCoreJson
 import com.freeturn.app.domain.proxy.LogLevel
@@ -84,7 +85,7 @@ class ProxyService : VpnService() {
             if (gap < DEEP_SLEEP_KICK_MS) return
             // Длительность сна - опора при разборе отвалов: по ней видно, пережила ли
             // аллокация паузу и не мы ли сами её выбросили.
-            log.add("Пробуждение после сна ${gap / 1000} c - пинок ядру")
+            log.add("Пробуждение после сна ${gap / 1000} c - будим ядро")
             engine.wake()
         }
     }
@@ -109,6 +110,13 @@ class ProxyService : VpnService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val source = when {
+            intent == null -> "null-intent"
+            intent.action == ProxyActions.START -> "START"
+            intent.action == ProxyActions.STOP -> "STOP"
+            else -> "system/other"
+        }
+        log.add("Вход сервиса: pid=${android.os.Process.myPid()} source=$source flags=$flags startId=$startId")
         // Отмена могла догнать ещё не обработанный START: гасимся, не поднимая ядро.
         // stopSelf(startId), а не stopSelf(): START, пришедший следом за отменой,
         // делает её неактуальной - иначе он поднял бы сессию в умирающем сервисе.
@@ -127,7 +135,7 @@ class ProxyService : VpnService() {
             ServiceCompat.startForeground(this, ProxyNotifier.NOTIF_ID_FG, notifier.build(), type)
         } catch (e: Exception) {
             // ForegroundServiceStartNotAllowedException и родня: сессии не будет.
-            fail("Не удалось запустить foreground-сервис: ${e.message}")
+            fail(getString(R.string.proxy_error_service, e.detail()))
             return START_NOT_STICKY
         }
 
@@ -145,8 +153,11 @@ class ProxyService : VpnService() {
             scope.launch {
                 // Sticky-рестарт после отказа: fail() снял намерение, а система вернула
                 // сервис. Без этой проверки он поднимал сессию заново - и так по кругу,
-                // сжигая персону и кредиты VK на каждом витке.
-                if (!fresh && !prefs.proxyDesiredFlow.first()) {
+                // сжигая персону и кредиты провайдера на каждом витке.
+                val desired = if (fresh) null else prefs.proxyDesiredFlow.first()
+                if (!isCurrent(next)) return@launch
+                log.add("Сессия $next: fresh=$fresh desired=$desired")
+                if (!fresh && desired == false) {
                     if (!isCurrent(next)) return@launch
                     log.add("Сервис возвращён системой, но прокси выключен - не поднимаем")
                     shutdown("возврат сервиса без намерения")
@@ -174,10 +185,10 @@ class ProxyService : VpnService() {
         // что процесс убивали, и после clearScreen от неё ничего бы не осталось.
         if (fresh) log.clearScreen()
         val startReason = if (fresh) "команда START" else "возврат сервиса"
-        log.add("Сессия $session: запуск ($startReason)")
+        log.add("Сессия $session: запуск ($startReason), pid=${android.os.Process.myPid()}")
 
-        if (cfg.serverAddress.isBlank() || cfg.vkLink.isBlank()) {
-            fail("Не заполнены настройки клиента")
+        if (cfg.serverAddress.isBlank() || (cfg.provider == Provider.RELAY && cfg.callLink.isBlank())) {
+            fail(getString(R.string.proxy_error_not_configured))
             return
         }
 
@@ -187,7 +198,7 @@ class ProxyService : VpnService() {
             engine.configToArgs(json)
         } catch (e: Exception) {
             if (!isCurrent(session)) return
-            fail("Конфиг отклонён ядром: ${e.message}")
+            fail(getString(R.string.proxy_error_config_rejected, e.detail()))
             return
         }
         log.add("Команда: ${CoreCommand.redact(argv, prefs.privacyModeFlow.first())}")
@@ -196,8 +207,7 @@ class ProxyService : VpnService() {
 
         acquireWakeLock()
         logEnvironment()
-        // Флаг снимается только штатной остановкой: следующий запуск процесса по нему
-        // отличит убийство системой от нормального выхода.
+        // Метка фиксирует незавершённую сессию, причину выхода сообщает ОС.
         prefs.setCleanExit(false)
         scope.launch { heartbeat(session) }
         network.register()
@@ -222,7 +232,7 @@ class ProxyService : VpnService() {
             engine.start(session, json, tun?.let { tunHandle }, protector)
         } catch (e: Exception) {
             if (!isCurrent(session)) return
-            fail("Ядро не запустилось: ${e.message}")
+            fail(getString(R.string.proxy_error_core_start, e.detail()))
             return
         }
         // Заявку отменили, пока поднимался интерфейс: ядро её не взяло, интерфейс не нужен.
@@ -230,6 +240,7 @@ class ProxyService : VpnService() {
             closeTunOf(session)
             return
         }
+        log.add("Сессия $session: запуск принят ядром")
         if (hotspot) startHotspot(session)
     }
 
@@ -258,13 +269,13 @@ class ProxyService : VpnService() {
         val setup = try {
             engine.parseTunnel(cfg.wireGuardConfig, ClientConfig.WG_MTU)
         } catch (e: Exception) {
-            return TunResult.Failed("WireGuard: конфиг не разобран - ${e.message}")
+            return TunResult.Failed(getString(R.string.proxy_error_tunnel_config, e.detail()))
         }
 
         val pfd = try {
             Builder().applyTunnel(applicationContext, cfg, setup, hotspot).establish()
         } catch (e: Exception) {
-            return TunResult.Failed("VPN-интерфейс не поднят: ${e.message}")
+            return TunResult.Failed(getString(R.string.proxy_error_tunnel_iface, e.detail()))
         }
         // null - пользователь не дал согласия: старт из тайла, виджета или
         // broadcast'а идёт мимо экрана, где его спрашивают.
@@ -476,3 +487,6 @@ class ProxyService : VpnService() {
         const val HEARTBEAT_MS = 60_000L
     }
 }
+
+/** Без message - хотя бы тип исключения. */
+internal fun Throwable.detail(): String = message?.takeIf { it.isNotBlank() } ?: javaClass.simpleName

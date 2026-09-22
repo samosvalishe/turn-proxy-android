@@ -10,6 +10,7 @@ import com.freeturn.app.domain.proxy.ProxyLog
 import com.freeturn.app.domain.proxy.ProxyStore
 import com.freeturn.app.service.ProxyNotifier
 import com.freeturn.app.service.ProxyWidgetProvider
+import com.freeturn.app.service.reportProcessExits
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -64,7 +65,8 @@ class App : Application() {
 
     // Незакрытая сессия не доказывает причину завершения процесса.
     private fun reportPreviousExit() {
-        scope.launch {
+        scope.launch(Dispatchers.IO) {
+            reportProcessExits(this@App, appPreferences, log)
             if (!appPreferences.previousSessionUnclean()) return@launch
             log.add("Предыдущая сессия завершилась без штатной остановки", LogLevel.Warning)
         }
