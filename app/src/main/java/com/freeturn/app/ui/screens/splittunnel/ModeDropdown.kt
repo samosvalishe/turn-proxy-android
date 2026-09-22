@@ -25,7 +25,6 @@ internal fun ModeDropdown(
         selected = mode,
         onSelect = onSelect,
         modifier = modifier,
-        enabled = enabled,
-        minLines = 2
+        enabled = enabled
     )
 }

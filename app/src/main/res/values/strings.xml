@@ -201,7 +201,6 @@
     <string name="call_link_label">Ссылка на звонок</string>
     <string name="call_link_placeholder">https://site.ru/call/…</string>
     <string name="call_link_support">Звонки -> Создать -> Скопировать ссылку (не нажимайте \"Завершить\")</string>
-    <string name="call_link_empty_error">Введите ссылку на звонок</string>
     <string name="paste">Вставить</string>
     <string name="local_listen_address">Локальный адрес прослушивания</string>
     <string name="local_listen_placeholder">127.0.0.1:9000</string>
@@ -338,7 +337,6 @@
     <string name="notif_captcha_title">Требуется прохождение капчи</string>
     <string name="notif_captcha_text">Откройте приложение для проверки</string>
     <string name="notif_proxy_connect_error">Ошибка подключения</string>
-    <string name="notif_proxy_wireguard_error">Ошибка WireGuard</string>
     <string name="notif_proxy_vpn_permission">Нужно разрешение VPN - откройте приложение</string>
     <string name="notif_proxy_vpn_denied">Разрешение VPN не выдано - прокси не запущен</string>
     <string name="proxy_error_service">Не удалось запустить сервис: %1$s</string>
@@ -353,7 +351,6 @@
     <string name="captcha_subtitle">Пройдите проверку для продолжения</string>
     <string name="captcha_close">Закрыть</string>
     <string name="captcha_browser_hint">Капча открыта во внешнем браузере. После прохождения вернитесь в приложение.</string>
-    <string name="captcha_open_browser">Открыть в браузере</string>
 
     <!-- Telegram -->
     <string name="tg_channel">Telegram-канал</string>
@@ -393,8 +390,8 @@
     <!-- Split tunneling -->
     <string name="split_tunnel_title">Раздельное туннелирование</string>
     <string name="split_tunnel_mode_label">Режим</string>
-    <string name="split_tunnel_mode_include">Только приложения из списка работают через VPN</string>
-    <string name="split_tunnel_mode_exclude">Приложения из списка не работают через VPN</string>
+    <string name="split_tunnel_mode_include">Только выбранные</string>
+    <string name="split_tunnel_mode_exclude">Все, кроме выбранных</string>
     <string name="split_tunnel_search">Поиск приложений</string>
     <string name="split_tunnel_empty">Приложения не найдены</string>
     <string name="split_tunnel_off_hint">Включите, чтобы выбрать приложения</string>
@@ -430,7 +427,6 @@
     <string name="nerd_launch_params">Параметры запуска</string>
     <string name="nerd_launch_server">Сервер</string>
     <string name="nerd_launch_client">Клиент</string>
-    <string name="open_logs">Открыть логи</string>
     <string name="nav_logs">Логи</string>
     <string name="logs_actions">Действия с логами</string>
     <string name="logs_share_file">Отправить файл</string>
@@ -490,7 +486,6 @@
     <string name="server_active_badge">Активный</string>
     <string name="server_has_ssh">SSH</string>
     <string name="server_actions">Действия с сервером</string>
-    <string name="menu_delete_server">Удалить сервер</string>
     <string name="menu_rename_server">Переименовать</string>
     <string name="menu_clone_server">Клонировать</string>
     <string name="rename_server_title">Переименовать сервер</string>

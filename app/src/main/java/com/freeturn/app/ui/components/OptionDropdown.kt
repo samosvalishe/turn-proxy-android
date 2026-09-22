@@ -37,8 +37,7 @@ fun <T> OptionDropdown(
     selected: T,
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    minLines: Int = 1
+    enabled: Boolean = true
 ) {
     val context = LocalContext.current
     var expanded by remember { mutableStateOf(false) }
@@ -52,8 +51,7 @@ fun <T> OptionDropdown(
             onValueChange = {},
             readOnly = true,
             enabled = enabled,
-            singleLine = minLines == 1,
-            minLines = minLines,
+            singleLine = true,
             label = { Text(label) },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
@@ -85,8 +83,7 @@ fun <T> OptionDropdown(
                             contentDescription = null,
                             modifier = Modifier.size(MenuDefaults.LeadingIconSize)
                         )
-                    },
-                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
+                    }
                 )
             }
         }
