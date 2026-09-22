@@ -90,13 +90,16 @@ class AppPreferences(context: Context) {
             .catch { if (it is IOException) emit(emptyPreferences()) else throw it }
             .map(transform)
 
-    val serversSnapshot: Flow<ServersSnapshot> = prefFlow { prefs ->
-        ServersSnapshot(
-            list = ServerJson.decodeList(prefs[SERVERS_JSON]),
-            activeId = prefs[ACTIVE_SERVER_ID]?.takeIf { it.isNotBlank() },
-            loaded = true
-        )
-    }
+    val serversSnapshot: Flow<ServersSnapshot> =
+        prefFlow { prefs -> prefs[SERVERS_JSON] to prefs[ACTIVE_SERVER_ID] }
+            .distinctUntilChanged()
+            .map { (json, activeId) ->
+                ServersSnapshot(
+                    list = ServerJson.decodeList(json),
+                    activeId = activeId?.takeIf { it.isNotBlank() },
+                    loaded = true
+                )
+            }
 
     // Производные от serversSnapshot: их читает рантайм (ProxyService, оркестратор,
     // SSH). Без активного сервера отдают дефолты - запускать в этом случае нечего.
