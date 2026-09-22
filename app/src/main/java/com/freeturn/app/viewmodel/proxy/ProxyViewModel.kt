@@ -26,9 +26,13 @@ class ProxyViewModel(
     val status: StateFlow<ProxyStatus> = store.status
     val logs: StateFlow<List<LogEntry>> = log.lines
 
-    fun start() = launcher.start()
+    fun start() {
+        launcher.start()
+    }
 
-    fun stop() = launcher.stop()
+    fun stop() {
+        launcher.stop()
+    }
 
     /**
      * Возврат приложения на передний план. Живую сессию не трогаем - открытие окна

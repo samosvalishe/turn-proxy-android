@@ -43,7 +43,7 @@ val appModule = module {
     single { SshRepository(androidContext(), get()) }
     single { AppUpdater(androidContext()) }
     single { BackupManager(get()) }
-    single { ProxyOrchestrator(get(), get(), get(), get()) }
+    single { ProxyOrchestrator(get(), get(), get()) }
     // factory: своя SSH-сессия на каждый прогон мастера, живой SshRepository не трогаем.
     factory { ServerSetupRepository(androidContext(), get()) }
     // factory по той же причине: SSH-операции шаринга не делят сессию с активным сервером.

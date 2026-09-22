@@ -13,9 +13,13 @@ class ProxyReceiver : BroadcastReceiver(), KoinComponent {
     private val launcher: ProxyServiceLauncher by inject()
 
     override fun onReceive(context: Context, intent: Intent) {
-        when (intent.action) {
+        val job = when (intent.action) {
             ProxyActions.START -> launcher.start()
             ProxyActions.STOP -> launcher.stop()
+            else -> return
         }
+
+        val pending = goAsync()
+        job.invokeOnCompletion { pending.finish() }
     }
 }
