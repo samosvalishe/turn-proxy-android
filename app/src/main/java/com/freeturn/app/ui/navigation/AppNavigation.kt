@@ -18,7 +18,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteItem
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
@@ -107,7 +107,7 @@ fun AppNavigation(
     }
 
     val suiteType = NavigationSuiteScaffoldDefaults
-        .navigationSuiteType(currentWindowAdaptiveInfo())
+        .navigationSuiteType(currentWindowAdaptiveInfoV2())
 
     val context = LocalContext.current
 
@@ -222,16 +222,12 @@ private fun AppNavHost(
                     }
             }
         },
-        popEnterTransition = {
-            if (reducedMotion) EnterTransition.None
-            else fadeIn(tween(NAV_FADE_IN_MS, easing = EmphasizedEasing)) +
-                slideInHorizontally(tween(NAV_SLIDE_MS, easing = EmphasizedEasing)) { -it / 5 }
-        },
-        popExitTransition = {
-            if (reducedMotion) ExitTransition.None
-            else fadeOut(tween(NAV_FADE_OUT_MS, easing = EmphasizedEasing)) +
-                slideOutHorizontally(tween(NAV_SLIDE_MS, easing = EmphasizedEasing)) { it / 12 }
-        }
+        popEnterTransition = { popEnter(reducedMotion) },
+        popExitTransition = { popExit(reducedMotion) },
+        // Дефолт navigation 2.10 для жеста назад - scaleOut(0.7): экран "проваливается".
+        // Жест ведёт тот же shared-axis, что и кнопка назад.
+        predictivePopEnterTransition = { popEnter(reducedMotion) },
+        predictivePopExitTransition = { popExit(reducedMotion) }
     ) {
         homeGraph(navController, settingsViewModel, serverConfigViewModel, proxyViewModel)
         logsGraph(proxyViewModel)
@@ -240,6 +236,16 @@ private fun AppNavHost(
         settingsGraph(navController, settingsViewModel, serverConfigViewModel, proxyViewModel, serverViewModel)
     }
 }
+
+private fun popEnter(reducedMotion: Boolean): EnterTransition =
+    if (reducedMotion) EnterTransition.None
+    else fadeIn(tween(NAV_FADE_IN_MS, easing = EmphasizedEasing)) +
+        slideInHorizontally(tween(NAV_SLIDE_MS, easing = EmphasizedEasing)) { -it / 5 }
+
+private fun popExit(reducedMotion: Boolean): ExitTransition =
+    if (reducedMotion) ExitTransition.None
+    else fadeOut(tween(NAV_FADE_OUT_MS, easing = EmphasizedEasing)) +
+        slideOutHorizontally(tween(NAV_SLIDE_MS, easing = EmphasizedEasing)) { it / 12 }
 
 private val tabOrder = listOf(
     HomeGraph::class, LogsGraph::class, ShareGraph::class, SettingsGraph::class, AddGraph::class
@@ -272,6 +278,7 @@ private fun TelegramSubscribeDialog(onSubscribe: () -> Unit, onDismiss: () -> Un
         text = { Text(stringResource(R.string.tg_subscribe_desc)) },
         confirmButton = {
             TextButton(
+                shapes = ButtonDefaults.shapes(),
                 onClick = onSubscribe,
                 colors = ButtonDefaults.textButtonColors(
                     contentColor = MaterialTheme.colorScheme.primary
@@ -279,7 +286,7 @@ private fun TelegramSubscribeDialog(onSubscribe: () -> Unit, onDismiss: () -> Un
             ) { Text(stringResource(R.string.tg_subscribe_btn)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.tg_not_now)) }
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(stringResource(R.string.tg_not_now)) }
         }
     )
 }

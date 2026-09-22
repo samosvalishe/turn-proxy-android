@@ -67,7 +67,6 @@ internal fun AppList(
         items(filtered, key = { it.packageName }) { app ->
             val checked = app.packageName in selected
             ListItem(
-                headlineContent = { Text(app.label) },
                 supportingContent = {
                     Text(app.packageName, style = MaterialTheme.typography.labelSmall)
                 },
@@ -86,7 +85,7 @@ internal fun AppList(
                     role = Role.Checkbox,
                     onValueChange = { onToggle(app.packageName) }
                 )
-            )
+            ) { Text(app.label) }
         }
     }
 }
