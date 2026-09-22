@@ -12,6 +12,7 @@ import android.os.PowerManager
 import android.os.SystemClock
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
+import com.freeturn.app.AppLocale
 import com.freeturn.app.R
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.CoreCommand
@@ -58,6 +59,11 @@ class ProxyService : VpnService() {
 
     private var tun: ParcelFileDescriptor? = null
     private var socks5: Socks5Server? = null
+
+    // Тексты уведомлений и ошибок сессии берутся из контекста сервиса, не приложения.
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLocale.wrap(newBase))
+    }
     private var wakeLock: PowerManager.WakeLock? = null
 
     // Сколько устройство успело проспать к прошлой проверке: разница elapsedRealtime

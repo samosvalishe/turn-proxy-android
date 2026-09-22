@@ -12,6 +12,7 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.net.Uri
 import androidx.annotation.StringRes
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -28,6 +29,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -35,6 +38,7 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -54,12 +58,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.freeturn.app.AppLocale
 import com.freeturn.app.R
 import com.freeturn.app.domain.UpdateError
 import com.freeturn.app.domain.UpdateState
@@ -151,7 +157,7 @@ fun AppScreen(
             ) {
                 SectionLabel(stringResource(R.string.app_section_interface))
                 SettingsGroup {
-                    SettingsGroupItem(0, 3) {
+                    SettingsGroupItem(0, 4) {
                         SettingsSwitchRow(
                             title = stringResource(R.string.privacy_mode_title),
                             subtitle = stringResource(R.string.privacy_mode_desc),
@@ -160,7 +166,7 @@ fun AppScreen(
                             onCheckedChange = { settingsViewModel.setPrivacyMode(it) }
                         )
                     }
-                    SettingsGroupItem(1, 3) {
+                    SettingsGroupItem(1, 4) {
                         SettingsSwitchRow(
                             title = stringResource(R.string.dynamic_theme_title),
                             subtitle = stringResource(R.string.dynamic_theme_desc),
@@ -169,7 +175,7 @@ fun AppScreen(
                             onCheckedChange = { settingsViewModel.setDynamicTheme(it) }
                         )
                     }
-                    SettingsGroupItem(2, 3) {
+                    SettingsGroupItem(2, 4) {
                         SettingsSwitchRow(
                             title = stringResource(R.string.seasonal_decor_title),
                             subtitle = stringResource(R.string.seasonal_decor_desc),
@@ -177,6 +183,9 @@ fun AppScreen(
                             checked = seasonalDecor,
                             onCheckedChange = { settingsViewModel.setSeasonalDecor(it) }
                         )
+                    }
+                    SettingsGroupItem(3, 4) {
+                        LanguageRow()
                     }
                 }
 
@@ -408,7 +417,69 @@ private fun UpdateError.labelRes(): Int = when (this) {
     UpdateError.FILE_MISSING -> R.string.update_error_file
 }
 
-/** Строка сброса: error-тинт иконки и заголовка, без trailing-шеврона. */
+/** Язык интерфейса; смена пересоздаёт активити. */
+@Composable
+private fun LanguageRow() {
+    val context = LocalContext.current
+    val activity = LocalActivity.current
+    var showDialog by rememberSaveable { mutableStateOf(false) }
+    val current = remember { AppLocale.current(context) }
+    val options = listOf("") + AppLocale.SUPPORTED
+
+    SettingsEntryRow(
+        iconRes = R.drawable.language_24px,
+        title = stringResource(R.string.language_title),
+        subtitle = languageName(current),
+        onClick = { showDialog = true }
+    )
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text(stringResource(R.string.language_title)) },
+            text = {
+                Column(Modifier.selectableGroup()) {
+                    options.forEach { tag ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .selectable(
+                                    selected = tag == current,
+                                    role = Role.RadioButton,
+                                    onClick = {
+                                        showDialog = false
+                                        if (tag != current) {
+                                            HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
+                                            activity?.let { AppLocale.set(it, tag) }
+                                        }
+                                    }
+                                )
+                                .padding(vertical = Spacing.md)
+                        ) {
+                            RadioButton(selected = tag == current, onClick = null)
+                            Text(languageName(tag), style = MaterialTheme.typography.bodyLarge)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun languageName(tag: String): String = when (tag) {
+    "ru" -> stringResource(R.string.language_ru)
+    "en" -> stringResource(R.string.language_en)
+    else -> stringResource(R.string.language_system)
+}
+
 /**
  * Статус исключения из оптимизации батареи и запрос его заново. Стартовый диалог
  * показывается один раз за установку, а без исключения система в Doze режет туннель -
@@ -469,6 +540,7 @@ private fun Context.openBatterySettings(exempt: Boolean) {
 private fun Context.isIgnoringBatteryOptimizations(): Boolean =
     getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(packageName)
 
+/** Строка сброса: error-тинт иконки и заголовка, без trailing-шеврона. */
 @Composable
 private fun ResetRow(onClick: () -> Unit) {
     Row(

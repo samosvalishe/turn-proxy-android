@@ -3,7 +3,7 @@
 
     <!-- HomeScreen -->
     <string name="nav_home">Главная</string>
-    <string name="turn_proxy_title">Free Turn</string>
+    <string name="turn_proxy_title" translatable="false">Free Turn</string>
     <string name="proxy_active">Прокси активен</string>
     <string name="tunnel_active">Туннель активен</string>
     <string name="proxy_connecting">Подключение…</string>
@@ -20,7 +20,7 @@
     <string name="share_connection_desc">Предоставление доступа к VPN без прав управления сервером</string>
     <string name="share_user_name_label">Имя пользователя</string>
     <string name="share_user_name_hint">Латиница, цифры, . _ -</string>
-    <string name="share_client_id_label">Client ID</string>
+    <string name="share_client_id_label" translatable="false">Client ID</string>
     <string name="share_client_id_hint">Нужен серверу, чтобы принять подключение (32 hex-символа)</string>
     <string name="share_client_id_invalid">Неверный формат: 32 hex-символа (0-9, a-f)</string>
     <string name="share_server_label">Сервер</string>
@@ -29,8 +29,8 @@
     <string name="share_info_loading">Проверка сервера…</string>
     <string name="share_info_error">Сервер недоступен</string>
     <string name="share_info_retry">Повторить</string>
-    <string name="protocol_wg">WireGuard</string>
-    <string name="protocol_awg">AmneziaWG</string>
+    <string name="protocol_wg" translatable="false">WireGuard</string>
+    <string name="protocol_awg" translatable="false">AmneziaWG</string>
     <string name="protocol_proxy">Прокси</string>
     <string name="share_protocol_wg_desc">Пользователь подключается по VPN - WireGuard или AmneziaWG</string>
     <string name="share_protocol_proxy_desc">Пользователь подключается через прокси</string>
@@ -121,7 +121,7 @@
     <string name="setup_checking_ssh_desc">Проверка окружения сервера</string>
     <string name="setup_wg_port_label">Порт WireGuard</string>
     <string name="setup_wg_conf_label">Клиентский конфиг (.conf)</string>
-    <string name="setup_wg_conf_placeholder">[Interface]\n…</string>
+    <string name="setup_wg_conf_placeholder" translatable="false">[Interface]\n…</string>
     <string name="setup_port_roll">Сгенерировать порт</string>
     <string name="setup_backend_protocol_label">Протокол VPN</string>
     <string name="setup_backend_protocol_desc">UDP - WireGuard/AmneziaWG, TCP - Xray</string>
@@ -143,12 +143,12 @@
     <string name="setup_wg_net_desc">Адреса клиентов, у сервера - .1. Не должна пересекаться с сетями сервера.</string>
     <string name="setup_wg_net_invalid">Сетевой адрес с префиксом /16-/29, например 10.13.13.0/24</string>
     <string name="setup_connect_label">Адрес VPN</string>
-    <string name="setup_connect_placeholder">127.0.0.1:51820</string>
+    <string name="setup_connect_placeholder" translatable="false">127.0.0.1:51820</string>
     <string name="setup_connect_desc">host:port вашего VPN, куда FreeTurn пересылает трафик</string>
     <string name="setup_connect_invalid">Нужен формат host:port</string>
     <string name="setup_server_section">Сервер</string>
-    <string name="setup_method_docker">Docker</string>
-    <string name="setup_method_systemd">systemd</string>
+    <string name="setup_method_docker" translatable="false">Docker</string>
+    <string name="setup_method_systemd" translatable="false">systemd</string>
     <string name="setup_method_docker_desc">FreeTurn в контейнере. Docker поставится сам - первая установка может занять несколько минут.</string>
     <string name="setup_method_systemd_desc">FreeTurn - системная служба, без Docker.</string>
     <string name="setup_done_external">Клиентский конфиг VPN возьмите в своей панели и импортируйте в \"Режиме подключения\".</string>
@@ -175,8 +175,8 @@
     <string name="setup_task_state_failed">Ошибка</string>
     <string name="setup_task_state_pending">В ожидании</string>
     <string name="proxy_captcha_required">Требуется прохождение капчи</string>
-    <string name="tcp">TCP</string>
-    <string name="udp">UDP</string>
+    <string name="tcp" translatable="false">TCP</string>
+    <string name="udp" translatable="false">UDP</string>
     <string name="ssh_connecting">SSH: сопряжение…</string>
     <string name="reconnect">Повторить сопряжение</string>
     <string name="server_connection_lost_title">Нет подключения к серверу</string>
@@ -196,17 +196,17 @@
     <!-- ClientSetupScreen -->
     <string name="connection_title">Подключение</string>
     <string name="server_address_label">Адрес turn-proxy сервера</string>
-    <string name="server_address_placeholder">1.2.3.4:56000</string>
+    <string name="server_address_placeholder" translatable="false">1.2.3.4:56000</string>
     <string name="server_address_support">IP и порт turn-proxy на вашем VPS</string>
     <string name="call_link_label">Ссылка на звонок</string>
-    <string name="call_link_placeholder">https://site.ru/call/…</string>
+    <string name="call_link_placeholder" translatable="false">https://site.ru/call/…</string>
     <string name="call_link_support">Звонки -> Создать -> Скопировать ссылку (не нажимайте \"Завершить\")</string>
     <string name="paste">Вставить</string>
     <string name="local_listen_address">Локальный адрес прослушивания</string>
-    <string name="local_listen_placeholder">127.0.0.1:9000</string>
+    <string name="local_listen_placeholder" translatable="false">127.0.0.1:9000</string>
     <string name="local_listen_support">Адрес, на котором клиент принимает трафик от WireGuard/XRay</string>
     <string name="client_section_performance">Производительность</string>
-    <string name="client_section_dns">DNS</string>
+    <string name="client_section_dns" translatable="false">DNS</string>
     <string name="client_section_advanced">Дополнительно</string>
     <string name="threads_format">Потоки: %1$d</string>
     <string name="threads_recommendation">Рекомендуется 8–12</string>
@@ -220,11 +220,11 @@
     <string name="obf_timing_format">Пейсинг: %1$d мс</string>
     <string name="obf_timing_hint">Пауза между пакетами на обеих сторонах. 20 мс - как у голосового звонка; чем больше, тем ниже потолок скорости.</string>
     <string name="obf_none">Выкл</string>
-    <string name="obf_rtpopus">rtpopus</string>
-    <string name="obf_rtpopus2">rtpopus2</string>
-    <string name="obf_rtpopus3">rtpopus3</string>
-    <string name="provider_relay">Relay</string>
-    <string name="provider_direct">Direct</string>
+    <string name="obf_rtpopus" translatable="false">rtpopus</string>
+    <string name="obf_rtpopus2" translatable="false">rtpopus2</string>
+    <string name="obf_rtpopus3" translatable="false">rtpopus3</string>
+    <string name="provider_relay" translatable="false">Relay</string>
+    <string name="provider_direct" translatable="false">Direct</string>
     <string name="provider_locked">Остановите подключение, чтобы сменить способ или ссылку</string>
     <string name="obf_key_empty_hint">Пусто - ключ сгенерируется при применении</string>
     <string name="obf_key_invalid_hint">Неверный формат - нужны 64 hex-символа</string>
@@ -241,8 +241,8 @@
     <string name="dns_mode_title">DNS-резолвер</string>
     <string name="dns_mode_desc">Авто - пробует системный DNS, переключается на DNS-over-HTTPS при блокировке</string>
     <string name="dns_mode_auto">Авто</string>
-    <string name="dns_mode_udp">UDP/53</string>
-    <string name="dns_mode_doh">DoH</string>
+    <string name="dns_mode_udp" translatable="false">UDP/53</string>
+    <string name="dns_mode_doh" translatable="false">DoH</string>
     <string name="dns_custom_label">DNS-серверы (вручную)</string>
     <string name="dns_custom_hint">Через запятую/пробел. Приоритет над DNS оператора. Пусто - не задавать.</string>
     <string name="dns_custom_invalid">Некорректные DNS-адреса будут пропущены.</string>
@@ -258,7 +258,7 @@
     <!-- ServerManagementScreen -->
     <string name="server_config">Конфигурация сервера</string>
     <string name="listen_port">Порт прослушивания</string>
-    <string name="listen_port_placeholder">56000</string>
+    <string name="listen_port_placeholder" translatable="false">56000</string>
     <string name="listen_port_desc">Порт, на котором сервер принимает подключения от клиентов</string>
     <string name="server_install">Установить</string>
     <string name="server_update">Обновить</string>
@@ -277,7 +277,7 @@
     <string name="back">Назад</string>
     <string name="server_data">Данные сервера</string>
     <string name="server_ip_label">IP-адрес сервера</string>
-    <string name="server_ip_placeholder">1.2.3.4</string>
+    <string name="server_ip_placeholder" translatable="false">1.2.3.4</string>
     <string name="ssh_port">SSH порт</string>
     <string name="username">Имя пользователя</string>
     <string name="password">Пароль</string>
@@ -285,7 +285,7 @@
     <string name="authentication">Аутентификация</string>
     <string name="auth_method_label">Способ входа</string>
     <string name="private_key_pem">Приватный ключ (PEM)</string>
-    <string name="private_key_placeholder">-----BEGIN RSA PRIVATE KEY-----\n…</string>
+    <string name="private_key_placeholder" translatable="false">-----BEGIN RSA PRIVATE KEY-----\n…</string>
     <string name="sudo_password">Пароль sudo</string>
     <string name="sudo_password_hint">Требуется, если вход выполняется не под root и sudo запрашивает пароль. Иначе оставьте поле пустым.</string>
     <string name="connect_btn">Подключиться</string>
@@ -319,7 +319,7 @@
     <string name="magic_switch">Альтернативный TURN-узел</string>
     <string name="magic_switch_desc">Указанный TURN-сервер вместо автоподбора</string>
     <string name="magic_switch_address_label">Адрес TURN-узла</string>
-    <string name="magic_switch_address_placeholder">255.255.255.255</string>
+    <string name="magic_switch_address_placeholder" translatable="false">255.255.255.255</string>
     <string name="magic_switch_address_support">IP или хост альтернативного TURN-сервера</string>
 
     <string name="dynamic_theme_title">Динамическая тема</string>
@@ -328,9 +328,13 @@
     <string name="privacy_mode_desc">Скрывает IP и порты</string>
     <string name="seasonal_decor_title">Сезонный декор</string>
     <string name="seasonal_decor_desc">Листва и свечение вокруг кнопки подключения</string>
+    <string name="language_title">Язык</string>
+    <string name="language_system">Как в системе</string>
+    <string name="language_ru" translatable="false">Русский</string>
+    <string name="language_en" translatable="false">English</string>
 
     <!-- Notifications -->
-    <string name="notif_proxy_title">FreeTurn</string>
+    <string name="notif_proxy_title" translatable="false">FreeTurn</string>
     <string name="notif_proxy_connecting">Подключение…</string>
     <string name="notif_channel_proxy">Прокси</string>
     <string name="notif_channel_captcha">Капча</string>
@@ -367,7 +371,7 @@
     <!-- Notification & Tile -->
     <string name="notif_proxy_stop_action">Отключить</string>
     <string name="notif_proxy_threads_format">Потоки: %1$d/%2$d</string>
-    <string name="tile_service_label">Free Turn</string>
+    <string name="tile_service_label" translatable="false">Free Turn</string>
 
     <!-- Виджет домашнего экрана -->
     <string name="widget_label">FreeTurn - прокси</string>
@@ -412,7 +416,7 @@
     <string name="settings_advanced_desc">Отладка и диагностика</string>
     <string name="nerd_mode">Режим отладки</string>
     <string name="nerd_mode_desc">Открывает отладочную информацию: состояние ядра, журнал сервера и подробные логи</string>
-    <string name="hotspot_proxy">SOCKS5 Hotspot</string>
+    <string name="hotspot_proxy" translatable="false">SOCKS5 Hotspot</string>
     <string name="hotspot_proxy_desc">Слушать на 0.0.0.0:1080 для раздачи WireGuard-туннеля через точку доступа</string>
     <string name="restart_server_on_switch">Перезапуск сервера при смене профиля</string>
     <string name="restart_server_on_switch_desc">Перезапускать сервер под параметры нового профиля</string>
@@ -484,7 +488,7 @@
     <string name="server_inactive_desc">Чтобы управлять ядром и SSH-подключением, сделайте этот сервер активным.</string>
     <string name="make_active">Сделать активным</string>
     <string name="server_active_badge">Активный</string>
-    <string name="server_has_ssh">SSH</string>
+    <string name="server_has_ssh" translatable="false">SSH</string>
     <string name="server_actions">Действия с сервером</string>
     <string name="menu_rename_server">Переименовать</string>
     <string name="menu_clone_server">Клонировать</string>
@@ -532,7 +536,7 @@
 
     <!-- Приложение -->
     <string name="settings_app">Приложение</string>
-    <string name="settings_app_desc">Тема, приватность и обновления</string>
+    <string name="settings_app_desc">Тема, язык и обновления</string>
     <string name="app_section_interface">Интерфейс</string>
     <string name="app_section_connection">Подключение</string>
     <string name="battery_opt_title">Работа в фоне без ограничений</string>

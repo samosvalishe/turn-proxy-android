@@ -1,5 +1,6 @@
 package com.freeturn.app
 
+import android.content.Context
 import android.content.Intent
 import android.net.VpnService
 import android.os.Bundle
@@ -27,6 +28,10 @@ class MainActivity : ComponentActivity() {
     private val settingsViewModel: SettingsViewModel by viewModel()
     private val proxyViewModel: ProxyViewModel by viewModel()
     private val linkImportBus: LinkImportBus by inject()
+
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(AppLocale.wrap(newBase))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()

@@ -1,0 +1,551 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- HomeScreen -->
+    <string name="nav_home">Home</string>
+    <string name="proxy_active">Proxy active</string>
+    <string name="tunnel_active">Tunnel active</string>
+    <string name="proxy_connecting">Connecting…</string>
+    <string name="proxy_press_to_start">Tap to start</string>
+    <string name="home_empty_title">No servers</string>
+    <string name="home_empty_desc">Add a server to start the proxy</string>
+    <string name="home_add_server">Add server</string>
+
+    <!-- ShareScreen -->
+    <string name="nav_share">Share</string>
+    <string name="share_title">Share</string>
+    <string name="share_tab_connection">Connection</string>
+    <string name="share_tab_users">Users</string>
+    <string name="share_connection_desc">Grant VPN access without server management rights</string>
+    <string name="share_user_name_label">User name</string>
+    <string name="share_user_name_hint">Latin letters, digits, . _ -</string>
+    <string name="share_client_id_hint">The server needs it to accept the connection (32 hex characters)</string>
+    <string name="share_client_id_invalid">Invalid format: 32 hex characters (0-9, a-f)</string>
+    <string name="share_server_label">Server</string>
+    <string name="share_server_none">Select a server</string>
+    <string name="share_create_button">Share</string>
+    <string name="share_info_loading">Checking server…</string>
+    <string name="share_info_error">Server unavailable</string>
+    <string name="share_info_retry">Retry</string>
+    <string name="protocol_proxy">Proxy</string>
+    <string name="share_protocol_wg_desc">The user connects over VPN - WireGuard or AmneziaWG</string>
+    <string name="share_protocol_proxy_desc">The user connects through the proxy</string>
+    <string name="share_chip_obf">Obfuscation</string>
+    <string name="share_access_type">Access type</string>
+    <string name="share_empty_title">No servers to share</string>
+    <string name="share_empty_desc">Add a server to share a connection</string>
+    <string name="share_empty_add">Add server</string>
+    <string name="share_users_section">Users</string>
+    <string name="share_users_refresh">Refresh list</string>
+    <string name="share_users_empty">No users yet</string>
+    <string name="share_peer_self">This device</string>
+    <string name="share_client_proxy_access">Proxy access</string>
+    <string name="share_peer_unnamed">Unnamed</string>
+    <string name="share_peer_seen">last seen %1$s</string>
+    <string name="share_peer_never_seen">never connected</string>
+    <string name="share_peer_actions">Actions</string>
+    <string name="share_peer_reshare">Show link</string>
+    <string name="share_peer_revoke">Revoke access</string>
+    <string name="share_result_title">Access for \"%1$s\"</string>
+    <string name="share_result_desc">Share the link or QR code only with people you trust. Changing the obfuscation key will require issuing a new link.</string>
+    <string name="share_result_qr">QR code with the access link</string>
+    <string name="share_result_copy">Copy</string>
+    <string name="share_result_share">Share</string>
+    <string name="share_revoke_title">Revoke access?</string>
+    <string name="share_revoke_desc">User \"%1$s\" will be removed from the server and their connection will stop working. This cannot be undone.</string>
+    <string name="share_revoke_confirm">Revoke</string>
+    <string name="share_include_call_link">Include call link</string>
+    <string name="share_include_call_link_desc">The recipient will not need their own account</string>
+    <string name="share_no_address">The server has no address - add it in the server settings</string>
+    <string name="error_ssh_generic">SSH error</string>
+    <string name="error_server_proto">The server management script version does not match - update the app.</string>
+    <string name="error_ssh_host_key_changed">The SSH server key does not match the saved one - the server may have been spoofed. Connection aborted, see the SSH log for details.</string>
+
+    <!-- Импорт по ссылке (ImportSheet) -->
+    <string name="import_title">Import connection</string>
+    <string name="import_default_name">Imported server</string>
+    <string name="import_call_link_label">Call link</string>
+    <string name="import_call_link_helper">Enter a call link to establish the connection</string>
+    <string name="import_call_link_from_owner">The link came with the access - you can replace it with your own</string>
+    <string name="import_duplicate_address">A server with this address already exists</string>
+    <string name="import_duplicate_conf">This configuration is already imported</string>
+    <string name="import_confirm">Import</string>
+    <string name="import_success_title">Server added</string>
+    <string name="import_success_desc">Setup complete. Start the connection on the home screen.</string>
+    <string name="import_success_go_home">Go to connection</string>
+    <string name="import_error_title">Import failed</string>
+    <string name="import_error_desc">Invalid link or unsupported app version.</string>
+    <string name="import_error_ok">Got it</string>
+    <string name="import_save_error">Could not save the server. Please try again.</string>
+
+    <!-- QR-сканер -->
+    <string name="scanner_title">Scan QR code</string>
+    <string name="scanner_hint">Point the camera at a QR code</string>
+    <string name="scanner_permission_rationale">Camera access is required to scan QR codes</string>
+    <string name="scanner_permission_grant">Allow access</string>
+    <string name="scanner_permission_open_settings">Open settings</string>
+    <string name="scanner_permission_denied">Camera access denied</string>
+
+    <!-- AddServerScreen -->
+    <string name="nav_add">Add</string>
+    <string name="add_server_title">Connection</string>
+    <string name="add_paste_hint">Paste a link</string>
+    <string name="add_paste_button">Paste</string>
+    <string name="add_paste_not_link">No freeturn:// link in the clipboard</string>
+    <string name="add_methods_section">Other ways to connect</string>
+    <string name="add_self_hosted_title">Own server</string>
+    <string name="add_self_hosted_desc">Set up the server connection yourself</string>
+    <string name="add_manual_title">Manual setup</string>
+    <string name="add_manual_desc">Enter parameters manually</string>
+    <string name="add_manual_create">Create</string>
+    <string name="add_restore_title">Restore</string>
+    <string name="add_restore_desc">Load a backup</string>
+    <string name="add_from_qr_title">QR code</string>
+    <string name="add_from_qr_desc">Scan a code from a screen</string>
+    <string name="add_soon_badge">Soon</string>
+    <string name="add_default_server_name">New server</string>
+
+    <!-- Мастер self-hosted сервера (ServerSetupScreen) -->
+    <string name="setup_step_counter">Step %1$d of %2$d</string>
+    <string name="setup_config_title">Server parameters</string>
+    <string name="setup_install_title">Installation</string>
+    <string name="setup_done_title">Server ready</string>
+    <string name="setup_continue">Continue</string>
+    <string name="setup_install_btn">Install</string>
+    <string name="setup_go_home">Go home</string>
+    <string name="setup_checking_ssh">Checking connection…</string>
+    <string name="setup_checking_ssh_desc">Checking the server environment</string>
+    <string name="setup_wg_port_label">WireGuard port</string>
+    <string name="setup_wg_conf_label">Client config (.conf)</string>
+    <string name="setup_port_roll">Generate port</string>
+    <string name="setup_backend_protocol_label">VPN protocol</string>
+    <string name="setup_backend_protocol_desc">UDP - WireGuard/AmneziaWG, TCP - Xray</string>
+    <string name="setup_listen_port_desc">External UDP port of the server, random from 56000–56999</string>
+    <string name="setup_obf_hint_rtpopus">Traffic is disguised as a voice call. The key will be generated and filled in automatically.</string>
+    <string name="setup_obf_hint_none">No traffic disguise. You can enable it later in the server settings.</string>
+    <string name="setup_call_link_hint">You can fill this in later in the connection settings</string>
+    <string name="setup_task_persist">Saving configuration</string>
+    <string name="setup_task_apply">Installing and starting</string>
+    <string name="setup_persist_failed">The server is set up, but the profile was not saved - the server list is corrupted</string>
+    <string name="setup_reinstall">FreeTurn is already installed on the server - fields are filled with its settings.</string>
+    <string name="setup_backend_section">Where traffic goes</string>
+    <string name="setup_backend_label">VPN on the server</string>
+    <string name="setup_backend_new">New WireGuard</string>
+    <string name="setup_backend_external">Existing VPN</string>
+    <string name="setup_backend_new_desc">The installer will set up WireGuard on the server (interface ft-wg0) and issue configs itself - for you and for the people you share with.</string>
+    <string name="setup_backend_external_desc">Your VPN is already running on the server (Amnezia, wg-easy, 3x-ui). FreeTurn only forwards traffic into it and does not touch the VPN itself - take client configs from its panel.</string>
+    <string name="setup_wg_net_label">WireGuard subnet</string>
+    <string name="setup_wg_net_desc">Client addresses, the server gets .1. Must not overlap with the server networks.</string>
+    <string name="setup_wg_net_invalid">A network address with a /16-/29 prefix, e.g. 10.13.13.0/24</string>
+    <string name="setup_connect_label">VPN address</string>
+    <string name="setup_connect_desc">host:port of your VPN that FreeTurn forwards traffic to</string>
+    <string name="setup_connect_invalid">Expected format host:port</string>
+    <string name="setup_server_section">Server</string>
+    <string name="setup_method_docker_desc">FreeTurn in a container. Docker will be installed automatically - the first installation may take a few minutes.</string>
+    <string name="setup_method_systemd_desc">FreeTurn as a system service, without Docker.</string>
+    <string name="setup_done_external">Take the VPN client config from your panel and import it in \"Connection mode\".</string>
+    <string name="setup_retry">Retry</string>
+    <string name="setup_back_to_config">Back to settings</string>
+    <string name="setup_done_hero">Server set up and running</string>
+    <string name="setup_done_active_hint">The server is added and made active - start it from the home screen.</string>
+    <string name="setup_done_wg_imported">WireGuard config received from the server and connected.</string>
+    <string name="setup_summary_address">Address</string>
+    <string name="setup_summary_obf">Obfuscation</string>
+    <string name="setup_obf_off">Off</string>
+    <string name="setup_abort_title">Abort installation?</string>
+    <string name="setup_abort_text">The installation will stop. Completed steps are kept, running it again is safe.</string>
+    <string name="setup_abort_confirm">Abort</string>
+    <string name="setup_abort_stay">Stay</string>
+    <string name="setup_field_required">Required field</string>
+    <string name="setup_port_invalid">Port from 1 to 65535</string>
+    <string name="setup_ports_clash">Same as the WireGuard port</string>
+    <string name="setup_duplicate_host">A server with this address is already in the list - another entry will be added.</string>
+    <string name="setup_name_hint">If left empty, it will be named \"New server\".</string>
+    <string name="setup_summary_name">Name</string>
+    <string name="setup_task_state_done">Done</string>
+    <string name="setup_task_state_active">In progress</string>
+    <string name="setup_task_state_failed">Failed</string>
+    <string name="setup_task_state_pending">Pending</string>
+    <string name="proxy_captcha_required">Captcha required</string>
+    <string name="ssh_connecting">SSH: pairing…</string>
+    <string name="reconnect">Pair again</string>
+    <string name="server_connection_lost_title">No connection to the server</string>
+    <string name="server_connection_lost_desc">The SSH session is not active. Pair again to manage the server.</string>
+    <string name="proxy_active_stop">Proxy active - tap to stop</string>
+    <string name="tunnel_active_stop">Tunnel active - tap to stop</string>
+    <string name="proxy_error_restart">Error - tap to restart</string>
+    <string name="start_proxy">Start proxy</string>
+    <string name="android_client">Android client</string>
+    <string name="proxy_core">Proxy core</string>
+    <string name="reset_settings">Reset settings</string>
+    <string name="reset">Reset</string>
+    <string name="reset_all_settings_title">Reset all settings?</string>
+    <string name="reset_all_settings_desc">All settings will be deleted and the proxy stopped. The app will restart.</string>
+    <string name="cancel">Cancel</string>
+
+    <!-- ClientSetupScreen -->
+    <string name="connection_title">Connection</string>
+    <string name="server_address_label">turn-proxy server address</string>
+    <string name="server_address_support">IP and port of turn-proxy on your VPS</string>
+    <string name="call_link_label">Call link</string>
+    <string name="call_link_support">Calls -> Create -> Copy link (do not press \"End\")</string>
+    <string name="paste">Paste</string>
+    <string name="local_listen_address">Local listen address</string>
+    <string name="local_listen_support">Address where the client accepts traffic from WireGuard/XRay</string>
+    <string name="client_section_performance">Performance</string>
+    <string name="client_section_advanced">Advanced</string>
+    <string name="threads_format">Threads: %1$d</string>
+    <string name="threads_recommendation">8–12 recommended</string>
+    <string name="streams_per_cred_recommendation">How many TURN streams one account serves</string>
+    <string name="streams_per_cred_format">Streams per account: %1$d</string>
+
+    <string name="tcp_forward_mode">Mode</string>
+    <string name="tcp_blocked_by_tunnel">The tunnel works only over UDP forwarding</string>
+    <string name="obf_profile_title">Obfuscation</string>
+    <string name="obf_timing_off">Pacing: off</string>
+    <string name="obf_timing_format">Pacing: %1$d ms</string>
+    <string name="obf_timing_hint">Pause between packets on both sides. 20 ms matches a voice call; the higher it is, the lower the speed ceiling.</string>
+    <string name="obf_none">Off</string>
+    <string name="provider_locked">Stop the connection to change the method or link</string>
+    <string name="obf_key_empty_hint">Empty - the key will be generated on apply</string>
+    <string name="obf_key_invalid_hint">Invalid format - 64 hex characters required</string>
+    <string name="server_sync_section">Synced server settings</string>
+    <string name="sync_server_switches">Sync with server</string>
+    <string name="sync_off_banner">Server sync is off. Check the settings manually.</string>
+    <string name="transport_protocol">Transport</string>
+    <string name="transport_protocol_desc">UDP lowers latency, TCP is more stable</string>
+    <string name="manual_captcha">Manual captcha</string>
+    <string name="manual_captcha_desc">Solve the captcha manually instead of automatic recognition</string>
+    <string name="use_carrier_dns">Carrier DNS</string>
+    <string name="use_carrier_dns_desc">Use the current network DNS instead of the system resolver</string>
+    <string name="use_carrier_dns_overridden">Disabled: the manual DNS list above is in effect</string>
+    <string name="dns_mode_title">DNS resolver</string>
+    <string name="dns_mode_desc">Auto - tries the system DNS, switches to DNS-over-HTTPS when blocked</string>
+    <string name="dns_mode_auto">Auto</string>
+    <string name="dns_custom_label">DNS servers (manual)</string>
+    <string name="dns_custom_hint">Comma or space separated. Takes priority over carrier DNS. Empty - not set.</string>
+    <string name="dns_custom_invalid">Invalid DNS addresses will be skipped.</string>
+
+    <string name="obf_select_profile_hint">Select an obfuscation profile to set the key.</string>
+
+    <!-- LogsScreen -->
+    <string name="logs_title">Logs</string>
+    <string name="copy">Copy</string>
+    <string name="clear">Clear</string>
+    <string name="no_logs">No logs</string>
+
+    <!-- ServerManagementScreen -->
+    <string name="server_config">Server configuration</string>
+    <string name="listen_port">Listen port</string>
+    <string name="listen_port_desc">Port on which the server accepts client connections</string>
+    <string name="server_install">Install</string>
+    <string name="server_update">Update</string>
+    <string name="server_obf_key_label">Obf key (64 hex)</string>
+    <string name="obf_key_regen">Generate new key</string>
+    <string name="start_server">Start server</string>
+    <string name="stop_server">Stop server</string>
+    <string name="ssh_log_title">SSH log</string>
+    <string name="ssh_log_fetch_journal">Server journal</string>
+    <string name="ssh_log_empty">Log is empty</string>
+
+    <!-- SshSetupScreen -->
+    <string name="show_password">Show password</string>
+    <string name="hide_password">Hide password</string>
+    <string name="connect_to_server">Pairing</string>
+    <string name="back">Back</string>
+    <string name="server_data">Server details</string>
+    <string name="server_ip_label">Server IP address</string>
+    <string name="ssh_port">SSH port</string>
+    <string name="username">User name</string>
+    <string name="password">Password</string>
+    <string name="private_key">Private key</string>
+    <string name="authentication">Authentication</string>
+    <string name="auth_method_label">Sign-in method</string>
+    <string name="private_key_pem">Private key (PEM)</string>
+    <string name="sudo_password">sudo password</string>
+    <string name="sudo_password_hint">Required if you sign in as a non-root user and sudo asks for a password. Otherwise leave it empty.</string>
+    <string name="connect_btn">Connect</string>
+    <string name="step_connecting">Pairing with the server…</string>
+    <string name="step_auth">Authenticating…</string>
+    <string name="step_ssh_check">Checking SSH…</string>
+
+    <!-- Update -->
+    <string name="update_title">Update</string>
+    <string name="update_check">Check</string>
+    <string name="update_checking">Checking…</string>
+    <string name="update_available_title">Update available</string>
+    <string name="update_available">Version %1$s is available</string>
+    <string name="update_download">Download</string>
+    <string name="update_downloading_title">Downloading update</string>
+    <string name="update_downloading">Downloading: %1$d%%</string>
+    <string name="update_ready_title">Update downloaded</string>
+    <string name="update_ready_desc">The APK is ready to install. Install now?</string>
+    <string name="update_ready_desc_short">Ready to install</string>
+    <string name="update_install">Install</string>
+    <string name="update_no_update">You have the latest version</string>
+    <string name="update_error_release">Could not get release info</string>
+    <string name="update_error_no_apk">The release has no APK</string>
+    <string name="update_error_network">No connection to the server</string>
+    <string name="update_error_download">Could not download the update</string>
+    <string name="update_error_signature">Update signature does not match - installation cancelled</string>
+    <string name="update_error_file">Update file not found</string>
+
+    <string name="debug_mode">Verbose logging</string>
+    <string name="debug_mode_desc">Detailed core output</string>
+    <string name="magic_switch">Alternative TURN node</string>
+    <string name="magic_switch_desc">Use the specified TURN server instead of auto-selection</string>
+    <string name="magic_switch_address_label">TURN node address</string>
+    <string name="magic_switch_address_support">IP or host of the alternative TURN server</string>
+
+    <string name="dynamic_theme_title">Dynamic theme</string>
+    <string name="dynamic_theme_desc">Use system colors (Material You)</string>
+    <string name="privacy_mode_title">Privacy mode</string>
+    <string name="privacy_mode_desc">Hides IPs and ports</string>
+    <string name="seasonal_decor_title">Seasonal decor</string>
+    <string name="seasonal_decor_desc">Leaves and glow around the connect button</string>
+    <string name="language_title">Language</string>
+    <string name="language_system">System default</string>
+
+    <!-- Notifications -->
+    <string name="notif_proxy_connecting">Connecting…</string>
+    <string name="notif_channel_proxy">Proxy</string>
+    <string name="notif_channel_captcha">Captcha</string>
+    <string name="notif_captcha_title">Captcha required</string>
+    <string name="notif_captcha_text">Open the app to complete the check</string>
+    <string name="notif_proxy_connect_error">Connection error</string>
+    <string name="notif_proxy_vpn_permission">VPN permission required - open the app</string>
+    <string name="notif_proxy_vpn_denied">VPN permission not granted - proxy not started</string>
+    <string name="proxy_error_service">Could not start the service: %1$s</string>
+    <string name="proxy_error_not_configured">Connection settings are not filled in</string>
+    <string name="proxy_error_config_rejected">The core rejected the configuration: %1$s</string>
+    <string name="proxy_error_core_start">The core failed to start: %1$s</string>
+    <string name="proxy_error_tunnel_config">Could not parse the WireGuard config: %1$s</string>
+    <string name="proxy_error_tunnel_iface">Could not bring up the VPN interface: %1$s</string>
+
+    <!-- CaptchaWebViewDialog -->
+    <string name="captcha_title">Robot check</string>
+    <string name="captcha_subtitle">Complete the check to continue</string>
+    <string name="captcha_close">Close</string>
+    <string name="captcha_browser_hint">The captcha is open in an external browser. Return to the app after completing it.</string>
+
+    <!-- Telegram -->
+    <string name="tg_channel">Telegram channel</string>
+    <string name="tg_subscribe_title">Stay updated</string>
+    <string name="tg_subscribe_desc">Subscribe to the Telegram channel to be the first to know about new versions.</string>
+    <string name="tg_subscribe_btn">Subscribe</string>
+    <string name="tg_not_now">Not now</string>
+
+    <!-- Servers -->
+    <string name="server_delete">Delete</string>
+    <string name="server_unsaved_label">Not saved</string>
+    <string name="server_unnamed">Untitled</string>
+
+    <!-- Notification & Tile -->
+    <string name="notif_proxy_stop_action">Disconnect</string>
+    <string name="notif_proxy_threads_format">Threads: %1$d/%2$d</string>
+
+    <!-- Виджет домашнего экрана -->
+    <string name="widget_label">FreeTurn - proxy</string>
+    <string name="widget_status_on">Connected</string>
+    <string name="widget_status_connecting">Connecting…</string>
+    <string name="widget_status_off">Disconnected</string>
+    <string name="widget_server_none">No active server</string>
+    <string name="widget_action_start">Start</string>
+    <string name="widget_action_stop">Stop</string>
+
+    <!-- App Shortcuts (long-press иконки) -->
+    <string name="shortcut_start_short">Start</string>
+    <string name="shortcut_start_long">Start proxy</string>
+    <string name="shortcut_stop_short">Stop</string>
+    <string name="shortcut_stop_long">Stop proxy</string>
+
+    <!-- Туннельное приложение (WireGuard) -->
+    <string name="wireguard_tunnel_name">Tunnel name</string>
+
+    <!-- Split tunneling -->
+    <string name="split_tunnel_title">Split tunneling</string>
+    <string name="split_tunnel_mode_label">Mode</string>
+    <string name="split_tunnel_mode_include">Selected only</string>
+    <string name="split_tunnel_mode_exclude">All except selected</string>
+    <string name="split_tunnel_search">Search apps</string>
+    <string name="split_tunnel_empty">No apps found</string>
+    <string name="split_tunnel_off_hint">Turn on to select apps</string>
+    <string name="split_tunnel_locked">Stop the connection to change split tunneling</string>
+    <string name="split_tunnel_include_empty">Nothing selected - no app will go through the VPN</string>
+    <string name="split_tunnel_status_off">Split tunneling is off</string>
+    <string name="split_tunnel_status_on">Split tunneling is on</string>
+
+    <!-- Servers sheet -->
+    <string name="servers_sheet_title">Servers</string>
+
+    <!-- Логи -->
+    <string name="logs_enabled">Show logs</string>
+    <string name="logs_enabled_desc">Core output and the logs button on the home screen</string>
+
+    <!-- Продвинутые / отладка -->
+    <string name="settings_advanced">Advanced</string>
+    <string name="settings_advanced_desc">Debugging and diagnostics</string>
+    <string name="nerd_mode">Debug mode</string>
+    <string name="nerd_mode_desc">Shows debug info: core state, server journal and verbose logs</string>
+    <string name="hotspot_proxy_desc">Listen on 0.0.0.0:1080 to share the WireGuard tunnel over a hotspot</string>
+    <string name="restart_server_on_switch">Restart server on profile switch</string>
+    <string name="restart_server_on_switch_desc">Restart the server with the new profile parameters</string>
+    <string name="nerd_section_title">Debug info</string>
+    <string name="nerd_section_desc">Core state, server journal and SSH log</string>
+    <string name="nerd_core_state">Core state</string>
+    <string name="nerd_state_label">State</string>
+    <string name="nerd_state_running">Running</string>
+    <string name="nerd_state_stopped">Stopped</string>
+    <string name="nerd_state_not_installed">Not installed</string>
+    <string name="nerd_version_label">Version</string>
+    <string name="nerd_launch_params">Launch parameters</string>
+    <string name="nerd_launch_server">Server</string>
+    <string name="nerd_launch_client">Client</string>
+    <string name="nav_logs">Logs</string>
+    <string name="logs_actions">Log actions</string>
+    <string name="logs_share_file">Send file</string>
+    <string name="logs_share_empty">Log file is empty</string>
+
+    <!-- Настройки (новый раздел) -->
+    <string name="nav_settings">Settings</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_servers">Servers</string>
+    <string name="settings_servers_desc">Manage added servers and their settings</string>
+    <string name="settings_empty_servers">No servers added</string>
+    <string name="server_delete_confirm_title">Delete server?</string>
+    <string name="server_delete_confirm_desc">Server \"%1$s\" and all its settings will be removed from the app.</string>
+    <!-- Раздел "Управление" в хабе сервера -->
+    <string name="server_management">Management</string>
+    <string name="server_clean_title">Remove FreeTurn from server</string>
+    <string name="server_clean_subtitle">Remove the service, WireGuard and user list from the remote server</string>
+    <string name="server_delete_app">Remove server from app</string>
+    <string name="server_delete_app_subtitle">Only the app entry is removed - the server is not changed</string>
+    <!-- Диалог очистки сервера от FreeTurn -->
+    <string name="server_clean_confirm_title">Remove FreeTurn from server?</string>
+    <string name="server_clean_confirm_desc">All FreeTurn components will be removed from the server. Users you shared access with will lose their connection.</string>
+    <string name="server_clean_confirm_btn">Remove</string>
+    <string name="server_delete_retry">Retry</string>
+    <string name="server_delete_cleaning_title">Removing from server</string>
+    <string name="server_delete_cleaning_desc">Removing FreeTurn components from the server over SSH…</string>
+    <string name="server_delete_done_title">Server cleaned</string>
+    <string name="server_delete_done_desc">FreeTurn components have been removed from the server.</string>
+    <string name="server_delete_done_confirm">Done</string>
+    <string name="provider_connection_settings">Connection settings</string>
+    <string name="provider_connection_settings_desc">Client parameters: address, threads, DNS</string>
+    <string name="provider_server_settings">Server settings</string>
+    <string name="provider_server_settings_desc">State, obfuscation, forwarding and core management</string>
+    <!-- Живой статус сервера в хабе -->
+    <string name="hub_server_running">Server running</string>
+    <string name="hub_server_stopped">Server stopped</string>
+    <string name="hub_connect_failed">Could not connect</string>
+    <string name="hub_not_installed">Core not installed</string>
+    <string name="hub_sync_off">Sync off</string>
+    <string name="hub_op_apply">Applying settings…</string>
+    <string name="hub_op_update">Updating server…</string>
+    <string name="hub_op_upload_build">Uploading local build…</string>
+    <string name="hub_op_stop">Stopping server…</string>
+    <!-- Заголовки фаз статуса (hero) -->
+    <string name="pill_connecting">Connecting…</string>
+    <string name="pill_not_paired">SSH not set up</string>
+    <string name="pill_offline">Server inactive</string>
+    <string name="not_paired_hint">The server has no SSH pairing: managing it from the app is unavailable, client settings still work.</string>
+    <string name="server_apply">Apply</string>
+    <string name="apply_blocked_arq">Fix the ARQ values</string>
+    <string name="apply_blocked_address">Check the listen and backend addresses</string>
+    <string name="apply_blocked_key">Check the obf key</string>
+    <string name="apply_blocked_busy">Wait for the server operation</string>
+    <string name="server_inactive_title">Server not active</string>
+    <string name="server_inactive_desc">To manage the core and SSH connection, make this server active.</string>
+    <string name="make_active">Make active</string>
+    <string name="server_active_badge">Active</string>
+    <string name="server_actions">Server actions</string>
+    <string name="menu_rename_server">Rename</string>
+    <string name="menu_clone_server">Clone</string>
+    <string name="rename_server_title">Rename server</string>
+    <string name="server_name_label">Server name</string>
+    <string name="save">Save</string>
+    <string name="connection_mode_title">Connection mode</string>
+    <string name="provider_connection_mode_desc">Proxy or VPN (WireGuard), config import</string>
+    <string name="mode_proxy">Proxy</string>
+    <string name="mode_vpn">VPN</string>
+    <string name="mode_proxy_desc">Traffic goes through a local proxy, without a tunnel.</string>
+    <string name="mode_vpn_desc">All device traffic is tunneled through WireGuard.</string>
+    <string name="forward_section">Forwarding</string>
+    <string name="forward_udp_desc">UDP relay: the local port accepts WireGuard/AmneziaWG traffic.</string>
+    <string name="forward_tcp_desc">TCP forwarder: the local port is used by Xray or sing-box, no own tunnel is brought up.</string>
+    <string name="forward_tcp_foreign_vpn">If another app holds the VPN on the device, exclude FreeTurn from its tunnel - otherwise traffic will loop.</string>
+    <string name="forward_server_match">The server must run in the same mode, otherwise it will reject the session.</string>
+
+    <string name="kcp_section">ARQ profile</string>
+    <string name="kcp_preset_label">Profile</string>
+    <string name="kcp_preset_standard">Standard</string>
+    <string name="kcp_preset_mobile">Mobile</string>
+    <string name="kcp_preset_custom">Custom</string>
+    <string name="kcp_preset_standard_desc">Core default: minimal latency, more overhead traffic.</string>
+    <string name="kcp_preset_mobile_desc">Gentle on cellular networks: less frequent polling, smaller windows, batched ACKs.</string>
+    <string name="kcp_preset_custom_desc">Values are set manually; applied to both client and server.</string>
+    <string name="kcp_interval_label">Loop interval, ms</string>
+    <string name="kcp_resend_label">Fast resend, duplicate ACKs</string>
+    <string name="kcp_sndwnd_label">Send window, packets</string>
+    <string name="kcp_rcvwnd_label">Receive window, packets</string>
+    <string name="kcp_mtu_label">Segment MTU, bytes</string>
+    <string name="kcp_mtu_support">Allowed 300–1350</string>
+    <string name="kcp_nodelay_title">Fast mode</string>
+    <string name="kcp_nodelay_desc">Send without accumulation delay</string>
+    <string name="kcp_nc_title">No congestion control</string>
+    <string name="kcp_nc_desc">Do not shrink the window on loss</string>
+    <string name="kcp_acknodelay_title">Immediate ACK</string>
+    <string name="kcp_acknodelay_desc">Lower latency, more overhead traffic</string>
+    <string name="kcp_value_positive">Must be greater than zero</string>
+    <string name="kcp_value_nonneg">Must be 0 or greater</string>
+    <string name="kcp_mtu_invalid">Must be between 300 and 1350</string>
+    <string name="load_wg_conf">Load from file</string>
+    <string name="connection_config_section">Tunnel configuration</string>
+    <string name="change_server">Change server</string>
+
+    <!-- Приложение -->
+    <string name="settings_app">App</string>
+    <string name="settings_app_desc">Theme, language and updates</string>
+    <string name="app_section_interface">Interface</string>
+    <string name="app_section_connection">Connection</string>
+    <string name="battery_opt_title">Unrestricted background use</string>
+    <string name="battery_opt_on">No restrictions. If the tunnel still drops during sleep, open \"Battery\" and choose \"Unrestricted\"</string>
+    <string name="battery_opt_off">Not allowed - the tunnel drops in sleep mode</string>
+    <string name="auto_connect_title">Connect on launch</string>
+    <string name="auto_connect_desc">Restore the session when the app opens if the system dropped it</string>
+    <string name="app_section_prompts">Prompts</string>
+    <string name="suppress_update_prompt_title">Do not offer updates</string>
+    <string name="suppress_update_prompt_desc">Do not show the update suggestion dialog</string>
+    <string name="suppress_tg_prompt_title">Do not offer Telegram</string>
+    <string name="suppress_tg_prompt_desc">Do not show the channel subscription dialog</string>
+    <string name="app_section_updates">Updates</string>
+    <string name="app_section_reset">Reset</string>
+    <string name="app_reset_desc">Delete all app data</string>
+    <string name="update_current_version">Current version %1$s</string>
+
+    <!-- Резервная копия (экспорт/восстановление) -->
+    <string name="app_section_backup">Backup</string>
+    <string name="backup_export_title">Export settings</string>
+    <string name="backup_export_desc">Profiles and settings to an encrypted file</string>
+    <string name="backup_export_action">Export</string>
+    <string name="backup_restore_title">Restore</string>
+    <string name="backup_restore_action">Restore</string>
+    <string name="backup_password_label">Password</string>
+    <string name="backup_password_confirm_label">Repeat password</string>
+    <string name="backup_password_hint">Needed to restore on another device. It cannot be recovered.</string>
+    <string name="backup_password_empty">Enter a password</string>
+    <string name="backup_password_mismatch">Passwords do not match</string>
+    <string name="backup_export_ok">Settings exported</string>
+    <string name="backup_export_fail">Could not save the file</string>
+    <string name="backup_restore_warning">Current servers and settings will be replaced.</string>
+    <string name="backup_restore_ok">Servers restored: %1$d</string>
+    <string name="backup_restore_fail">Could not restore</string>
+    <string name="backup_restore_bad_password">Wrong password</string>
+    <string name="backup_restore_bad_file">Invalid file format</string>
+
+    <!-- О проекте -->
+    <string name="settings_about">About</string>
+    <string name="settings_about_desc">Version, description and links</string>
+    <string name="about_description">Free Turn proxies WireGuard and Xray traffic through public TURN servers. Open source and no telemetry: all settings are stored only on your device.</string>
+    <string name="about_links">Links</string>
+</resources>

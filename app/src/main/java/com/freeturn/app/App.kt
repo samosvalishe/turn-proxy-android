@@ -1,6 +1,7 @@
 package com.freeturn.app
 
 import android.app.Application
+import android.content.Context
 import android.content.pm.ApplicationInfo
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.di.appModule
@@ -35,6 +36,10 @@ class App : Application() {
     private val store: ProxyStore by inject()
     private val log: ProxyLog by inject()
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(AppLocale.wrap(base))
+    }
 
     override fun onCreate() {
         super.onCreate()
