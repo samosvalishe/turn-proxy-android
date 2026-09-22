@@ -19,6 +19,7 @@ import com.freeturn.app.data.config.ClientConfig
 import com.freeturn.app.data.config.Provider
 import com.freeturn.app.data.config.coreDnsServers
 import com.freeturn.app.data.config.toCoreJson
+import com.freeturn.app.data.server.ServerOpts
 import com.freeturn.app.domain.proxy.LogLevel
 import com.freeturn.app.domain.proxy.ProxyEngine
 import com.freeturn.app.domain.proxy.ProxyLog
@@ -181,7 +182,10 @@ class ProxyService : VpnService() {
 
     /** [fresh] - команда пользователя; иначе это возврат сервиса после смерти процесса. */
     private suspend fun startSession(session: Long, fresh: Boolean) {
-        val cfg = prefs.clientConfigFlow.first()
+        // Один снимок профиля: раздельные чтения смешали бы peer одного сервера с obf другого.
+        val server = prefs.activeServerFlow.first()
+        val cfg = server?.client ?: ClientConfig()
+        val opts = server?.opts ?: ServerOpts()
         if (!isCurrent(session)) return
         // Лог рестарта не чистим: строка "Процесс запущен" от App - единственный след того,
         // что процесс убивали, и после clearScreen от неё ничего бы не осталось.
@@ -194,7 +198,7 @@ class ProxyService : VpnService() {
             return
         }
 
-        val json = buildConfigJson(cfg)
+        val json = buildConfigJson(cfg, opts)
         if (!isCurrent(session)) return
         val argv = try {
             engine.configToArgs(json)
@@ -303,8 +307,8 @@ class ProxyService : VpnService() {
         return true
     }
 
-    private suspend fun buildConfigJson(cfg: ClientConfig): String = cfg.toCoreJson(
-        srv = prefs.serverOptsFlow.first(),
+    private suspend fun buildConfigJson(cfg: ClientConfig, opts: ServerOpts): String = cfg.toCoreJson(
+        srv = opts,
         carrierDns = if (cfg.useCarrierDns) network.physicalDnsServers() else null,
         ownClientId = prefs.ownClientId(),
     )

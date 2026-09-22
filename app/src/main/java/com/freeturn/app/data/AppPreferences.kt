@@ -104,7 +104,8 @@ class AppPreferences(context: Context) {
     // Производные от serversSnapshot: их читает рантайм (ProxyService, оркестратор,
     // SSH). Без активного сервера отдают дефолты - запускать в этом случае нечего.
 
-    private val activeServerFlow: Flow<Server?> =
+    /** Весь активный профиль одним снимком - для решений, которым нужны его разные части. */
+    val activeServerFlow: Flow<Server?> =
         serversSnapshot.map { it.active }.distinctUntilChanged()
 
     val sshConfigFlow: Flow<SshConfig> =

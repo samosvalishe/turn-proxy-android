@@ -82,10 +82,10 @@ class ProxyOrchestrator(
             sshRepository.logNote("рестарт сервера пропущен: нет активной SSH-сессии")
             return
         }
+        val server = prefs.serversSnapshot.first().active ?: return
         // Сессия должна вести на хост активного профиля: после смены профиля она ещё
         // может указывать на прошлый сервер - иначе рестартнём чужой хост.
-        val cfg = prefs.sshConfigFlow.first()
-        if (active.ip != cfg.ip || active.port != cfg.port) {
+        if (active.ip != server.ssh.ip || active.port != server.ssh.port) {
             sshRepository.logNote("рестарт сервера пропущен: SSH-сессия указывает на другой хост")
             return
         }
@@ -97,7 +97,6 @@ class ProxyOrchestrator(
             sshRepository.logNote("рестарт сервера пропущен: $reason")
             return
         }
-        val server = prefs.serversSnapshot.first().active ?: return
         val applied = sshRepository.applyServer(server.applyOptions()) ?: return
         saveApplied(server.withApplied(applied))
     }
