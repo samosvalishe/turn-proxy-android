@@ -9,6 +9,15 @@ import java.util.Base64
 
 class FreeturnLinkTest {
 
+    @Test
+    fun `bond round trip matches Go wire fields`() {
+        val link = FreeturnLink(provider = "vk", peer = "1.2.3.4:56000", mode = "tcp", bond = true)
+        val json = String(Base64.getUrlDecoder().decode(link.encode().removePrefix("freeturn://")), Charsets.UTF_8)
+        assertEquals("""{"v":1,"provider":"vk","peer":"1.2.3.4:56000","mode":"tcp","bond":true}""", json)
+        assertEquals(link, FreeturnLink.parse(link.encode()).getOrThrow())
+        assertFalse(FreeturnLink.parse(goldenMinimal).getOrThrow().bond)
+    }
+
     /** Ссылка из docs/uri.md Go-репо: {"v":1,"provider":"vk","peer":"1.2.3.4:56000"}. */
     private val goldenMinimal = "freeturn://eyJ2IjoxLCJwcm92aWRlciI6InZrIiwicGVlciI6IjEuMi4zLjQ6NTYwMDAifQ"
 

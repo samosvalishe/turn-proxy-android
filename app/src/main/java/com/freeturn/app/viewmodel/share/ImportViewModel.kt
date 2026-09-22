@@ -124,6 +124,7 @@ class ImportViewModel(
     // стартовал бы с конфигом, который отвергнет ядро или сервер.
     private fun requireUsable(link: FreeturnLink) {
         require(link.provider in Provider.VALUES) { "unknown provider" }
+        require(!link.bond || (link.mode == ProxyMode.TCP && link.wgConf.isBlank())) { "bond requires TCP proxy" }
         if (link.obfProfile.isBlank() || link.obfProfile == ObfProfile.NONE) return
         require(link.obfProfile in ObfProfile.VALUES) { "unknown obf profile" }
         require(ObfProfile.isValidKey(link.obfKey)) { "bad obf key" }
@@ -139,6 +140,7 @@ class ImportViewModel(
                 callLink = st.callLink.trim(),
                 provider = link.provider,
                 useUdp = link.transport == "udp",
+                bond = link.bond,
                 threads = link.n.takeIf { it > 0 } ?: ClientConfig.DEFAULT_THREADS,
                 streamsPerCred = link.streamsPerCred.takeIf { it > 0 }
                     ?: ClientConfig.DEFAULT_STREAMS_PER_CRED,

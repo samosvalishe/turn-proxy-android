@@ -61,6 +61,7 @@ internal object ServerJson {
             put("threads", p.client.threads)
             put("streamsPerCred", p.client.streamsPerCred)
             put("useUdp", p.client.useUdp)
+            put("bond", p.client.bond)
             put("manualCaptcha", p.client.manualCaptcha)
             put("localPort", p.client.localPort)
             put("debugMode", p.client.debugMode)
@@ -120,6 +121,7 @@ internal object ServerJson {
                 threads = cliO.optInt("threads", ClientConfig.DEFAULT_THREADS),
                 streamsPerCred = cliO.optInt("streamsPerCred", ClientConfig.DEFAULT_STREAMS_PER_CRED),
                 useUdp = cliO.optBoolean("useUdp", false),
+                bond = cliO.optBoolean("bond", false),
                 manualCaptcha = cliO.optBoolean("manualCaptcha", false),
                 localPort = cliO.optString("localPort", ClientConfig.DEFAULT_LOCAL_PORT),
                 debugMode = cliO.optBoolean("debugMode", false),

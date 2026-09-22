@@ -502,6 +502,8 @@
     <string name="mode_proxy_desc">Трафик идёт через локальный прокси, без туннеля.</string>
     <string name="mode_vpn_desc">Весь трафик устройства туннелируется через WireGuard.</string>
     <string name="forward_section">Проброс</string>
+    <string name="bond_title">Объединять каналы (bond)</string>
+    <string name="bond_desc">Одно TCP-соединение использует несколько каналов. Нужен сервер с поддержкой bond. При обрыве канала Xray потребуется переподключиться.</string>
     <string name="forward_udp_desc">UDP-релей: локальный порт принимает трафик WireGuard/AmneziaWG.</string>
     <string name="forward_tcp_desc">TCP-форвардер: локальный порт слушает Xray или sing-box, свой туннель не поднимается.</string>
     <string name="forward_tcp_foreign_vpn">Если VPN на устройстве держит другое приложение, исключите FreeTurn из его туннеля - иначе трафик зациклится.</string>

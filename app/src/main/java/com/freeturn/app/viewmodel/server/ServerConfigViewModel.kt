@@ -133,9 +133,23 @@ class ServerConfigViewModel(
 
     fun setProxyMode(id: String?, mode: String) = updateOpts(id) { it.copy(proxyMode = mode) }
 
-    /** Режим и ARQ одной транзакцией: рестарт пары идёт один раз на "Применить". */
-    fun applyForwardConfig(id: String?, mode: String, kcp: KcpProfile) =
-        updateOpts(id) { it.copy(proxyMode = mode, kcp = kcp) }
+    /** Bond меняет только клиент; режим и ARQ требуют синхронизации сервера. */
+    fun applyForwardConfig(id: String?, mode: String, kcp: KcpProfile, bond: Boolean) {
+        viewModelScope.launch {
+            var serverChanged = false
+            val transform: (Server) -> Server = {
+                val opts = it.opts.copy(proxyMode = mode, kcp = kcp)
+                serverChanged = opts != it.opts
+                it.copy(opts = opts, client = it.client.copy(bond = bond))
+            }
+            val changed = if (id == null) prefs.updateActiveServer(transform)
+                else prefs.updateServer(id, transform)
+            if (!changed) return@launch
+            if (id != null && id != prefs.serversSnapshot.first().activeId) return@launch
+            if (serverChanged) orchestrator.scheduleSync()
+            else orchestrator.restartProxyIfRunning()
+        }
+    }
 
     /**
      * Режим и ARQ обязаны совпадать с сервером, поэтому правка активного сервера

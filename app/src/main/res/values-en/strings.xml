@@ -471,6 +471,8 @@
     <string name="mode_proxy_desc">Traffic goes through a local proxy, without a tunnel.</string>
     <string name="mode_vpn_desc">All device traffic is tunneled through WireGuard.</string>
     <string name="forward_section">Forwarding</string>
+    <string name="bond_title">Combine channels (bond)</string>
+    <string name="bond_desc">Use several channels for one TCP connection. Requires a server with bond support. If a channel fails, Xray will need to reconnect.</string>
     <string name="forward_udp_desc">UDP relay: the local port accepts WireGuard/AmneziaWG traffic.</string>
     <string name="forward_tcp_desc">TCP forwarder: the local port is used by Xray or sing-box, no own tunnel is brought up.</string>
     <string name="forward_tcp_foreign_vpn">If another app holds the VPN on the device, exclude FreeTurn from its tunnel - otherwise traffic will loop.</string>

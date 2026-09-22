@@ -1,5 +1,6 @@
 package com.freeturn.app.data.server
 
+import com.freeturn.app.data.config.ClientConfig
 import com.freeturn.app.data.config.KcpProfile
 import com.freeturn.app.data.config.ObfProfile
 import com.freeturn.app.data.config.ProxyMode
@@ -8,6 +9,14 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ServerJsonTest {
+
+    @Test
+    fun `bond persists and old profiles keep it disabled`() {
+        val server = Server(name = "bond", client = ClientConfig(bond = true))
+        val decoded = ServerJson.decodeList(ServerJson.encodeList(listOf(server))).single()
+        assertEquals(true, decoded.client.bond)
+        assertEquals(false, ServerJson.decodeList("""[{"id":"old","client":{}}]""").single().client.bond)
+    }
 
     @Test
     fun `opts round trip keeps mode and arq`() {

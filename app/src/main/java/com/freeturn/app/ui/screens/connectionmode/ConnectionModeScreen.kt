@@ -61,6 +61,7 @@ import com.freeturn.app.ui.components.SettingsCard
 import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.ui.components.SettingsEntryRow
 import com.freeturn.app.ui.components.SettingsFieldSlot
+import com.freeturn.app.ui.components.SettingsSwitchRow
 import com.freeturn.app.ui.components.UdpTcpSegmented
 import com.freeturn.app.ui.screens.splittunnel.SplitTunnelModal
 import com.freeturn.app.ui.theme.Spacing
@@ -109,7 +110,8 @@ fun ConnectionModeScreen(
     // Проброс и ARQ - черновики: рестарт пары клиент+сервер идёт по "Применить".
     var isTcp by remember(fieldsKey, savedOpts.proxyMode) { mutableStateOf(savedOpts.tcpMode) }
     var kcpDraft by remember(fieldsKey, savedOpts.kcp) { mutableStateOf(savedOpts.kcp) }
-    val forwardDirty = isTcp != savedOpts.tcpMode || kcpDraft != savedOpts.kcp
+    var bondDraft by remember(fieldsKey, saved.bond) { mutableStateOf(saved.bond) }
+    val forwardDirty = isTcp != savedOpts.tcpMode || kcpDraft != savedOpts.kcp || bondDraft != saved.bond
     val forwardVisible = !isVpn && forwardDirty
     val applyBlocked = if (isTcp && !kcpDraft.valid) stringResource(R.string.apply_blocked_arq) else null
 
@@ -118,7 +120,8 @@ fun ConnectionModeScreen(
         serverConfigViewModel.applyForwardConfig(
             serverId,
             if (isTcp) ProxyMode.TCP else ProxyMode.UDP,
-            kcpDraft
+            kcpDraft,
+            bondDraft
         )
         onBack?.invoke()
     }
@@ -263,6 +266,14 @@ fun ConnectionModeScreen(
                     }
 
                     if (isTcp) {
+                        SettingsCard {
+                            SettingsSwitchRow(
+                                title = stringResource(R.string.bond_title),
+                                subtitle = stringResource(R.string.bond_desc),
+                                checked = bondDraft,
+                                onCheckedChange = { bondDraft = it }
+                            )
+                        }
                         KcpCard(profile = kcpDraft, onProfile = { kcpDraft = it })
                     }
                 } else {

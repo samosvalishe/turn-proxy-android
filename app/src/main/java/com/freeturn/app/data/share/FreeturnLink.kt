@@ -13,6 +13,7 @@ data class FreeturnLink(
     val peer: String,
     val transport: String = "",
     val mode: String = "",
+    val bond: Boolean = false,
     val obfProfile: String = "",
     val obfKey: String = "",
     val obfTimingMs: Int = 0,
@@ -37,6 +38,7 @@ data class FreeturnLink(
         sb.field("peer", jsonString(peer))
         if (transport.isNotEmpty()) sb.field("transport", jsonString(transport))
         if (mode.isNotEmpty()) sb.field("mode", jsonString(mode))
+        if (bond) sb.field("bond", "true")
         if (obfProfile.isNotEmpty() && obfProfile != "none") {
             sb.field("obf", jsonString(obfProfile))
             sb.field("key", jsonString(obfKey))
@@ -82,6 +84,7 @@ data class FreeturnLink(
                 peer = peer,
                 transport = o.optString("transport"),
                 mode = o.optString("mode"),
+                bond = o.optBoolean("bond", false),
                 obfProfile = o.optString("obf"),
                 obfKey = o.optString("key"),
                 obfTimingMs = o.optInt("timing", 0),

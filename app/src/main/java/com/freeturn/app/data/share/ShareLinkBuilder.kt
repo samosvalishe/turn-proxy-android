@@ -28,6 +28,7 @@ object ShareLinkBuilder {
             peer = server.client.serverAddress,
             transport = if (server.client.useUdp) "udp" else "",
             mode = if (tcpMode) ProxyMode.TCP else "",
+            bond = tcpMode && server.client.bond && wgConf.isNullOrBlank(),
             // Профиль ARQ сервер не репортит: отдаём тот, что владелец ему и выставил.
             kcp = server.opts.kcp.takeIf { tcpMode && it != KcpProfile.DEFAULT },
             obfProfile = if (ObfProfile.isValidKey(obfKey)) obfProfile else "",

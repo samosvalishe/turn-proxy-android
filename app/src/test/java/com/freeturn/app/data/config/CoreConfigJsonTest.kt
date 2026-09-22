@@ -15,6 +15,21 @@ import org.junit.Test
  */
 class CoreConfigJsonTest {
 
+    @Test
+    fun bondIsSentOnlyWhenEnabledForTcpProxy() {
+        val client = ClientConfig(bond = true)
+        val tcp = ServerOpts(proxyMode = ProxyMode.TCP)
+        val proxy = parse(client, tcp)["proxy"]!!.jsonObject
+        assertEquals("true", proxy["bond"]!!.jsonPrimitive.content)
+        assertFalse(parse(client)["proxy"]!!.jsonObject.containsKey("bond"))
+        assertFalse(parse(client.copy(bond = false), tcp)["proxy"]!!.jsonObject.containsKey("bond"))
+        val wg = client.copy(
+            tunnelTransport = TunnelTransport.WIREGUARD,
+            wireGuardConfig = "[Interface]\nAddress = 10.8.0.2/32\n"
+        )
+        assertFalse(parse(wg, tcp)["proxy"]!!.jsonObject.containsKey("bond"))
+    }
+
     private val base = ClientConfig(
         serverAddress = "1.2.3.4:56000",
         callLink = "https://call.example/x",

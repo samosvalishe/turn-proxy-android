@@ -7,6 +7,7 @@ data class ClientConfig(
     val threads: Int = DEFAULT_THREADS,
     val streamsPerCred: Int = DEFAULT_STREAMS_PER_CRED,
     val useUdp: Boolean = false,
+    val bond: Boolean = false,
     val manualCaptcha: Boolean = false,
     val localPort: String = DEFAULT_LOCAL_PORT,
     val debugMode: Boolean = false,

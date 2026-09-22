@@ -32,7 +32,7 @@ data class CoreConfigJson(
     data class Turn(val n: Int, val transport: String, val host: String, val port: String)
 
     @Serializable
-    data class Proxy(val mode: String, val listen: String)
+    data class Proxy(val mode: String, val listen: String, val bond: Boolean? = null)
 
     @Serializable
     data class Kcp(
@@ -67,8 +67,7 @@ data class CoreConfigJson(
     data class Tunnel(val mode: String, val config: String, val mtu: Int)
 
     companion object {
-        // Все поля явно: пропущенное ядро молча заменит своим дефолтом. Исключение -
-        // kcp: null не сериализуется, и дефолты ARQ остаются за ядром.
+        // null в kcp/bond опускается ради дефолтов ядра и совместимости со старыми AAR.
         private val json = Json { encodeDefaults = true; explicitNulls = false }
 
         const val TRANSPORT_TCP = "tcp"
@@ -140,6 +139,8 @@ fun ClientConfig.toCoreJson(
                 // В туннельном режиме порт не биндится (ядро берёт in-memory pipe),
                 // но валидацию проходит и нужен прокси-режиму.
                 listen = localPort,
+                // Выключенный bond не отправляем: старые AAR отвергают незнакомые поля.
+                bond = if (tcpMode && bond) true else null,
             ),
             relay = CoreConfigJson.Relay(
                 links = listOf(callLink),

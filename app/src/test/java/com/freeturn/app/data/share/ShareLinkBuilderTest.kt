@@ -10,6 +10,20 @@ import org.junit.Test
 
 class ShareLinkBuilderTest {
 
+    @Test
+    fun `bond is shared only for TCP without a WG config`() {
+        val srv = Server(
+            name = "bond",
+            client = ClientConfig(serverAddress = "1.2.3.4:56000", bond = true),
+            opts = ServerOpts(proxyMode = ProxyMode.TCP)
+        )
+        fun shared(server: Server, wg: String? = null) =
+            FreeturnLink.parse(ShareLinkBuilder.build(server, ShareInfo(), "guest", wg)).getOrThrow()
+        assertEquals(true, shared(srv).bond)
+        assertEquals(false, shared(srv.copy(opts = ServerOpts())).bond)
+        assertEquals(false, shared(srv, "[Interface]\nAddress=10.8.0.2/32").bond)
+    }
+
     private val key = "ab".repeat(32)
 
     private fun server(
