@@ -21,6 +21,7 @@ import java.net.UnknownHostException
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.coroutineContext
 
 /**
@@ -45,6 +46,8 @@ class Socks5Server(
     private val executor = Executors.newCachedThreadPool()
     private val scope = CoroutineScope(executor.asCoroutineDispatcher() + SupervisorJob())
     private val sockets = ConcurrentHashMap.newKeySet<Socket>()
+    // Потоков и fd на клиента по два: без предела раздачу, открытую всей LAN, выедает любой.
+    private val clients = AtomicInteger(0)
 
     // Слушающий сокет - под монитором: bind идёт на потоке вызывающего, чтобы
     // BindException был виден ему, а не утонул в корутине.
@@ -87,17 +90,27 @@ class Socks5Server(
                 }
                 return
             }
+            if (clients.incrementAndGet() > MAX_CLIENTS) {
+                clients.decrementAndGet()
+                client.closeQuietly()
+                continue
+            }
+
+            track(client)
             scope.launch { handleClient(client) }
         }
     }
 
     private suspend fun handleClient(client: Socket) = coroutineScope {
         var target: Socket? = null
-        track(client)
         try {
             // Обратный канал - мимо туннеля: приложение теперь внутри tun, и ответы
-            // клиенту в локальную сеть без этого ушли бы в туннель.
-            protect(client)
+            // клиенту в локальную сеть без этого ушли бы в туннель. Отказ - сброс, а не
+            // обслуживание в обход.
+            if (!protect(client)) {
+                log.add("SOCKS5: protect отклонён - клиент сброшен", LogLevel.Warning)
+                return@coroutineScope
+            }
             client.soTimeout = HANDSHAKE_TIMEOUT_MS
 
             val input = client.getInputStream()
@@ -150,6 +163,7 @@ class Socks5Server(
             target?.closeQuietly()
             sockets.remove(client)
             target?.let(sockets::remove)
+            clients.decrementAndGet()
         }
     }
 
@@ -227,6 +241,7 @@ class Socks5Server(
 
         private const val BIND_ADDRESS = "0.0.0.0"
         private const val BACKLOG = 50
+        private const val MAX_CLIENTS = 64
         private const val BUFFER_SIZE = 8192
         private const val CONNECT_TIMEOUT_MS = 10_000
         private const val HANDSHAKE_TIMEOUT_MS = 15_000
