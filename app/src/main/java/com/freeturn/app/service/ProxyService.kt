@@ -69,13 +69,12 @@ class ProxyService : VpnService() {
     // null - сессия ещё не прочла конфиг.
     @Volatile private var provider: String? = null
     // Остановка решена: всё, что поднимет хвост уже начатого старта, сворачиваем сразу.
-    @Volatile private var stopping = false
+    // Переводит его ровно один из STOP, fail, onRevoke и onDestroy - он и сворачивает.
+    private val stopping = AtomicBoolean(false)
     // Заявка ядру на текущую сессию: гасим по ней именно свою, а не следующую.
     @Volatile private var session = 0L
     // Гасимся всегда по последнему startId: свежий START делает остановку неактуальной.
     @Volatile private var lastStartId = 0
-    // Сессию сворачивает либо STOP, либо onDestroy - кто успел первым.
-    private val shutdownDone = AtomicBoolean(false)
 
     // Экран зажёгся после глубокого сна - аллокации протухли, пинаем ядро сразу, не
     // дожидаясь его гэп-детектора (тик 30 c). Короткие блокировки экрана пропускаем:
@@ -89,7 +88,7 @@ class ProxyService : VpnService() {
             // Длительность сна - опора при разборе отвалов: по ней видно, пережила ли
             // аллокация паузу и не мы ли сами её выбросили.
             log.add("Пробуждение после сна ${gap / 1000} c - будим ядро")
-            if (!stopping) engine.wake(session)
+            if (!stopping.get()) engine.wake(session)
         }
     }
 
@@ -154,9 +153,8 @@ class ProxyService : VpnService() {
             session = next
             val fresh = intent?.action == ProxyActions.START
             // Инстанс мог уже свернуть сессию (STOP при забинденном сервисе его не
-            // уничтожает): для новой сессии он снова рабочий, флаги снимаем.
-            stopping = false
-            shutdownDone.set(false)
+            // уничтожает): для новой сессии он снова рабочий, флаг снимаем.
+            stopping.set(false)
             scope.launch {
                 // Sticky-рестарт после отказа: fail() снял намерение, а система вернула
                 // сервис. Без этой проверки он поднимал сессию заново - и так по кругу,
@@ -320,14 +318,14 @@ class ProxyService : VpnService() {
     private fun onNetworkHandover() {
         // stopping, а не только isRunning: остановка идёт в фоне, и ядро всё ещё живо -
         // без проверки рестарт поднимал бы сессию, которую сворачивают.
-        if (stopping || !engine.isRunning) return
+        if (stopping.get() || !engine.isRunning) return
         val slept = (SystemClock.elapsedRealtime() - SystemClock.uptimeMillis() - sleptMillis) / 1000
         log.add("Смена сети - переподключение (сон с прошлой проверки $slept c)")
         withCoreDns { session, dns -> engine.reconnect(session, dns) }
     }
 
     private fun onDnsChanged() {
-        if (stopping || !engine.isRunning) return
+        if (stopping.get() || !engine.isRunning) return
         log.add("Сеть: сменились DNS - обновляем резолверы ядра")
         withCoreDns { session, dns -> engine.setDnsServers(session, dns) }
     }
@@ -345,7 +343,7 @@ class ProxyService : VpnService() {
     private suspend fun observeStatus() {
         store.status.collect { status ->
             // После решения об остановке молчим: нотификация уже снята.
-            if (stopping) return@collect
+            if (stopping.get()) return@collect
             notifier.update(status, tunnelMode, provider)
         }
     }
@@ -359,7 +357,7 @@ class ProxyService : VpnService() {
     }
 
     /** Заявка ещё актуальна? Отменённая молчит: её ошибки уже не про текущую сессию. */
-    private fun isCurrent(session: Long) = !stopping && session == this.session
+    private fun isCurrent(session: Long) = !stopping.get() && session == this.session
 
     /** Свой интерфейс, а не чужой: следующая сессия могла уже поднять и принять свой. */
     @Synchronized
@@ -419,14 +417,13 @@ class ProxyService : VpnService() {
     /** Всегда false - удобно возвращать из веток, где сессия не состоялась. */
     private fun fail(message: String): Boolean {
         // Уже гасимся - об отменённой сессии сообщать нечего.
-        if (stopping) return false
-        stopping = true
+        if (!stopping.compareAndSet(false, true)) return false
         // Сессия не состоялась по своей вине (конфиг, отказ системы) - восстанавливать
         // нечего: без вмешательства пользователя следующая попытка упрётся в то же самое.
         prefs.setProxyDesired(false)
         log.add(message, LogLevel.Error)
         store.fail(message)
-        shutdown(message)
+        teardown(message)
         stopSelf(lastStartId)
         return false
     }
@@ -439,10 +436,12 @@ class ProxyService : VpnService() {
      *
      * Идемпотентна: STOP и следующий за ним onDestroy не должны гасить дважды.
      */
-    @Synchronized
     private fun shutdown(reason: String) {
-        if (!shutdownDone.compareAndSet(false, true)) return
-        stopping = true
+        if (stopping.compareAndSet(false, true)) teardown(reason)
+    }
+
+    @Synchronized
+    private fun teardown(reason: String) {
         val session = this.session
         notifier.cancelCaptcha()
         // Причина обязательна: по логу после гибернации надо отличать команду пользователя
