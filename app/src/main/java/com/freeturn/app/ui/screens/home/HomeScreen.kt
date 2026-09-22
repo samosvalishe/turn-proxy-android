@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.freeturn.app.data.config.Provider
 import com.freeturn.app.data.config.SplitTunnelMode
 import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.ui.util.HapticUtil
@@ -157,6 +158,8 @@ fun HomeScreen(
                     ConnectionHero(
                         status = status,
                         uptimeText = uptimeText,
+                        // direct - всегда один поток, счётчик ничего не сообщает.
+                        showStreams = clientConfig.provider != Provider.DIRECT,
                         decorEnabled = seasonalDecor,
                         onToggle = {
                             // Любая непокоящаяся фаза (включая капчу и старт) - остановка.

@@ -65,6 +65,8 @@ class ProxyService : VpnService() {
 
     // Нотификация должна сказать про туннель раньше, чем метрики его увидят.
     @Volatile private var tunnelMode = false
+    // null - сессия ещё не прочла конфиг.
+    @Volatile private var provider: String? = null
     // Остановка решена: всё, что поднимет хвост уже начатого старта, сворачиваем сразу.
     @Volatile private var stopping = false
     // Заявка ядру на текущую сессию: гасим по ней именно свою, а не следующую.
@@ -213,6 +215,7 @@ class ProxyService : VpnService() {
         network.register()
 
         tunnelMode = cfg.wireGuardActive
+        provider = cfg.provider
         // Раздача только поверх туннеля: без tun сокеты сервера ушли бы напрямую.
         val hotspot = tunnelMode && prefs.hotspotProxyEnabledFlow.first()
         if (tunnelMode) {
@@ -323,7 +326,7 @@ class ProxyService : VpnService() {
         store.status.collect { status ->
             // После решения об остановке молчим: нотификация уже снята.
             if (stopping) return@collect
-            notifier.update(status, tunnelMode)
+            notifier.update(status, tunnelMode, provider)
         }
     }
 

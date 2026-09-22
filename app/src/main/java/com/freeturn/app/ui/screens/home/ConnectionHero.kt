@@ -73,6 +73,7 @@ import kotlin.math.ceil
 internal fun ConnectionHero(
     status: ProxyStatus,
     uptimeText: String?,
+    showStreams: Boolean,
     decorEnabled: Boolean,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier
@@ -105,7 +106,7 @@ internal fun ConnectionHero(
 
         Spacer(Modifier.height(10.dp))
 
-        StatsPill(status = status, kind = kind, uptimeText = uptimeText)
+        StatsPill(status = status, kind = kind, uptimeText = uptimeText, showStreams = showStreams)
     }
 }
 
@@ -371,9 +372,9 @@ private fun StatusLabel(status: ProxyStatus, reducedMotion: Boolean) {
 }
 
 @Composable
-private fun StatsPill(status: ProxyStatus, kind: HeroKind, uptimeText: String?) {
+private fun StatsPill(status: ProxyStatus, kind: HeroKind, uptimeText: String?, showStreams: Boolean) {
     val counts = when {
-        !status.busy -> null
+        !showStreams || !status.busy -> null
         status.total > 0 -> "${status.active}/${status.total}"
         status.phase == ProxyPhase.Connected -> "${status.active}"
         else -> null

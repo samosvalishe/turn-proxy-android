@@ -11,6 +11,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.freeturn.app.R
+import com.freeturn.app.data.config.Provider
 import com.freeturn.app.domain.proxy.ProxyPhase
 import com.freeturn.app.domain.proxy.ProxyStatus
 import java.util.Locale
@@ -54,6 +55,7 @@ class ProxyNotifier(private val service: Service) {
 
     private var shown: ProxyStatus? = null
     private var shownTunnelMode = false
+    private var shownProvider: String? = null
     private var captchaShown = false
 
     private val openApp: PendingIntent? by lazy {
@@ -72,22 +74,24 @@ class ProxyNotifier(private val service: Service) {
     }
 
     /** Первая нотификация для `startForeground` - до неё сессии ещё нет. */
-    fun build(): Notification = build(ProxyStatus(phase = ProxyPhase.Connecting), tunnelMode = false)
+    fun build(): Notification =
+        build(ProxyStatus(phase = ProxyPhase.Connecting), tunnelMode = false, provider = null)
 
-    fun update(status: ProxyStatus, tunnelMode: Boolean) {
+    fun update(status: ProxyStatus, tunnelMode: Boolean, provider: String?) {
         if (status.captchaUrl.isNotEmpty()) showCaptcha() else cancelCaptcha()
         val prev = shown
-        if (prev != null && tunnelMode == shownTunnelMode &&
+        if (prev != null && tunnelMode == shownTunnelMode && provider == shownProvider &&
             prev.phase == status.phase && prev.active == status.active && prev.total == status.total
         ) {
             return
         }
         shown = status
         shownTunnelMode = tunnelMode
-        notify(NOTIF_ID_FG, build(status, tunnelMode))
+        shownProvider = provider
+        notify(NOTIF_ID_FG, build(status, tunnelMode, provider))
     }
 
-    private fun build(status: ProxyStatus, tunnelMode: Boolean): Notification {
+    private fun build(status: ProxyStatus, tunnelMode: Boolean, provider: String?): Notification {
         val connected = status.phase == ProxyPhase.Connected
         val title = when {
             connected && tunnelMode -> service.getString(R.string.tunnel_active)
@@ -95,8 +99,11 @@ class ProxyNotifier(private val service: Service) {
             status.phase == ProxyPhase.Error -> service.getString(R.string.notif_proxy_connect_error)
             else -> service.getString(R.string.notif_proxy_connecting)
         }
-        val details = streamsText(status)?.takeIf { connected }
-            ?: service.getString(R.string.notif_proxy_title)
+        // direct - всегда один поток: счётчик там ничего не сообщает.
+        val streams = streamsText(status)?.takeIf { connected && provider != Provider.DIRECT }
+        val details = listOfNotNull(providerText(provider), streams)
+            .joinToString(" · ")
+            .ifEmpty { service.getString(R.string.notif_proxy_title) }
         return NotificationCompat.Builder(service, CHANNEL_PROXY)
             .setContentTitle(title)
             .setContentText(details)
@@ -105,6 +112,12 @@ class ProxyNotifier(private val service: Service) {
             .setContentIntent(openApp)
             .addAction(0, service.getString(R.string.notif_proxy_stop_action), stopAction)
             .build()
+    }
+
+    private fun providerText(provider: String?): String? = when (provider) {
+        Provider.RELAY -> service.getString(R.string.provider_relay)
+        Provider.DIRECT -> service.getString(R.string.provider_direct)
+        else -> null
     }
 
     private fun streamsText(status: ProxyStatus): String? =
