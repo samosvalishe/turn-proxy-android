@@ -89,7 +89,7 @@ class ProxyService : VpnService() {
             // Длительность сна - опора при разборе отвалов: по ней видно, пережила ли
             // аллокация паузу и не мы ли сами её выбросили.
             log.add("Пробуждение после сна ${gap / 1000} c - будим ядро")
-            engine.wake()
+            if (!stopping) engine.wake(session)
         }
     }
 
@@ -319,9 +319,15 @@ class ProxyService : VpnService() {
         if (stopping || !engine.isRunning) return
         val slept = (SystemClock.elapsedRealtime() - SystemClock.uptimeMillis() - sleptMillis) / 1000
         log.add("Смена сети - переподключение (сон с прошлой проверки $slept c)")
+        withCoreDns { session, dns -> engine.reconnect(session, dns) }
+    }
+
+    private fun withCoreDns(apply: (session: Long, dns: String) -> Unit) {
+        val session = this.session
         scope.launch {
             val cfg = prefs.clientConfigFlow.first()
-            engine.reconnect(cfg.coreDnsServers { network.physicalDnsServers() }.joinToString(","))
+            if (!isCurrent(session)) return@launch
+            apply(session, cfg.coreDnsServers { network.physicalDnsServers() }.joinToString(","))
         }
     }
 
@@ -335,9 +341,9 @@ class ProxyService : VpnService() {
     }
 
     private suspend fun observeCoreErrors() {
-        store.coreErrors.collect { message ->
-            if (stopping || session == 0L) return@collect
-            shutdown("ошибка ядра: $message")
+        store.coreErrors.collect { error ->
+            if (!isCurrent(error.session)) return@collect
+            shutdown("ошибка ядра: ${error.message}")
             stopSelf(lastStartId)
         }
     }

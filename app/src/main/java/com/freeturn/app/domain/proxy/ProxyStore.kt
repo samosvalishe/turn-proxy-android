@@ -34,12 +34,13 @@ class ProxyStore {
 
     // Ошибка именно ОТ ЯДРА, а не любая красная фаза: fail() зовут и снаружи сессии
     // (отказ от VPN-согласия в трамплине, отлуп startForegroundService), а хост по такой
-    // ошибке сворачивал бы живую чужую сессию.
-    private val _coreErrors = MutableSharedFlow<String>(
+    // ошибке сворачивал бы живую чужую сессию. Id сессии - ошибка из буфера могла
+    // дождаться сборщика уже после рестарта.
+    private val _coreErrors = MutableSharedFlow<CoreError>(
         extraBufferCapacity = 8,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
-    val coreErrors: SharedFlow<String> = _coreErrors.asSharedFlow()
+    val coreErrors: SharedFlow<CoreError> = _coreErrors.asSharedFlow()
 
     private val captchaSeq = AtomicLong(0)
     // Поколение показанной ошибки: таймер гасит только свою. Ошибки приходят из горутин
@@ -70,11 +71,11 @@ class ProxyStore {
         scheduleErrorReset(generation)
     }
 
-    /** Фаза от ядра. Момент подключения ставится один раз - рестарт его не сбивает. */
-    fun setPhase(phase: ProxyPhase, active: Int, total: Int, error: String = "") {
+    /** Фаза от ядра сессии [session]. Момент подключения ставится один раз - рестарт его не сбивает. */
+    fun setPhase(session: Long, phase: ProxyPhase, active: Int, total: Int, error: String = "") {
         if (phase == ProxyPhase.Error) {
             scheduleErrorReset(errorSeq.incrementAndGet())
-            _coreErrors.tryEmit(error)
+            _coreErrors.tryEmit(CoreError(session, error))
         }
         _status.update {
             val connected = if (phase == ProxyPhase.Connected) {
@@ -109,3 +110,5 @@ class ProxyStore {
         const val ERROR_RESET_MS = 4_000L
     }
 }
+
+data class CoreError(val session: Long, val message: String)

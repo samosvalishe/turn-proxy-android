@@ -170,29 +170,25 @@ class ProxyEngine(
     /**
      * Устройство проснулось: стримы бросают backoff и пересоздают TURN-аллокации,
      * не дожидаясь гэп-детектора ядра (тик 30 c) и тем более провалов ChannelBind.
-     *
-     * Мимо [lock]: ядро само проверяет, есть ли живая сессия, а ждать за локом
-     * долгий `start`/`stop` смысла нет - к их концу пинок уже неактуален.
      */
-    fun wake() {
-        if (running == 0L) return
-        scope.launch {
-            runCatching { Mobile.wake() }
-                .onFailure { log.add("Пробуждение ядра не удалось: ${it.message}", LogLevel.Warning) }
-        }
-    }
+    fun wake(session: Long) = onSession(session, "Пробуждение ядра") { Mobile.wake() }
 
     /**
      * Смена сети: аллокации пересоздаются, туннель и tun-дескриптор остаются.
      * Пустой [dnsServers] оставляет текущие резолверы.
      */
-    fun reconnect(dnsServers: String) {
-        if (running == 0L) return
+    fun reconnect(session: Long, dnsServers: String) = onSession(session, "Переподключение") {
+        Mobile.setDNSServers(dnsServers)
+        Mobile.reconnect()
+    }
+
+    private fun onSession(session: Long, what: String, call: () -> Unit) {
+        if (running != session) return
         scope.launch {
-            runCatching {
-                Mobile.setDNSServers(dnsServers)
-                Mobile.reconnect()
-            }.onFailure { log.add("Переподключение не удалось: ${it.message}", LogLevel.Warning) }
+            lock.withLock {
+                if (running != session) return@withLock
+                runCatching(call).onFailure { log.add("$what не удалось: ${it.message}", LogLevel.Warning) }
+            }
         }
     }
 
@@ -221,8 +217,9 @@ class ProxyEngine(
     private inner class CoreEventSink : EventSink {
 
         override fun onState(state: String, streams: Long, total: Long, errMsg: String) {
-            if (running == 0L) return
-            store.setPhase(state.toPhase(), streams.toInt(), total.toInt(), errMsg)
+            val session = running
+            if (session == 0L) return
+            store.setPhase(session, state.toPhase(), streams.toInt(), total.toInt(), errMsg)
         }
 
         override fun onLog(level: String, msg: String, unixMillis: Long) {
