@@ -2,15 +2,14 @@
 
 package com.freeturn.app.ui.components
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExposedDropdownMenu
-import androidx.compose.material3.ExposedDropdownMenuAnchorType
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -30,6 +29,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.data.config.SshConfig
+import com.freeturn.app.ui.theme.Spacing
 import com.freeturn.app.ui.util.HapticUtil
 
 @Composable
@@ -95,7 +95,7 @@ fun SshFormFields(
         }
         SettingsRowDivider()
         SettingsFieldSlot {
-            AuthMethodDropdown(
+            AuthMethodChoice(
                 authType = authType,
                 onAuthTypeChange = onAuthTypeChange
             )
@@ -115,7 +115,7 @@ fun SshFormFields(
                     } else null,
                     visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
-                        IconButton(onClick = {
+                        IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
                             HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
                             showPassword = !showPassword
                         }) {
@@ -159,7 +159,7 @@ fun SshFormFields(
                     singleLine = true,
                     visualTransformation = if (showSudoPw) VisualTransformation.None else PasswordVisualTransformation(),
                     trailingIcon = {
-                        IconButton(onClick = {
+                        IconButton(shapes = IconButtonDefaults.shapes(), onClick = {
                             HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
                             showSudoPw = !showSudoPw
                         }) {
@@ -180,47 +180,19 @@ fun SshFormFields(
 }
 
 @Composable
-private fun AuthMethodDropdown(
+private fun AuthMethodChoice(
     authType: String,
     onAuthTypeChange: (String) -> Unit
 ) {
-    val context = LocalContext.current
-    var expanded by remember { mutableStateOf(false) }
-    val options = listOf(
-        SshConfig.AUTH_PASSWORD to stringResource(R.string.password),
-        SshConfig.AUTH_SSH_KEY to stringResource(R.string.private_key)
-    )
-    val current = options.firstOrNull { it.first == authType }?.second.orEmpty()
-
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = !expanded },
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        OutlinedTextField(
-            value = current,
-            onValueChange = {},
-            readOnly = true,
-            singleLine = true,
-            label = { Text(stringResource(R.string.auth_method_label)) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier
-                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
-                .fillMaxWidth()
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        SettingsControlLabel(stringResource(R.string.auth_method_label))
+        ConnectedChoiceRow(
+            options = listOf(
+                ChoiceOption(SshConfig.AUTH_PASSWORD, stringResource(R.string.password)),
+                ChoiceOption(SshConfig.AUTH_SSH_KEY, stringResource(R.string.private_key))
+            ),
+            selected = authType,
+            onSelect = onAuthTypeChange
         )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            options.forEach { (value, label) ->
-                DropdownMenuItem(
-                    text = { Text(label) },
-                    onClick = {
-                        expanded = false
-                        if (value != authType) {
-                            HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
-                            onAuthTypeChange(value)
-                        }
-                    }
-                )
-            }
-        }
     }
 }

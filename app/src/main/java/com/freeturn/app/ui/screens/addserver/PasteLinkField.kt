@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -48,7 +49,7 @@ internal fun PasteLinkField(onPaste: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f)
             )
-            Button(onClick = {
+            Button(shapes = ButtonDefaults.shapes(), onClick = {
                 HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                 onPaste()
             }) {

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -47,14 +48,14 @@ internal fun UpdateDialogs(
                 title = { Text(stringResource(R.string.update_available_title)) },
                 text = { Text(stringResource(R.string.update_available, state.version)) },
                 confirmButton = {
-                    TextButton(onClick = {
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                         dismissedVersion = state.version
                         onDownload()
                     }) { Text(stringResource(R.string.update_download)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { dismissedVersion = state.version }) {
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = { dismissedVersion = state.version }) {
                         Text(stringResource(R.string.cancel))
                     }
                 }
@@ -82,13 +83,13 @@ internal fun UpdateDialogs(
                 title = { Text(stringResource(R.string.update_ready_title)) },
                 text = { Text(stringResource(R.string.update_ready_desc)) },
                 confirmButton = {
-                    TextButton(onClick = {
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                         onInstall()
                     }) { Text(stringResource(R.string.update_install)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = onReset) {
+                    TextButton(shapes = ButtonDefaults.shapes(), onClick = onReset) {
                         Text(stringResource(R.string.cancel))
                     }
                 }

@@ -2,6 +2,7 @@ package com.freeturn.app.ui.screens.addserver
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -38,6 +39,7 @@ internal fun ManualNameDialog(
         },
         confirmButton = {
             TextButton(
+                shapes = ButtonDefaults.shapes(),
                 onClick = {
                     HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                     onCreate(name)
@@ -46,7 +48,7 @@ internal fun ManualNameDialog(
             ) { Text(stringResource(R.string.add_manual_create)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }

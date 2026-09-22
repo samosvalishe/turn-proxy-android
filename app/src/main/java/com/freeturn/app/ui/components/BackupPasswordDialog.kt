@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -82,7 +83,7 @@ fun BackupPasswordDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = {
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = {
                 when {
                     password.isEmpty() -> error = emptyMsg
                     requireConfirmation && password != repeat -> error = mismatchMsg
@@ -91,7 +92,7 @@ fun BackupPasswordDialog(
             }) { Text(confirmLabel) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
         }
     )
 }

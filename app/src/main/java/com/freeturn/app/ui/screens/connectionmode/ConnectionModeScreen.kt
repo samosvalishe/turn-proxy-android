@@ -20,13 +20,12 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -53,6 +52,8 @@ import com.freeturn.app.data.config.TunnelTransport
 import com.freeturn.app.data.server.ServerOpts
 import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.ui.components.ApplyFab
+import com.freeturn.app.ui.components.ChoiceOption
+import com.freeturn.app.ui.components.ConnectedChoiceRow
 import com.freeturn.app.ui.components.FabClearance
 import com.freeturn.app.ui.components.InlineNoticeCard
 import com.freeturn.app.ui.components.SectionLabel
@@ -97,7 +98,7 @@ fun ConnectionModeScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // userPickedVpn сохраняет выбор на время сессии (чтобы сегмент не мигал).
+    // userPickedVpn сохраняет выбор на время сессии (чтобы выбор не мигал).
     var userPickedVpn by remember(serverId, saved.tunnelTransport) { mutableStateOf<Boolean?>(null) }
     val isVpn = userPickedVpn ?: (saved.tunnelTransport == TunnelTransport.WIREGUARD)
 
@@ -181,7 +182,7 @@ fun ConnectionModeScreen(
                 title = { Text(stringResource(R.string.connection_mode_title)) },
                 navigationIcon = {
                     if (onBack != null) {
-                        IconButton(onClick = onBack) {
+                        IconButton(shapes = IconButtonDefaults.shapes(), onClick = onBack) {
                             Icon(
                                 painterResource(R.drawable.arrow_back_24px),
                                 contentDescription = stringResource(R.string.back)
@@ -212,30 +213,23 @@ fun ConnectionModeScreen(
                     .padding(horizontal = Spacing.lg, vertical = Spacing.md),
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg)
             ) {
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    SegmentedButton(
-                        selected = !isVpn,
-                        onClick = {
-                            HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                            userPickedVpn = false
-                            persistWg(vpn = false)
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                    ) { Text(stringResource(R.string.mode_proxy)) }
-                    SegmentedButton(
-                        selected = isVpn,
-                        onClick = {
-                            HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                            userPickedVpn = true
-                            persistWg(vpn = true)
+                ConnectedChoiceRow(
+                    options = listOf(
+                        ChoiceOption(false, stringResource(R.string.mode_proxy)),
+                        ChoiceOption(true, stringResource(R.string.mode_vpn))
+                    ),
+                    selected = isVpn,
+                    onSelect = { vpn ->
+                        userPickedVpn = vpn
+                        persistWg(vpn = vpn)
+                        if (vpn) {
                             // Встроенный туннель живёт только поверх udp: иначе сервер
                             // остался бы поднят в tcp и отклонял бы наши сессии.
                             isTcp = false
                             if (savedOpts.tcpMode) serverConfigViewModel.setProxyMode(serverId, ProxyMode.UDP)
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                    ) { Text(stringResource(R.string.mode_vpn)) }
-                }
+                        }
+                    }
+                )
 
                 Text(
                     stringResource(if (isVpn) R.string.mode_vpn_desc else R.string.mode_proxy_desc),

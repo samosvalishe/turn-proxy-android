@@ -97,6 +97,7 @@ internal fun HomeEmptyState(
         )
         Spacer(Modifier.height(24.dp))
         Button(
+            shapes = ButtonDefaults.shapes(),
             onClick = onAddServer,
             contentPadding = ButtonDefaults.ButtonWithIconContentPadding
         ) {

@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -80,7 +82,7 @@ fun SettingsControlLabel(title: String, desc: String? = null) {
 
 @Composable
 fun SettingsBackButton(onBack: () -> Unit) {
-    IconButton(onClick = onBack) {
+    IconButton(shapes = IconButtonDefaults.shapes(), onClick = onBack) {
         Icon(
             painterResource(R.drawable.arrow_back_24px),
             contentDescription = stringResource(R.string.back)

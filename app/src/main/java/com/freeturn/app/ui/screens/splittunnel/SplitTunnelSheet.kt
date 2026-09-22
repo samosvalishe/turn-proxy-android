@@ -13,13 +13,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.SearchBarDefaults
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Switch
+import com.freeturn.app.ui.components.SwitchThumbIcon
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
@@ -34,6 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.data.config.SplitTunnelMode
@@ -123,6 +130,7 @@ fun SplitTunnelSheetContent(
             Switch(
                 checked = splitOn,
                 enabled = !locked,
+                thumbContent = { SwitchThumbIcon(splitOn) },
                 onCheckedChange = { on ->
                     HapticUtil.perform(context, HapticUtil.Pattern.SELECTION)
                     onModeChange(if (on) modeChoice else SplitTunnelMode.ALL)
@@ -156,17 +164,38 @@ fun SplitTunnelSheetContent(
             }
         )
 
-        OutlinedTextField(
+        val searchContainer = MaterialTheme.colorScheme.surfaceContainerHighest
+        TextField(
             value = query,
             onValueChange = { query = it },
             enabled = controlsEnabled,
             singleLine = true,
+            shape = SearchBarDefaults.inputFieldShape,
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = searchContainer,
+                unfocusedContainerColor = searchContainer,
+                disabledContainerColor = searchContainer,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+                disabledIndicatorColor = Color.Transparent
+            ),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = HorizontalPadding),
-            label = { Text(stringResource(R.string.split_tunnel_search)) },
+            placeholder = { Text(stringResource(R.string.split_tunnel_search)) },
             leadingIcon = {
                 Icon(painterResource(R.drawable.search_24px), null)
+            },
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = { query = "" }) {
+                        Icon(
+                            painterResource(R.drawable.close_24px),
+                            contentDescription = stringResource(R.string.clear)
+                        )
+                    }
+                }
             }
         )
 
