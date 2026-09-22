@@ -4,6 +4,7 @@ package com.freeturn.app.ui.screens.share
 
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -14,7 +15,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 
-/** Подтверждение отзыва доступа: пир/cid удаляется с сервера, доступ получателя умрёт. */
+/** Подтверждение отзыва доступа: клиент (cid и пир) удаляется с сервера, доступ получателя умрёт. */
 @Composable
 fun RevokeDialog(
     userName: String,
@@ -28,7 +29,7 @@ fun RevokeDialog(
         title = { Text(stringResource(R.string.share_revoke_title)) },
         text = { Text(stringResource(R.string.share_revoke_desc, name)) },
         confirmButton = {
-            TextButton(onClick = onConfirm, enabled = !revoking) {
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = onConfirm, enabled = !revoking) {
                 if (revoking) {
                     LoadingIndicator(modifier = Modifier.size(22.dp))
                 } else {
@@ -40,7 +41,7 @@ fun RevokeDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !revoking) {
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = onDismiss, enabled = !revoking) {
                 Text(stringResource(R.string.cancel))
             }
         }

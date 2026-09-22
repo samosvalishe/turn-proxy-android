@@ -9,6 +9,7 @@ import com.freeturn.app.data.config.DnsMode
 import com.freeturn.app.data.config.HostPort
 import com.freeturn.app.data.config.KcpProfile
 import com.freeturn.app.data.config.ObfProfile
+import com.freeturn.app.data.config.Provider
 import com.freeturn.app.data.config.ProxyMode
 import com.freeturn.app.data.server.Server
 import com.freeturn.app.data.server.ServerOpts
@@ -31,7 +32,7 @@ import kotlinx.coroutines.launch
 data class ImportUiState(
     val link: FreeturnLink? = null,
     val serverName: String = "",
-    val vkLink: String = "",
+    val callLink: String = "",
     val duplicateAddress: Boolean = false,
     val duplicateConf: Boolean = false,
     val parseError: Boolean = false,
@@ -40,7 +41,8 @@ data class ImportUiState(
     val saved: Boolean = false
 ) {
     val canConfirm: Boolean
-        get() = link != null && !saving && !saved && vkLink.isNotBlank()
+        get() = link != null && !saving && !saved &&
+            (link.provider != Provider.RELAY || callLink.isNotBlank())
 }
 
 class ImportViewModel(
@@ -63,14 +65,14 @@ class ImportViewModel(
 
     private suspend fun offer(raw: String) {
         if (_uiState.value.saving) return
-        FreeturnLink.parse(raw).mapCatching { it.also(::requireUsableObf) }.fold(
+        FreeturnLink.parse(raw).mapCatching { it.also(::requireUsable) }.fold(
             onSuccess = { link ->
                 val servers = prefs.serversSnapshot.first().list
                 val normalizedConf = link.wgConf.trim()
                 _uiState.value = ImportUiState(
                     link = link,
                     serverName = link.name.ifBlank { link.peer.substringBefore(':') },
-                    vkLink = link.vkLink.trim(),
+                    callLink = link.callLink.trim(),
                     duplicateAddress = servers.any {
                         it.client.serverAddress.equals(link.peer, ignoreCase = true)
                     },
@@ -88,7 +90,7 @@ class ImportViewModel(
 
     fun setServerName(name: String) = _uiState.update { it.copy(serverName = name) }
 
-    fun setVkLink(value: String) = _uiState.update { it.copy(vkLink = value) }
+    fun setCallLink(value: String) = _uiState.update { it.copy(callLink = value) }
 
     fun confirm(fallbackName: String) {
         val st = _uiState.value
@@ -118,9 +120,10 @@ class ImportViewModel(
         _uiState.value = ImportUiState()
     }
 
-    // Ссылку с непригодной обфускацией отбиваем на входе: сохранённый сервер
+    // Незнакомый провайдер или непригодную обфускацию отбиваем на входе: профиль
     // стартовал бы с конфигом, который отвергнет ядро или сервер.
-    private fun requireUsableObf(link: FreeturnLink) {
+    private fun requireUsable(link: FreeturnLink) {
+        require(link.provider in Provider.VALUES) { "unknown provider" }
         if (link.obfProfile.isBlank() || link.obfProfile == ObfProfile.NONE) return
         require(link.obfProfile in ObfProfile.VALUES) { "unknown obf profile" }
         require(ObfProfile.isValidKey(link.obfKey)) { "bad obf key" }
@@ -133,7 +136,7 @@ class ImportViewModel(
             ssh = SshConfig(),
             client = ClientConfig(
                 serverAddress = link.peer,
-                vkLink = st.vkLink.trim(),
+                callLink = st.callLink.trim(),
                 provider = link.provider,
                 useUdp = link.transport == "udp",
                 threads = link.n.takeIf { it > 0 } ?: ClientConfig.DEFAULT_THREADS,

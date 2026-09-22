@@ -72,16 +72,16 @@ class FreeturnLinkTest {
             dnsServers = "8.8.8.8,8.8.4.4",
             manualCaptcha = true,
             name = "Тест Юзер",
-            vkLink = "https://vk.com/call/abc",
+            callLink = "https://call.example/call/abc",
             wgConf = wgConf
         )
         assertEquals(original, FreeturnLink.parse(original.encode()).getOrThrow())
     }
 
     @Test
-    fun `timing and vk follow go field order`() {
+    fun `timing and call link follow go field order`() {
         val goldenJson = """{"v":1,"provider":"vk","peer":"1.2.3.4:56000","obf":"rtpopus",""" +
-            """"key":"${"00".repeat(32)}","timing":20,"name":"Papa","vk":"https://vk.ru/call/join/x"}"""
+            """"key":"${"00".repeat(32)}","timing":20,"name":"Papa","vk":"https://call.example/call/join/x"}"""
         val golden = "freeturn://" + Base64.getUrlEncoder().withoutPadding()
             .encodeToString(goldenJson.toByteArray(Charsets.UTF_8))
 
@@ -92,7 +92,7 @@ class FreeturnLinkTest {
             obfKey = "00".repeat(32),
             obfTimingMs = 20,
             name = "Papa",
-            vkLink = "https://vk.ru/call/join/x"
+            callLink = "https://call.example/call/join/x"
         )
         assertEquals(golden, link.encode())
     }

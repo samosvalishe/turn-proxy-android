@@ -1,18 +1,17 @@
 package com.freeturn.app.data.share
 
 /**
- * Фактические параметры запущенного сервера (`share-info`).
- * Используется вместо локального [com.freeturn.app.data.server.ServerOpts] для точности.
+ * Фактические параметры сервера (`client-list` share). Используется вместо локального
+ * [com.freeturn.app.data.server.ServerOpts]: гостю нужны значения, с которыми сервер живёт.
  */
 data class ShareInfo(
-    /** Режим проброса живого сервера: "udp" | "tcp". */
+    /** Режим проброса сервера: "udp" | "tcp". */
     val mode: String = "",
-    /** Пусто = сервер не запускался из приложения; при живых args хотя бы "none". */
+    /** Пусто - серверной правды нет (ручной профиль без SSH); иначе хотя бы "none". */
     val obfProfile: String = "",
     val obfKey: String = "",
-    /** Есть WG-conf в /etc/wireguard -> шарим VPN-доступ (peer-add). Иначе - прокси. */
+    /** Свой WG ft-wg0 -> в ссылке WG-конфиг гостя. Иначе - только FreeTurn-часть. */
     val wgBackend: Boolean = false
 ) {
-    /** run.args найден - серверным значениям можно верить. */
     val hasRunArgs: Boolean get() = obfProfile.isNotEmpty()
 }

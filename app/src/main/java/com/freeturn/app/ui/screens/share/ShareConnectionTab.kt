@@ -3,7 +3,7 @@
 package com.freeturn.app.ui.screens.share
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.snap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,22 +11,22 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
-import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.data.config.ClientId
 import com.freeturn.app.ui.components.SectionLabel
 import com.freeturn.app.ui.theme.LocalReducedMotion
@@ -41,7 +41,7 @@ import com.freeturn.app.ui.theme.Spacing
 
 /**
  * Суб-вкладка "Соединение": имя нового пользователя + сервер. Сам запуск выдачи -
- * на FAB экрана. Протокол (WireGuard/прокси) определяет сервер (share-info),
+ * на FAB экрана. Протокол (WireGuard/прокси) определяет бэкенд сервера (client-list),
  * не локальный режим владельца.
  */
 @Composable
@@ -50,12 +50,12 @@ fun ShareConnectionTab(
     onSelectServer: (String) -> Unit,
     onUserNameChange: (String) -> Unit,
     onClientIdChange: (String) -> Unit,
-    onSetMode: (Boolean) -> Unit,
-    onSetShareVkLink: (Boolean) -> Unit,
-    onVkLinkChange: (String) -> Unit,
+    onSetShareCallLink: (Boolean) -> Unit,
+    onCallLinkChange: (String) -> Unit,
     onRetryInfo: () -> Unit
 ) {
-    val context = LocalContext.current
+    // Ошибку имени показываем после ухода из поля, не посреди набора.
+    var nameTouched by remember { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.lg)) {
         Text(
             stringResource(R.string.share_connection_desc),
@@ -67,16 +67,21 @@ fun ShareConnectionTab(
             value = state.userName,
             onValueChange = onUserNameChange,
             label = { Text(stringResource(R.string.share_user_name_label)) },
+            isError = nameTouched && state.userName.isNotEmpty() && !state.userNameValid,
             singleLine = true,
             enabled = !state.creating,
             supportingText = {
-                Text(
-                    "${state.userName.length}/${ShareViewModel.MAX_USER_NAME_LEN}",
-                    modifier = Modifier.fillMaxWidth(),
-                    textAlign = TextAlign.End
-                )
+                Row {
+                    Text(
+                        if (state.localOnly) "" else stringResource(R.string.share_user_name_hint),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Text("${state.userName.length}/${ShareViewModel.MAX_USER_NAME_LEN}")
+                }
             },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .onFocusChanged { if (!it.isFocused && state.userName.isNotEmpty()) nameTouched = true }
         )
 
         ServerSelector(
@@ -107,51 +112,29 @@ fun ShareConnectionTab(
             )
         }
 
-        // WG-сервер умеет оба типа доступа -> выбор. Прокси-only сервер - просто статус.
+        // Тип доступа задаёт бэкенд сервера: свой WG -> WG-конфиг гостя, чужой VPN -> только FreeTurn.
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             SectionLabel(stringResource(R.string.share_access_type))
-            if (state.canChooseMode && state.shareInfo != null &&
-                !state.infoLoading && state.infoError == null
-            ) {
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    SegmentedButton(
-                        selected = state.useWg,
-                        onClick = {
-                            HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                            onSetMode(false)
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                    ) { Text(stringResource(R.string.protocol_wg)) }
-                    SegmentedButton(
-                        selected = !state.useWg,
-                        onClick = {
-                            HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                            onSetMode(true)
-                        },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                    ) { Text(stringResource(R.string.protocol_proxy)) }
-                }
-            }
             ShareProtocolCard(state = state, onRetryInfo = onRetryInfo)
         }
 
         // Ссылка на звонок уходит вместе с доступом - только по явному согласию владельца.
-        if (state.ownerVkLink.isNotBlank()) {
+        if (state.ownerCallLink.isNotBlank()) {
             SettingsCard {
                 SettingsSwitchRow(
-                    title = stringResource(R.string.share_include_vk_link),
-                    subtitle = stringResource(R.string.share_include_vk_link_desc),
+                    title = stringResource(R.string.share_include_call_link),
+                    subtitle = stringResource(R.string.share_include_call_link_desc),
                     iconRes = R.drawable.link_24px,
-                    checked = state.shareVkLink,
-                    onCheckedChange = onSetShareVkLink,
+                    checked = state.shareCallLink,
+                    onCheckedChange = onSetShareCallLink,
                     enabled = !state.creating
                 )
-                if (state.shareVkLink) {
+                if (state.shareCallLink) {
                     SettingsRowDivider()
                     SettingsFieldSlot {
                         OutlinedTextField(
-                            value = state.vkLinkToShare,
-                            onValueChange = onVkLinkChange,
+                            value = state.callLinkToShare,
+                            onValueChange = onCallLinkChange,
                             label = { Text(stringResource(R.string.call_link_label)) },
                             placeholder = { Text(stringResource(R.string.call_link_placeholder)) },
                             singleLine = true,
@@ -181,7 +164,7 @@ fun ShareConnectionTab(
     }
 }
 
-/** Статус выбранного сервера: протокол шаринга либо загрузка/ошибка share-info. */
+/** Статус выбранного сервера: протокол шаринга либо загрузка/ошибка client-list. */
 @Composable
 private fun ShareProtocolCard(state: ShareUiState, onRetryInfo: () -> Unit) {
     val reducedMotion = LocalReducedMotion.current
@@ -213,7 +196,7 @@ private fun ShareProtocolCard(state: ShareUiState, onRetryInfo: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                TextButton(onClick = onRetryInfo) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = onRetryInfo) {
                     Text(stringResource(R.string.share_info_retry))
                 }
             }
@@ -221,7 +204,7 @@ private fun ShareProtocolCard(state: ShareUiState, onRetryInfo: () -> Unit) {
             else -> state.shareInfo?.let {
                 Crossfade(
                     targetState = state.useWg,
-                    animationSpec = tween(if (reducedMotion) 0 else 250),
+                    animationSpec = if (reducedMotion) snap() else MaterialTheme.motionScheme.defaultEffectsSpec(),
                     label = "protocol_mode"
                 ) { wg ->
                     Column(

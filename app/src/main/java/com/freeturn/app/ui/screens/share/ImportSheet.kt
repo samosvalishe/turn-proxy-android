@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
@@ -44,6 +45,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
 import com.freeturn.app.data.config.AccessProtocol
 import com.freeturn.app.data.config.ObfProfile
+import com.freeturn.app.data.config.Provider
 import com.freeturn.app.ui.components.EmptyState
 import com.freeturn.app.ui.components.InlineErrorCard
 import com.freeturn.app.ui.components.ProtocolPills
@@ -70,7 +72,7 @@ fun ImportSheet(
             title = { Text(stringResource(R.string.import_error_title)) },
             text = { Text(stringResource(R.string.import_error_desc)) },
             confirmButton = {
-                TextButton(onClick = viewModel::dismiss) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = viewModel::dismiss) {
                     Text(stringResource(R.string.import_error_ok))
                 }
             }
@@ -141,22 +143,24 @@ fun ImportSheet(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            OutlinedTextField(
-                value = state.vkLink,
-                onValueChange = viewModel::setVkLink,
-                label = { Text(stringResource(R.string.import_vk_link_label)) },
-                supportingText = {
-                    Text(
-                        stringResource(
-                            if (link.vkLink.isNotBlank()) R.string.import_vk_link_from_owner
-                            else R.string.import_vk_link_helper
+            if (link.provider == Provider.RELAY) {
+                OutlinedTextField(
+                    value = state.callLink,
+                    onValueChange = viewModel::setCallLink,
+                    label = { Text(stringResource(R.string.import_call_link_label)) },
+                    supportingText = {
+                        Text(
+                            stringResource(
+                                if (link.callLink.isNotBlank()) R.string.import_call_link_from_owner
+                                else R.string.import_call_link_helper
+                            )
                         )
-                    )
-                },
-                singleLine = true,
-                enabled = !state.saving,
-                modifier = Modifier.fillMaxWidth()
-            )
+                    },
+                    singleLine = true,
+                    enabled = !state.saving,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
 
             if (state.duplicateConf) {
                 ImportWarning(stringResource(R.string.import_duplicate_conf))
@@ -169,6 +173,7 @@ fun ImportSheet(
             }
 
             Button(
+                shapes = ButtonDefaults.shapes(),
                 onClick = { viewModel.confirm(fallbackName) },
                 enabled = state.canConfirm,
                 modifier = Modifier.fillMaxWidth()

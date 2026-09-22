@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -111,7 +113,7 @@ fun QrScannerScreen(onBack: () -> Unit) {
             TopAppBar(
                 title = { Text(stringResource(R.string.scanner_title)) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = onBack) {
                         Icon(
                             painterResource(R.drawable.arrow_back_24px),
                             contentDescription = stringResource(R.string.back)
@@ -275,11 +277,11 @@ private fun CameraPermissionGate(
             textAlign = TextAlign.Center
         )
         if (permanentlyDenied) {
-            TextButton(onClick = onOpenSettings) {
+            TextButton(shapes = ButtonDefaults.shapes(), onClick = onOpenSettings) {
                 Text(stringResource(R.string.scanner_permission_open_settings))
             }
         } else {
-            Button(onClick = onRequest, modifier = Modifier.padding(top = Spacing.lg)) {
+            Button(shapes = ButtonDefaults.shapes(), onClick = onRequest, modifier = Modifier.padding(top = Spacing.lg)) {
                 Text(stringResource(R.string.scanner_permission_grant))
             }
         }

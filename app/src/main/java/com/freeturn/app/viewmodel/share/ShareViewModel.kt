@@ -5,13 +5,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.freeturn.app.data.AppPreferences
 import com.freeturn.app.data.config.AccessProtocol
-import com.freeturn.app.data.config.ClientConfig
 import com.freeturn.app.data.config.ClientId
 import com.freeturn.app.data.server.Server
 import com.freeturn.app.data.share.ShareInfo
 import com.freeturn.app.data.share.ShareLinkBuilder
 import com.freeturn.app.data.share.SharedClient
-import com.freeturn.app.data.share.WgPeer
 import com.freeturn.app.domain.share.ShareRepository
 import com.freeturn.app.viewmodel.HapticEvent
 import com.freeturn.app.viewmodel.Haptics
@@ -24,12 +22,6 @@ import kotlinx.coroutines.launch
 
 data class ShareResult(val userName: String, val link: String, val protocol: AccessProtocol)
 
-data class RevokeTarget(
-    val name: String,
-    val pubkey: String? = null,
-    val clientId: String? = null
-)
-
 data class ShareUiState(
     val servers: List<Server> = emptyList(),
     val selectedServerId: String? = null,
@@ -38,42 +30,42 @@ data class ShareUiState(
     val infoError: String? = null,
     val userName: String = "",
     val manualClientId: String = "",
-    val shareAsProxy: Boolean = false,
-    val shareVkLink: Boolean = false,
-    val vkLinkToShare: String = "",
+    val shareCallLink: Boolean = false,
+    val callLinkToShare: String = "",
     val creating: Boolean = false,
     val createError: String? = null,
     val result: ShareResult? = null,
-    val peers: List<WgPeer> = emptyList(),
     val clients: List<SharedClient> = emptyList(),
-    val peersLoaded: Boolean = false,
-    val peersLoading: Boolean = false,
-    val peersError: String? = null,
-    val resharePubkey: String? = null,
-    val revokeTarget: RevokeTarget? = null,
+    val clientsLoaded: Boolean = false,
+    val clientsLoading: Boolean = false,
+    val clientsError: String? = null,
+    val reshareName: String? = null,
+    val revokeTarget: SharedClient? = null,
     val revoking: Boolean = false
 ) {
     val selectedServer: Server? get() = servers.firstOrNull { it.id == selectedServerId }
 
     val localOnly: Boolean get() = selectedServer?.ssh?.ip?.isBlank() == true
 
-    val ownerVkLink: String get() = selectedServer?.client?.vkLink?.trim().orEmpty()
+    val ownerCallLink: String get() = selectedServer?.client?.callLink?.trim().orEmpty()
 
-    val sharedVkLink: String get() = if (shareVkLink) vkLinkToShare.trim() else ""
+    val sharedCallLink: String get() = if (shareCallLink) callLinkToShare.trim() else ""
 
     val canManageUsers: Boolean get() = selectedServer != null && !localOnly
 
-    val useWg: Boolean get() = shareInfo?.wgBackend == true && !shareAsProxy
-
-    val canChooseMode: Boolean get() = shareInfo?.wgBackend == true
+    val useWg: Boolean get() = shareInfo?.wgBackend == true
 
     val missingAddress: Boolean
         get() = selectedServer?.client?.serverAddress?.isBlank() == true
 
     val manualClientIdValid: Boolean get() = !localOnly || ClientId.isValid(manualClientId.trim())
 
+    // Имя - ключ клиента на сервере; у ручного профиля оно только подпись в ссылке.
+    val userNameValid: Boolean
+        get() = if (localOnly) userName.isNotBlank() else ShareRepository.isValidName(userName)
+
     val canCreate: Boolean
-        get() = !creating && userName.isNotBlank() && selectedServer != null &&
+        get() = !creating && userNameValid && selectedServer != null &&
             !missingAddress && shareInfo != null && !infoLoading && manualClientIdValid
 }
 
@@ -87,15 +79,16 @@ class ShareViewModel(
     private val appContext = context.applicationContext
 
     companion object {
-        // Строже серверного лимита nameB64 (64): короткое имя плотнее в UI и QR.
+        // = лимит valid_name в install.sh.
         const val MAX_USER_NAME_LEN = 32
+        private val NAME_CHARS = Regex("[^A-Za-z0-9._-]")
     }
 
     private val _uiState = MutableStateFlow(ShareUiState())
     val uiState: StateFlow<ShareUiState> = _uiState.asStateFlow()
 
-    // share-info по серверам в рамках жизни VM: повторный выбор не дёргает SSH.
-    private val infoCache = mutableMapOf<String, ShareInfo>()
+    // client-list по серверам в рамках жизни VM: повторный выбор не дёргает SSH.
+    private val cache = mutableMapOf<String, ShareRepository.Snapshot>()
 
     init {
         viewModelScope.launch {
@@ -120,58 +113,55 @@ class ShareViewModel(
         selectedServerId = id,
         shareInfo = null,
         manualClientId = "",
-        shareAsProxy = false,
-        shareVkLink = false,
-        vkLinkToShare = "",
+        shareCallLink = false,
+        callLinkToShare = "",
         infoError = null,
         createError = null,
-        peers = emptyList(),
         clients = emptyList(),
-        peersLoaded = false,
-        peersLoading = false,
-        peersError = null,
-        resharePubkey = null
+        clientsLoaded = false,
+        clientsLoading = false,
+        clientsError = null,
+        reshareName = null
     )
 
     fun selectServer(id: String) {
         if (_uiState.value.selectedServerId == id) return
         _uiState.update { it.resetForServer(id) }
-        loadInfoIfNeeded(id)
+        loadIfNeeded(id)
     }
 
-    fun setUserName(name: String) =
-        _uiState.update { it.copy(userName = name.take(MAX_USER_NAME_LEN), createError = null) }
+    fun setUserName(name: String) {
+        val v = if (_uiState.value.localOnly) name else name.replace(NAME_CHARS, "")
+        _uiState.update { it.copy(userName = v.take(MAX_USER_NAME_LEN), createError = null) }
+    }
 
     fun setManualClientId(id: String) =
         _uiState.update { it.copy(manualClientId = id.trim().lowercase().take(32), createError = null) }
 
-    fun setShareMode(proxy: Boolean) =
-        _uiState.update { it.copy(shareAsProxy = proxy, createError = null) }
-
-    fun setShareVkLink(enabled: Boolean) =
+    fun setShareCallLink(enabled: Boolean) =
         _uiState.update {
             // Включили - подставляем ссылку сервера как заготовку, её можно перебить своей.
             it.copy(
-                shareVkLink = enabled,
-                vkLinkToShare = if (enabled) it.ownerVkLink else "",
+                shareCallLink = enabled,
+                callLinkToShare = if (enabled) it.ownerCallLink else "",
                 createError = null
             )
         }
 
-    fun setVkLinkToShare(value: String) =
-        _uiState.update { it.copy(vkLinkToShare = value, createError = null) }
+    fun setCallLinkToShare(value: String) =
+        _uiState.update { it.copy(callLinkToShare = value, createError = null) }
 
     fun retryInfo() {
         val id = _uiState.value.selectedServerId ?: return
-        infoCache.remove(id)
+        cache.remove(id)
         _uiState.update { it.copy(infoError = null) }
-        loadInfoIfNeeded(id)
+        loadIfNeeded(id)
     }
 
     fun ensureInfoLoaded() {
         val st = _uiState.value
         if (st.shareInfo == null && !st.infoLoading && st.infoError == null) {
-            st.selectedServerId?.let(::loadInfoIfNeeded)
+            st.selectedServerId?.let(::loadIfNeeded)
         }
     }
 
@@ -183,17 +173,22 @@ class ShareViewModel(
         val server = st.servers.firstOrNull { it.id == id } ?: return
         if (server.ssh.ip.isBlank()) return // ручной сервер: серверной правды нет
         viewModelScope.launch {
-            repo.shareInfo(server.ssh).onSuccess { fresh ->
-                infoCache[id] = fresh
+            repo.list(server.ssh).onSuccess { fresh ->
+                cache[id] = fresh
                 _uiState.update { cur ->
-                    if (cur.selectedServerId == id && cur.shareInfo != fresh) cur.copy(shareInfo = fresh)
-                    else cur
+                    if (cur.selectedServerId == id) cur.withSnapshot(fresh) else cur
                 }
             }
         }
     }
 
-    private fun loadInfoIfNeeded(id: String) {
+    private fun ShareUiState.withSnapshot(s: ShareRepository.Snapshot) = copy(
+        shareInfo = s.info,
+        clients = s.clients,
+        clientsLoaded = true
+    )
+
+    private fun loadIfNeeded(id: String) {
         val st = _uiState.value
         if (st.selectedServerId != id || st.infoLoading) return
         val server = st.servers.firstOrNull { it.id == id } ?: return
@@ -204,24 +199,24 @@ class ShareViewModel(
             }
             return
         }
-        infoCache[id]?.let { cached ->
-            if (st.shareInfo != cached) _uiState.update { it.copy(shareInfo = cached) }
+        cache[id]?.let { cached ->
+            _uiState.update { it.withSnapshot(cached) }
             return
         }
         _uiState.update { it.copy(infoLoading = true, infoError = null) }
         viewModelScope.launch {
-            val result = repo.shareInfo(server.ssh)
-            result.onSuccess { infoCache[id] = it }
+            val result = repo.list(server.ssh)
+            result.onSuccess { cache[id] = it }
             val current = _uiState.value.selectedServerId
             if (current != id) {
-            // Результат SSH относится к уже снятому выбору.
+                // Результат SSH относится к уже снятому выбору.
                 _uiState.update { it.copy(infoLoading = false) }
-                current?.let(::loadInfoIfNeeded)
+                current?.let(::loadIfNeeded)
                 return@launch
             }
             result
-                .onSuccess { info ->
-                    _uiState.update { it.copy(infoLoading = false, shareInfo = info) }
+                .onSuccess { snap ->
+                    _uiState.update { it.copy(infoLoading = false).withSnapshot(snap) }
                 }
                 .onFailure { e ->
                     _uiState.update {
@@ -242,52 +237,29 @@ class ShareViewModel(
                 serverId = server.id,
                 userName = userName,
                 link = ShareLinkBuilder.build(
-                    server, info, userName, null, st.manualClientId.trim(), st.sharedVkLink
+                    server, info, userName, null, st.manualClientId.trim(), st.sharedCallLink
                 ),
                 wgConf = null
             )
             return
         }
-        val useWg = st.useWg
         _uiState.update { it.copy(creating = true, createError = null) }
         viewModelScope.launch {
-            val cid = ClientId.generate()
-            if (useWg) {
-                repo.addPeer(server.ssh, userName, ClientConfig.DEFAULT_LOCAL_PORT, cid)
-                    .onSuccess { peer ->
-                        commitCreated(
-                            serverId = server.id,
-                            userName = userName,
-                            link = ShareLinkBuilder.build(
-                                server, info, userName, peer.clientConf, cid, st.sharedVkLink
-                            ),
-                            wgConf = peer.clientConf,
-                            newPeer = WgPeer(
-                                pubkey = peer.pubkey,
-                                name = userName,
-                                ip = peer.ip,
-                                lastHandshakeEpoch = null,
-                                hasStoredConf = true,
-                                isSelf = false
-                            )
-                        )
-                    }
-                    .onFailure(::commitCreateError)
-            } else {
-                repo.addClient(server.ssh, userName, cid)
-                    .onSuccess {
-                        commitCreated(
-                            serverId = server.id,
-                            userName = userName,
-                            link = ShareLinkBuilder.build(
-                                server, info, userName, null, cid, st.sharedVkLink
-                            ),
-                            wgConf = null,
-                            newClient = SharedClient(clientId = cid, name = userName)
-                        )
-                    }
-                    .onFailure(::commitCreateError)
-            }
+            repo.add(server.ssh, userName)
+                .onSuccess { access ->
+                    cache.remove(server.id)
+                    commitCreated(
+                        serverId = server.id,
+                        userName = userName,
+                        link = ShareLinkBuilder.build(
+                            server, info, userName, access.wgConf,
+                            access.client.clientId, st.sharedCallLink
+                        ),
+                        wgConf = access.wgConf,
+                        newClient = access.client
+                    )
+                }
+                .onFailure(::commitCreateError)
         }
     }
 
@@ -296,18 +268,16 @@ class ShareViewModel(
         userName: String,
         link: String,
         wgConf: String?,
-        newPeer: WgPeer? = null,
         newClient: SharedClient? = null
     ) {
         haptics.perform(HapticEvent.SUCCESS)
         _uiState.update { cur ->
-            val appendable = cur.selectedServerId == serverId && cur.peersLoaded
+            val appendable = cur.selectedServerId == serverId && cur.clientsLoaded && newClient != null
             cur.copy(
                 creating = false,
                 userName = "",
                 result = ShareResult(userName, link, AccessProtocol.of(wgConf)),
-                peers = if (appendable && newPeer != null) cur.peers + newPeer else cur.peers,
-                clients = if (appendable && newClient != null) cur.clients + newClient else cur.clients
+                clients = if (appendable) cur.clients + newClient else cur.clients
             )
         }
     }
@@ -319,56 +289,50 @@ class ShareViewModel(
 
     fun dismissResult() = _uiState.update { it.copy(result = null) }
 
-    fun refreshPeers(force: Boolean = false) {
+    fun refreshClients() {
         val st = _uiState.value
         val server = st.selectedServer ?: return
-        if (st.peersLoading || (st.peersLoaded && !force)) return
-        _uiState.update { it.copy(peersLoading = true, peersError = null) }
+        if (st.clientsLoading || server.ssh.ip.isBlank()) return
+        _uiState.update { it.copy(clientsLoading = true, clientsError = null) }
         viewModelScope.launch {
-            val result = repo.listShared(server.ssh)
+            val result = repo.list(server.ssh)
             // Результат SSH относится к уже снятому выбору.
             if (_uiState.value.selectedServerId != server.id) return@launch
             result
-                .onSuccess { (peers, clients) ->
-                    _uiState.update {
-                        it.copy(
-                            peersLoading = false,
-                            peersLoaded = true,
-                            peers = peers,
-                            clients = clients
-                        )
-                    }
+                .onSuccess { snap ->
+                    cache[server.id] = snap
+                    _uiState.update { it.copy(clientsLoading = false).withSnapshot(snap) }
                 }
                 .onFailure { e ->
                     _uiState.update {
-                        it.copy(peersLoading = false, peersError = e.uiError(appContext))
+                        it.copy(clientsLoading = false, clientsError = e.uiError(appContext))
                     }
                 }
         }
     }
 
-    fun resharePeer(peer: WgPeer) {
+    fun reshare(client: SharedClient) {
         val st = _uiState.value
         val server = st.selectedServer ?: return
         val info = st.shareInfo ?: return
-        if (st.resharePubkey != null || !peer.hasStoredConf) return
-        _uiState.update { it.copy(resharePubkey = peer.pubkey, peersError = null) }
+        if (st.reshareName != null) return
+        _uiState.update { it.copy(reshareName = client.name, clientsError = null) }
         viewModelScope.launch {
-            val result = repo.peerConf(server.ssh, peer.pubkey, ClientId.generate(), peer.name)
+            val result = repo.conf(server.ssh, client.name)
             // Результат SSH относится к уже снятому выбору.
             if (_uiState.value.selectedServerId != server.id) return@launch
             result
                 .onSuccess { access ->
                     _uiState.update {
                         it.copy(
-                            resharePubkey = null,
+                            reshareName = null,
                             result = ShareResult(
-                                userName = peer.name,
+                                userName = client.name,
                                 link = ShareLinkBuilder.build(
-                                    server, info, peer.name, access.clientConf,
-                                    access.clientId, st.sharedVkLink
+                                    server, info, client.name, access.wgConf,
+                                    access.client.clientId, it.sharedCallLink
                                 ),
-                                protocol = AccessProtocol.of(access.clientConf)
+                                protocol = AccessProtocol.of(access.wgConf)
                             )
                         )
                     }
@@ -376,34 +340,13 @@ class ShareViewModel(
                 .onFailure { e ->
                     haptics.perform(HapticEvent.ERROR)
                     _uiState.update {
-                        it.copy(resharePubkey = null, peersError = e.uiError(appContext))
+                        it.copy(reshareName = null, clientsError = e.uiError(appContext))
                     }
                 }
         }
     }
 
-    fun reshareClient(client: SharedClient) {
-        val st = _uiState.value
-        val server = st.selectedServer ?: return
-        val info = st.shareInfo ?: return
-        _uiState.update {
-            it.copy(
-                result = ShareResult(
-                    userName = client.name,
-                    link = ShareLinkBuilder.build(
-                        server, info, client.name, null, client.clientId, it.sharedVkLink
-                    ),
-                    protocol = AccessProtocol.PROXY
-                )
-            )
-        }
-    }
-
-    fun askRevoke(peer: WgPeer) =
-        _uiState.update { it.copy(revokeTarget = RevokeTarget(name = peer.name, pubkey = peer.pubkey)) }
-
-    fun askRevokeClient(client: SharedClient) =
-        _uiState.update { it.copy(revokeTarget = RevokeTarget(name = client.name, clientId = client.clientId)) }
+    fun askRevoke(client: SharedClient) = _uiState.update { it.copy(revokeTarget = client) }
 
     fun dismissRevoke() {
         if (_uiState.value.revoking) return
@@ -417,18 +360,15 @@ class ShareViewModel(
         if (st.revoking) return
         _uiState.update { it.copy(revoking = true) }
         viewModelScope.launch {
-            val result =
-                if (target.pubkey != null) repo.removePeer(server.ssh, target.pubkey)
-                else repo.removeClient(server.ssh, target.clientId.orEmpty())
-            result
+            repo.remove(server.ssh, target.name)
                 .onSuccess {
+                    cache.remove(server.id)
                     haptics.perform(HapticEvent.SUCCESS)
                     _uiState.update {
                         it.copy(
                             revoking = false,
                             revokeTarget = null,
-                            peers = it.peers.filterNot { p -> p.pubkey == target.pubkey },
-                            clients = it.clients.filterNot { c -> c.clientId == target.clientId }
+                            clients = it.clients.filterNot { c -> c.name == target.name }
                         )
                     }
                 }
@@ -438,7 +378,7 @@ class ShareViewModel(
                         it.copy(
                             revoking = false,
                             revokeTarget = null,
-                            peersError = e.uiError(appContext)
+                            clientsError = e.uiError(appContext)
                         )
                     }
                 }

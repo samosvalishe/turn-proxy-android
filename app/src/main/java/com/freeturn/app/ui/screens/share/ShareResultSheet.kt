@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -142,6 +144,7 @@ fun ShareResultSheet(result: ShareResult, shareInfo: ShareInfo?, onDismiss: () -
 
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
                 FilledTonalIconButton(
+                    shapes = IconButtonDefaults.shapes(),
                     onClick = {
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                         // Ссылка несёт WG PrivateKey и obf-ключ - прячем из превью буфера.
@@ -155,6 +158,7 @@ fun ShareResultSheet(result: ShareResult, shareInfo: ShareInfo?, onDismiss: () -
                     )
                 }
                 FilledIconButton(
+                    shapes = IconButtonDefaults.shapes(),
                     onClick = {
                         HapticUtil.perform(context, HapticUtil.Pattern.CLICK)
                         val send = Intent(Intent.ACTION_SEND).apply {

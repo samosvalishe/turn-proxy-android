@@ -14,14 +14,14 @@ class ShareLinkBuilderTest {
 
     private fun server(
         useUdp: Boolean = false,
-        vkLink: String = "",
+        callLink: String = "",
         opts: ServerOpts = ServerOpts()
     ) = Server(
         name = "Мой сервер",
         client = ClientConfig(
             serverAddress = "1.2.3.4:56000",
             useUdp = useUdp,
-            vkLink = vkLink
+            callLink = callLink
         ),
         opts = opts
     )
@@ -135,19 +135,19 @@ class ShareLinkBuilderTest {
     }
 
     @Test
-    fun `vk link stays out of the link by default`() {
-        val srv = server(vkLink = "https://vk.com/call/abc")
+    fun `call link stays out of the link by default`() {
+        val srv = server(callLink = "https://call.example/call/abc")
         val link = FreeturnLink.parse(ShareLinkBuilder.build(srv, ShareInfo(), "u", null)).getOrThrow()
-        assertEquals("", link.vkLink)
+        assertEquals("", link.callLink)
     }
 
     @Test
-    fun `vk link from the field carried over`() {
-        val srv = server(vkLink = " https://vk.com/call/abc ")
+    fun `call link from the field carried over`() {
+        val srv = server(callLink = " https://call.example/call/abc ")
         val link = FreeturnLink.parse(
-            ShareLinkBuilder.build(srv, ShareInfo(), "u", null, vkLink = " https://vk.com/call/own ")
+            ShareLinkBuilder.build(srv, ShareInfo(), "u", null, callLink = " https://call.example/call/own ")
         ).getOrThrow()
-        assertEquals("https://vk.com/call/own", link.vkLink)
+        assertEquals("https://call.example/call/own", link.callLink)
     }
 
     @Test

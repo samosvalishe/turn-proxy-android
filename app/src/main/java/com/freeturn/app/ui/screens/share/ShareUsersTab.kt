@@ -18,6 +18,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,7 +45,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.data.share.SharedClient
-import com.freeturn.app.data.share.WgPeer
 import com.freeturn.app.ui.components.EmptyState
 import com.freeturn.app.ui.components.SectionLabel
 import com.freeturn.app.ui.components.SettingsGroup
@@ -62,10 +63,8 @@ fun ShareUsersTab(
     state: ShareUiState,
     onSelectServer: (String) -> Unit,
     onRefresh: () -> Unit,
-    onReshare: (WgPeer) -> Unit,
-    onRevoke: (WgPeer) -> Unit,
-    onReshareClient: (SharedClient) -> Unit,
-    onRevokeClient: (SharedClient) -> Unit
+    onReshare: (SharedClient) -> Unit,
+    onRevoke: (SharedClient) -> Unit
 ) {
     // Тикает, чтобы online-статус пира гас сам по времени, а не только при перезагрузке.
     val nowSec by produceState(System.currentTimeMillis() / 1000) {
@@ -91,12 +90,12 @@ fun ShareUsersTab(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (state.peersLoading) {
+                if (state.clientsLoading || state.infoLoading) {
                     Box(modifier = Modifier.size(48.dp), contentAlignment = Alignment.Center) {
                         LoadingIndicator(modifier = Modifier.size(24.dp))
                     }
                 } else {
-                    IconButton(onClick = onRefresh) {
+                    IconButton(shapes = IconButtonDefaults.shapes(), onClick = onRefresh) {
                         Icon(
                             painterResource(R.drawable.refresh_24px),
                             contentDescription = stringResource(R.string.share_users_refresh),
@@ -107,7 +106,7 @@ fun ShareUsersTab(
             }
         }
 
-        state.peersError?.let { error ->
+        (state.clientsError ?: state.infoError)?.let { error ->
             Text(
                 error,
                 style = MaterialTheme.typography.bodyMedium,
@@ -115,8 +114,8 @@ fun ShareUsersTab(
             )
         }
 
-        val total = state.peers.size + state.clients.size
-        if (state.peersLoaded && total == 0) {
+        val total = state.clients.size
+        if (state.clientsLoaded && total == 0) {
             EmptyState(
                 iconRes = R.drawable.group_off_24px,
                 desc = stringResource(R.string.share_users_empty),
@@ -124,38 +123,20 @@ fun ShareUsersTab(
             )
         } else if (total > 0) {
             SettingsGroup {
-                state.peers.forEachIndexed { index, peer ->
+                state.clients.forEachIndexed { index, client ->
                     SettingsGroupItem(index, total) {
                         UserRow(
-                            name = when {
-                                peer.isSelf -> stringResource(R.string.share_peer_self)
-                                peer.name.isNotEmpty() -> peer.name
-                                else -> stringResource(R.string.share_peer_unnamed)
-                            },
-                            subtitle = peerSubtitle(peer),
-                            online = peer.lastHandshakeEpoch?.let {
+                            name = if (client.isSelf) stringResource(R.string.share_peer_self)
+                                else client.name,
+                            subtitle = clientSubtitle(client),
+                            online = client.lastHandshakeEpoch?.let {
                                 nowSec - it < ONLINE_WINDOW_SEC
                             } ?: false,
-                            resharing = state.resharePubkey == peer.pubkey,
-                            canReshare = peer.hasStoredConf,
-                            canRevoke = !peer.isSelf,
-                            onReshare = { onReshare(peer) },
-                            onRevoke = { onRevoke(peer) }
-                        )
-                    }
-                }
-                state.clients.forEachIndexed { index, client ->
-                    SettingsGroupItem(state.peers.size + index, total) {
-                        UserRow(
-                            name = client.name.ifEmpty { stringResource(R.string.share_peer_unnamed) },
-                            subtitle = stringResource(R.string.share_client_proxy_access),
-                            // Прокси-гость без WG-пира - статус подключения серверу неизвестен.
-                            online = false,
-                            resharing = false,
+                            resharing = state.reshareName == client.name,
                             canReshare = true,
-                            canRevoke = true,
-                            onReshare = { onReshareClient(client) },
-                            onRevoke = { onRevokeClient(client) }
+                            canRevoke = !client.isSelf,
+                            onReshare = { onReshare(client) },
+                            onRevoke = { onRevoke(client) }
                         )
                     }
                 }
@@ -224,7 +205,7 @@ private fun UserRowMenu(
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { expanded = true }) {
+        IconButton(shapes = IconButtonDefaults.shapes(), onClick = { expanded = true }) {
             Icon(
                 painterResource(R.drawable.more_vert_24px),
                 contentDescription = stringResource(R.string.share_peer_actions),
@@ -297,9 +278,11 @@ private fun OnlineDot(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun peerSubtitle(peer: WgPeer): String {
+private fun clientSubtitle(client: SharedClient): String {
+    // Без пира (чужой VPN) сервер не видит подключений гостя.
+    if (client.wgIp == null) return stringResource(R.string.share_client_proxy_access)
     val context = LocalContext.current
-    return peer.lastHandshakeEpoch?.let { epoch ->
+    return client.lastHandshakeEpoch?.let { epoch ->
         stringResource(
             R.string.share_peer_seen,
             DateUtils.formatDateTime(

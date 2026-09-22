@@ -16,7 +16,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,12 +29,13 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,9 +48,12 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.ui.util.HapticUtil
+import com.freeturn.app.ui.components.ChoiceOption
+import com.freeturn.app.ui.components.ConnectedChoiceRow
 import com.freeturn.app.ui.components.EmptyState
 import com.freeturn.app.ui.components.SettingsContentMaxWidth
 import com.freeturn.app.ui.theme.LocalReducedMotion
@@ -85,11 +88,6 @@ fun ShareScreen(
     LaunchedEffect(Unit) { viewModel.revalidateInfo() }
     LaunchedEffect(screenSettled, state.selectedServerId) {
         if (screenSettled) viewModel.ensureInfoLoaded()
-    }
-
-    // Список пользователей тянем лениво - только когда открыта их вкладка.
-    LaunchedEffect(tab, state.selectedServerId) {
-        if (tab == TAB_USERS) viewModel.refreshPeers()
     }
 
     Scaffold(
@@ -155,68 +153,78 @@ fun ShareScreen(
                 // Переключатель "Соединение / Пользователи" - только для SSH-серверов:
                 // у ручных нет серверного списка выданных доступов.
                 if (state.canManageUsers) {
-                    SingleChoiceSegmentedButtonRow(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = Spacing.lg, vertical = Spacing.md)
-                    ) {
-                        SegmentedButton(
-                            selected = tab == TAB_CONNECTION,
-                            onClick = {
-                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                tab = TAB_CONNECTION
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2)
-                        ) { Text(stringResource(R.string.share_tab_connection)) }
-                        SegmentedButton(
-                            selected = tab == TAB_USERS,
-                            onClick = {
-                                HapticUtil.perform(context, HapticUtil.Pattern.TOGGLE_ON)
-                                tab = TAB_USERS
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2)
-                        ) { Text(stringResource(R.string.share_tab_users)) }
-                    }
+                    ConnectedChoiceRow(
+                        options = listOf(
+                            ChoiceOption(TAB_CONNECTION, stringResource(R.string.share_tab_connection)),
+                            ChoiceOption(TAB_USERS, stringResource(R.string.share_tab_users))
+                        ),
+                        selected = tab,
+                        onSelect = { tab = it },
+                        modifier = Modifier.padding(horizontal = Spacing.lg, vertical = Spacing.md)
+                    )
                 }
+                // transitionSpec не composable - спеки motionScheme берём снаружи.
+                val slideSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
+                val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+                val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
                 AnimatedContent(
                     targetState = tab,
                     // Shared-axis X: вперёд (к "Пользователям") - въезд справа, назад - слева.
                     transitionSpec = {
-                        val forward = targetState > initialState
-                        val w = { full: Int -> if (forward) full / 5 else -full / 5 }
-                        (slideInHorizontally(tween(260)) { w(it) } + fadeIn(tween(260)))
-                            .togetherWith(
-                                slideOutHorizontally(tween(200)) { -w(it) } + fadeOut(tween(120))
-                            )
+                        if (reducedMotion) {
+                            EnterTransition.None togetherWith ExitTransition.None
+                        } else {
+                            val forward = targetState > initialState
+                            val w = { full: Int -> if (forward) full / 5 else -full / 5 }
+                            (slideInHorizontally(slideSpec) { w(it) } + fadeIn(fadeInSpec))
+                                .togetherWith(slideOutHorizontally(slideSpec) { -w(it) } + fadeOut(fadeOutSpec))
+                        }
                     },
                     label = "share_tab"
                 ) { current ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = Spacing.lg, vertical = Spacing.lg)
-                    ) {
-                        when (current) {
-                            TAB_CONNECTION -> ShareConnectionTab(
+                    val tabModifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.lg)
+                    when (current) {
+                        TAB_CONNECTION -> Column(modifier = tabModifier) {
+                            ShareConnectionTab(
                                 state = state,
                                 onSelectServer = viewModel::selectServer,
                                 onUserNameChange = viewModel::setUserName,
                                 onClientIdChange = viewModel::setManualClientId,
-                                onSetMode = viewModel::setShareMode,
-                                onSetShareVkLink = viewModel::setShareVkLink,
-                                onVkLinkChange = viewModel::setVkLinkToShare,
+                                onSetShareCallLink = viewModel::setShareCallLink,
+                                onCallLinkChange = viewModel::setCallLinkToShare,
                                 onRetryInfo = viewModel::retryInfo
                             )
-                            TAB_USERS -> ShareUsersTab(
-                                state = state,
-                                onSelectServer = viewModel::selectServer,
-                                onRefresh = { viewModel.refreshPeers(force = true) },
-                                onReshare = viewModel::resharePeer,
-                                onRevoke = viewModel::askRevoke,
-                                onReshareClient = viewModel::reshareClient,
-                                onRevokeClient = viewModel::askRevokeClient
-                            )
+                        }
+                        // Жест - основной путь обновления; кнопка в шапке списка остаётся
+                        // доступной альтернативой (TalkBack, клавиатура).
+                        TAB_USERS -> {
+                            val pullState = rememberPullToRefreshState()
+                            val refreshing = state.clientsLoading
+                            PullToRefreshBox(
+                                isRefreshing = refreshing,
+                                onRefresh = viewModel::refreshClients,
+                                state = pullState,
+                                indicator = {
+                                    PullToRefreshDefaults.LoadingIndicator(
+                                        state = pullState,
+                                        isRefreshing = refreshing,
+                                        modifier = Modifier.align(Alignment.TopCenter)
+                                    )
+                                }
+                            ) {
+                                Column(modifier = tabModifier) {
+                                    ShareUsersTab(
+                                        state = state,
+                                        onSelectServer = viewModel::selectServer,
+                                        onRefresh = viewModel::refreshClients,
+                                        onReshare = viewModel::reshare,
+                                        onRevoke = viewModel::askRevoke
+                                    )
+                                }
+                            }
                         }
                     }
                 }
