@@ -64,7 +64,7 @@ class ProxyLog(dir: File) {
     }
 
     /** Собирает лог в [target] для отправки; false - писать было нечего. */
-    fun export(target: File): Boolean = file.export(target)
+    suspend fun export(target: File): Boolean = file.export(target)
 
     /**
      * Ядро сыплет строками пачками из своих горутин: публикуем срез не чаще

@@ -61,5 +61,5 @@ class ProxyViewModel(
     fun clearLogs() = log.clearAll()
 
     /** false - отправлять нечего. */
-    fun exportLogs(target: File): Boolean = log.export(target)
+    suspend fun exportLogs(target: File): Boolean = log.export(target)
 }
