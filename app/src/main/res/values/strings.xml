@@ -135,8 +135,8 @@
     <string name="setup_reinstall">На сервере уже стоит FreeTurn - поля заполнены его настройками.</string>
     <string name="setup_backend_section">Куда идёт трафик</string>
     <string name="setup_backend_label">VPN на сервере</string>
-    <string name="setup_backend_new">Новый WireGuard</string>
-    <string name="setup_backend_external">Готовый VPN</string>
+    <string name="setup_backend_new">FreeTurn WG</string>
+    <string name="setup_backend_external">Мой VPN</string>
     <string name="setup_backend_new_desc">Установщик поставит на сервер WireGuard (интерфейс ft-wg0) и сам выпустит конфиги - для вас и для тех, с кем поделитесь.</string>
     <string name="setup_backend_external_desc">На сервере уже работает ваш VPN (Amnezia, wg-easy, 3x-ui). FreeTurn только передаёт в него трафик и сам VPN не трогает - клиентские конфиги берите в его панели.</string>
     <string name="setup_wg_net_label">Подсеть WireGuard</string>

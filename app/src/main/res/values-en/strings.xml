@@ -130,8 +130,8 @@
     <string name="setup_reinstall">FreeTurn is already installed on the server - fields are filled with its settings.</string>
     <string name="setup_backend_section">Where traffic goes</string>
     <string name="setup_backend_label">VPN on the server</string>
-    <string name="setup_backend_new">New WireGuard</string>
-    <string name="setup_backend_external">Existing VPN</string>
+    <string name="setup_backend_new">FreeTurn WG</string>
+    <string name="setup_backend_external">My VPN</string>
     <string name="setup_backend_new_desc">The installer will set up WireGuard on the server (interface ft-wg0) and issue configs itself - for you and for the people you share with.</string>
     <string name="setup_backend_external_desc">Your VPN is already running on the server (Amnezia, wg-easy, 3x-ui). FreeTurn only forwards traffic into it and does not touch the VPN itself - take client configs from its panel.</string>
     <string name="setup_wg_net_label">WireGuard subnet</string>
