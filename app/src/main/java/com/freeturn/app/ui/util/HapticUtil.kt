@@ -14,6 +14,7 @@ import com.freeturn.app.viewmodel.Haptics
 object HapticUtil {
 
     enum class Pattern {
+        TICK,
         SELECTION,
         CLICK,
         TOGGLE_ON,
@@ -31,6 +32,12 @@ object HapticUtil {
         val vibrator = context.getSystemService(Vibrator::class.java) ?: return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val effect = when (pattern) {
+                Pattern.TICK -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK)
+                } else {
+                    VibrationEffect.createOneShot(8, 70)
+                }
+
                 Pattern.SELECTION -> VibrationEffect.createOneShot(20, 120)
 
                 Pattern.CLICK -> VibrationEffect.createOneShot(25, 160)
@@ -90,6 +97,7 @@ object HapticUtil {
             } catch (_: Exception) {}
         } else {
             val duration = when (pattern) {
+                Pattern.TICK -> 8L
                 Pattern.SELECTION -> 20L
                 Pattern.CLICK -> 25L
                 Pattern.TOGGLE_ON, Pattern.TOGGLE_OFF -> 50L

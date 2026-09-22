@@ -2,6 +2,7 @@
 
 package com.freeturn.app.ui.screens.home
 
+import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.LinearEasing
@@ -20,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -58,6 +60,7 @@ private const val BURST_MS = 950
 
 /** Грань Cookie12Sided: на отпускании фигура доводится до кратного угла. */
 private const val SPIN_NOTCH_DEG = 30f
+private const val SPIN_TICK_MIN_MS = 30L
 
 /** Сектор разлёта: вверх и в стороны. Вниз лист не выстреливает, он туда падает сам. */
 private const val SPREAD_FROM_DEG = -170f
@@ -217,6 +220,24 @@ internal fun Modifier.leafSpin(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val settleSpec = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
+
+    LaunchedEffect(spin, enabled) {
+        if (!enabled) return@LaunchedEffect
+        var lastAngle = spin.value
+        var lastNotch = (lastAngle / SPIN_NOTCH_DEG).roundToInt()
+        var lastTickAt = 0L
+        snapshotFlow { spin.value }.collect { angle ->
+            val notch = (angle / SPIN_NOTCH_DEG).roundToInt()
+            val real = abs(angle - lastAngle) < 180f
+            val now = SystemClock.uptimeMillis()
+            if (real && notch != lastNotch && now - lastTickAt >= SPIN_TICK_MIN_MS) {
+                HapticUtil.perform(context, HapticUtil.Pattern.TICK)
+                lastTickAt = now
+            }
+            lastAngle = angle
+            lastNotch = notch
+        }
+    }
     if (!enabled) return this
 
     return pointerInput(Unit) {
