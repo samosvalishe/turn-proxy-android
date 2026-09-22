@@ -101,7 +101,11 @@ class ProxyService : VpnService() {
         super.onCreate()
         scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         notifier = ProxyNotifier(this)
-        network = NetworkHandoverMonitor(applicationContext, scope, log) { onNetworkHandover() }
+        network = NetworkHandoverMonitor(
+            applicationContext, scope, log,
+            onHandover = ::onNetworkHandover,
+            onDnsChanged = ::onDnsChanged,
+        )
         sleptMillis = SystemClock.elapsedRealtime() - SystemClock.uptimeMillis()
         // Только динамически: SCREEN_ON манифестом не ловится.
         ContextCompat.registerReceiver(
@@ -320,6 +324,12 @@ class ProxyService : VpnService() {
         val slept = (SystemClock.elapsedRealtime() - SystemClock.uptimeMillis() - sleptMillis) / 1000
         log.add("Смена сети - переподключение (сон с прошлой проверки $slept c)")
         withCoreDns { session, dns -> engine.reconnect(session, dns) }
+    }
+
+    private fun onDnsChanged() {
+        if (stopping || !engine.isRunning) return
+        log.add("Сеть: сменились DNS - обновляем резолверы ядра")
+        withCoreDns { session, dns -> engine.setDnsServers(session, dns) }
     }
 
     private fun withCoreDns(apply: (session: Long, dns: String) -> Unit) {

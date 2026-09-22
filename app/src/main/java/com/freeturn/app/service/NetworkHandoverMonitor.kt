@@ -2,6 +2,7 @@ package com.freeturn.app.service
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.LinkProperties
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
@@ -13,7 +14,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Следит за сменой ФИЗИЧЕСКОЙ сети (Wi-Fi <-> LTE и т.п.) и дёргает [onHandover].
+ * Следит за сменой ФИЗИЧЕСКОЙ сети (Wi-Fi <-> LTE и т.п.) и дёргает [onHandover];
+ * смена одних DNS той же сети - [onDnsChanged], без рецикла аллокаций.
  * VPN-интерфейсы отфильтрованы: иначе старт WireGuard выглядел бы как смена сети
  * и уводил прокси в бесконечный рестарт.
  */
@@ -22,6 +24,7 @@ class NetworkHandoverMonitor(
     private val scope: CoroutineScope,
     private val log: ProxyLog,
     private val onHandover: () -> Unit,
+    private val onDnsChanged: () -> Unit,
 ) {
     companion object {
         // Игнорируем сетевые события первые секунды после регистрации - иначе
@@ -32,22 +35,31 @@ class NetworkHandoverMonitor(
     private val cm get() = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     private var callback: ConnectivityManager.NetworkCallback? = null
     @Volatile private var debounceJob: Job? = null
+    @Volatile private var warmupJob: Job? = null
     @Volatile private var lastKey: String? = null
+    @Volatile private var lastDns: String = ""
     // Сеть в linger: система уже увела на неё default, но сокеты ещё живут. Из выбора
     // приоритетной физсети исключена - иначе DNS и ключ остались бы от уходящей.
     @Volatile private var lingering: Network? = null
 
     fun register() {
-        // START прилетает в живой сервис на каждом рестарте сессии: без снятия
-        // прошлого колбэка они копятся (дубли переподключений, а после ~100
-        // регистраций в процессе - TooManyRequestsException).
         unregister()
         val cm = cm
         val registeredAt = SystemClock.elapsedRealtime()
         lastKey = physicalNetworkKey(cm)
+        lastDns = physicalDnsServers()
+
+        fun warmingUp() = SystemClock.elapsedRealtime() - registeredAt < WARMUP_MS
+
+        fun syncDns() {
+            val dns = physicalDnsServers()
+            if (dns.isEmpty() || dns == lastDns) return
+            lastDns = dns
+            onDnsChanged()
+        }
 
         fun schedule(reason: String) {
-            if (SystemClock.elapsedRealtime() - registeredAt < WARMUP_MS) return
+            if (warmingUp()) return
             if (debounceJob?.isActive == true) return
             debounceJob = scope.launch {
                 delay(2_000)
@@ -55,14 +67,23 @@ class NetworkHandoverMonitor(
                 val newKey = physicalNetworkKey(cm)
                 // Ключ тот же - ожидаемый no-op. onCapabilitiesChanged сыплет
                 // десятки раз/мин (сигнал, link speed, валидация инета), не логаем.
-                if (oldKey == newKey) return@launch
+                if (oldKey == newKey) {
+                    syncDns()
+                    return@launch
+                }
                 lastKey = newKey
                 if (newKey == null) {
                     log.add("Сеть: физическая сеть недоступна ($reason)")
                     return@launch
                 }
+                lastDns = physicalDnsServers()
                 onHandover()
             }
+        }
+
+        warmupJob = scope.launch {
+            delay(WARMUP_MS + 1)
+            schedule("warmup")
         }
 
         val cb = object : ConnectivityManager.NetworkCallback() {
@@ -80,14 +101,21 @@ class NetworkHandoverMonitor(
             // Единственное окно, когда аллокации TURN можно освободить по живому сокету:
             // сеть ещё принимает трафик. Без debounce - оно короткое.
             override fun onLosing(network: Network, maxMsToLive: Int) {
-                if (SystemClock.elapsedRealtime() - registeredAt < WARMUP_MS) return
+                if (warmingUp()) return
                 lingering = network
                 val newKey = physicalNetworkKey(cm)
                 if (newKey == null || newKey == lastKey) return
                 debounceJob?.cancel()
                 lastKey = newKey
+                lastDns = physicalDnsServers()
                 log.add("Сеть: уходит через $maxMsToLive мс - переподключение заранее")
                 onHandover()
+            }
+
+            override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
+                if (warmingUp() || debounceJob?.isActive == true) return
+                if (network != physicalNetwork(cm)) return
+                syncDns()
             }
 
             override fun onLost(network: Network) {
@@ -115,11 +143,10 @@ class NetworkHandoverMonitor(
     }
 
     fun unregister() {
-        // Debounce живёт своими 2 секундами и после снятия колбэка: без отмены он
-        // дёргает onHandover уже на сворачиваемой сессии, а при перерегистрации -
-        // мимо прогрева, рестартя только что поднятую.
         debounceJob?.cancel()
         debounceJob = null
+        warmupJob?.cancel()
+        warmupJob = null
         lingering = null
         callback?.let { cb ->
             try {
@@ -147,13 +174,15 @@ class NetworkHandoverMonitor(
     }
 
     /**
-     * Ключ ОДНОЙ приоритетной физсети (транспорт + iface). Берём приоритетную, а не
-     * весь allNetworks: при активном Wi-Fi cellular флапает в фоне, набор прыгал бы ->
+     * Ключ ОДНОЙ приоритетной физсети (Network + транспорт + iface). Берём приоритетную,
+     * а не весь allNetworks: при активном Wi-Fi cellular флапает в фоне, набор прыгал бы ->
      * ложная "смена сети". link-адреса не в ключе - ротация IPv6/DHCP идёт на той же
-     * сети; реальный хендовер меняет транспорт/iface.
+     * сети. Network в ключе: Wi-Fi A -> B (и переподключение к той же точке) даёт новый
+     * Network при прежнем wlan0, а сокеты старого уже мертвы.
      */
     private fun physicalNetworkKey(cm: ConnectivityManager): String? =
-        rankedPhysicalNetworks(cm).minWithOrNull(comparator)?.let { "${it.transport}|${it.iface}" }
+        rankedPhysicalNetworks(cm).minWithOrNull(comparator)
+            ?.let { "${it.network}|${it.transport}|${it.iface}" }
 
     /** Та же приоритетная физсеть, что даёт ключ - её DNS уходят в конфиг ядра. */
     private fun physicalNetwork(cm: ConnectivityManager): Network? =

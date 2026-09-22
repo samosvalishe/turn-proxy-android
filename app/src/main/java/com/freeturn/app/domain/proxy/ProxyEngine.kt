@@ -182,6 +182,9 @@ class ProxyEngine(
         Mobile.reconnect()
     }
 
+    fun setDnsServers(session: Long, dnsServers: String) =
+        onSession(session, "Обновление DNS") { Mobile.setDNSServers(dnsServers) }
+
     private fun onSession(session: Long, what: String, call: () -> Unit) {
         if (running != session) return
         scope.launch {
