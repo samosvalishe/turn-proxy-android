@@ -11,6 +11,7 @@ import android.content.Intent
 import android.os.PowerManager
 import android.provider.Settings
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -60,6 +61,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
+import com.freeturn.app.domain.UpdateError
 import com.freeturn.app.domain.UpdateState
 import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.ui.components.BackupPasswordDialog
@@ -264,6 +266,7 @@ fun AppScreen(
             text = { Text(stringResource(R.string.reset_all_settings_desc)) },
             confirmButton = {
                 TextButton(
+                    shapes = ButtonDefaults.shapes(),
                     onClick = {
                         showResetDialog = false
                         backupViewModel.resetAllSettings()
@@ -274,7 +277,7 @@ fun AppScreen(
                 ) { Text(stringResource(R.string.reset)) }
             },
             dismissButton = {
-                TextButton(onClick = { showResetDialog = false }) {
+                TextButton(shapes = ButtonDefaults.shapes(), onClick = { showResetDialog = false }) {
                     Text(stringResource(R.string.cancel))
                 }
             }
@@ -361,6 +364,7 @@ private fun UpdateCard(
                     else -> onCheck
                 }
                 FilledTonalButton(
+                    shapes = ButtonDefaults.shapes(),
                     onClick = action,
                     enabled = state !is UpdateState.Checking,
                     modifier = Modifier.fillMaxWidth()
@@ -391,7 +395,17 @@ private fun updateStatusText(state: UpdateState, appVersion: String): String = w
     is UpdateState.Downloading -> stringResource(R.string.update_downloading, state.progress)
     is UpdateState.ReadyToInstall -> stringResource(R.string.update_ready_desc_short)
     is UpdateState.NoUpdate -> stringResource(R.string.update_no_update)
-    is UpdateState.Error -> stringResource(R.string.update_error, state.message)
+    is UpdateState.Error -> stringResource(state.reason.labelRes())
+}
+
+@StringRes
+private fun UpdateError.labelRes(): Int = when (this) {
+    UpdateError.RELEASE_UNAVAILABLE -> R.string.update_error_release
+    UpdateError.NO_APK -> R.string.update_error_no_apk
+    UpdateError.NETWORK -> R.string.update_error_network
+    UpdateError.DOWNLOAD_FAILED -> R.string.update_error_download
+    UpdateError.SIGNATURE_MISMATCH -> R.string.update_error_signature
+    UpdateError.FILE_MISSING -> R.string.update_error_file
 }
 
 /** Строка сброса: error-тинт иконки и заголовка, без trailing-шеврона. */

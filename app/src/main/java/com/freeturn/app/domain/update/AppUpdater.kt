@@ -8,6 +8,7 @@ import android.content.pm.Signature
 import android.os.Build
 import androidx.core.content.FileProvider
 import com.freeturn.app.data.config.toHex
+import com.freeturn.app.domain.UpdateError
 import com.freeturn.app.domain.UpdateState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -46,7 +47,7 @@ class AppUpdater(private val context: Context) {
             val release = withContext(Dispatchers.IO) { fetchLatestRelease() }
             if (release == null) {
                 _state.value = if (silent) UpdateState.Idle
-                else UpdateState.Error("Не удалось получить информацию о релизе")
+                else UpdateState.Error(UpdateError.RELEASE_UNAVAILABLE)
                 return
             }
 
@@ -58,7 +59,7 @@ class AppUpdater(private val context: Context) {
                     _state.value = UpdateState.Available(remoteVersion)
                 } else {
                     _state.value = if (silent) UpdateState.Idle
-                    else UpdateState.Error("APK не найден в релизе")
+                    else UpdateState.Error(UpdateError.NO_APK)
                 }
             } else {
                 _state.value = UpdateState.NoUpdate
@@ -68,13 +69,13 @@ class AppUpdater(private val context: Context) {
             throw e
         } catch (_: Exception) {
             _state.value = if (silent) UpdateState.Idle
-            else UpdateState.Error("Нет соединения с сервером")
+            else UpdateState.Error(UpdateError.NETWORK)
         }
     }
 
     suspend fun downloadUpdate() {
         val url = latestApkUrl ?: run {
-            _state.value = UpdateState.Error("URL обновления не найден")
+            _state.value = UpdateState.Error(UpdateError.RELEASE_UNAVAILABLE)
             return
         }
 
@@ -118,22 +119,22 @@ class AppUpdater(private val context: Context) {
             val trusted = withContext(Dispatchers.IO) { isSignedBySameCert(apkFile) }
             if (!trusted) {
                 apkFile.delete()
-                _state.value = UpdateState.Error("Подпись обновления не совпадает - установка отменена")
+                _state.value = UpdateState.Error(UpdateError.SIGNATURE_MISMATCH)
                 return
             }
             _state.value = UpdateState.ReadyToInstall
         } catch (e: CancellationException) {
             apkFile.delete()
             throw e
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             apkFile.delete()
-            _state.value = UpdateState.Error("Ошибка загрузки: ${e.message}")
+            _state.value = UpdateState.Error(UpdateError.DOWNLOAD_FAILED)
         }
     }
 
     fun installUpdate() {
         if (!apkFile.exists()) {
-            _state.value = UpdateState.Error("Файл обновления не найден")
+            _state.value = UpdateState.Error(UpdateError.FILE_MISSING)
             return
         }
 
