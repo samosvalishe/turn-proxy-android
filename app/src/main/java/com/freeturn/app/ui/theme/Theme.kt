@@ -121,6 +121,9 @@ fun FreeTurnTheme(
             else -> lightScheme
         }
     }
+    val extendedScheme = remember(colorScheme.primary, darkTheme) {
+        extendedColorSchemeFor(darkTheme).harmonizedWith(colorScheme.primary)
+    }
     val motionScheme = remember { MotionScheme.expressive() }
 
     val view = LocalView.current
@@ -140,7 +143,7 @@ fun FreeTurnTheme(
     }
 
     CompositionLocalProvider(
-        LocalExtendedColorScheme provides extendedColorSchemeFor(darkTheme),
+        LocalExtendedColorScheme provides extendedScheme,
         LocalReducedMotion provides reduceMotion
     ) {
         MaterialExpressiveTheme(

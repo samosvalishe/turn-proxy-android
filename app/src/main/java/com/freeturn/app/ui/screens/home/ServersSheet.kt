@@ -122,7 +122,7 @@ internal fun ServersSheetContent(
                 (it.client.serverAddress.takeIf { a -> a.isNotBlank() }
                     ?: it.ssh.ip.takeIf { a -> a.isNotBlank() })?.redact(privacyMode)
             }
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(Spacing.xs))
             Text(
                 sub.orEmpty(),
                 style = MaterialTheme.typography.bodyMedium,
@@ -133,7 +133,7 @@ internal fun ServersSheetContent(
             )
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(Spacing.lg))
 
         ProviderPicker(
             current = active?.client?.provider ?: Provider.RELAY,
@@ -145,7 +145,7 @@ internal fun ServersSheetContent(
             modifier = Modifier.padding(horizontal = Spacing.lg)
         )
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(Spacing.xl))
 
         Text(
             stringResource(R.string.servers_sheet_title),

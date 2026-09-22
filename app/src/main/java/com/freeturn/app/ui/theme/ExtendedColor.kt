@@ -11,7 +11,9 @@ import androidx.compose.ui.graphics.Color
  * Дополнительная цветовая схема для ролей, которых нет в MaterialTheme.colorScheme:
  * success / warning / info. Значения сгенерированы через Material Theme Builder
  * (seed: success #4CAF50, warning #E67E22, info #2196F3) и держат полный набор
- * тональных пар, чтобы корректно пройти контраст 4.5:1 в light/dark.
+ * тональных пар, чтобы корректно пройти контраст 4.5:1 в light/dark. Тон сводится
+ * к colorScheme.primary в FreeTurnTheme ([harmonizedWith]) - сдвиг тона контраст пар
+ * не трогает.
  */
 @Immutable
 data class ExtendedColorScheme(
@@ -61,6 +63,22 @@ private val extendedDark = ExtendedColorScheme(
 
 internal fun extendedColorSchemeFor(darkTheme: Boolean): ExtendedColorScheme =
     if (darkTheme) extendedDark else extendedLight
+
+/** Схема, сведённая к тону [source] (обычно colorScheme.primary) - см. [harmonizeWith]. */
+internal fun ExtendedColorScheme.harmonizedWith(source: Color) = ExtendedColorScheme(
+    success = success.harmonizeWith(source),
+    onSuccess = onSuccess.harmonizeWith(source),
+    successContainer = successContainer.harmonizeWith(source),
+    onSuccessContainer = onSuccessContainer.harmonizeWith(source),
+    warning = warning.harmonizeWith(source),
+    onWarning = onWarning.harmonizeWith(source),
+    warningContainer = warningContainer.harmonizeWith(source),
+    onWarningContainer = onWarningContainer.harmonizeWith(source),
+    info = info.harmonizeWith(source),
+    onInfo = onInfo.harmonizeWith(source),
+    infoContainer = infoContainer.harmonizeWith(source),
+    onInfoContainer = onInfoContainer.harmonizeWith(source),
+)
 
 internal val LocalExtendedColorScheme = staticCompositionLocalOf { extendedLight }
 

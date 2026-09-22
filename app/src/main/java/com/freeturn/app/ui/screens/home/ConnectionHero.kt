@@ -100,11 +100,11 @@ internal fun ConnectionHero(
             }
         )
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(Spacing.xl))
 
         StatusLabel(status = status, reducedMotion = reducedMotion)
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(Spacing.md))
 
         StatsPill(status = status, kind = kind, uptimeText = uptimeText, showStreams = showStreams)
     }

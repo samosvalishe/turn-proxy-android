@@ -149,12 +149,12 @@ private fun AboutHero(appVersion: String) {
                 )
             }
         }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(Spacing.lg))
         Text(
             stringResource(R.string.turn_proxy_title),
             style = MaterialTheme.typography.headlineSmall
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(Spacing.sm))
         Surface(
             shape = CircleShape,
             color = MaterialTheme.colorScheme.secondaryContainer
@@ -166,7 +166,7 @@ private fun AboutHero(appVersion: String) {
                 modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.xs)
             )
         }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(Spacing.lg))
         Text(
             stringResource(R.string.about_description),
             style = MaterialTheme.typography.bodyMedium,

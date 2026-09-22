@@ -57,10 +57,10 @@ fun EmptyState(
                 )
             }
         }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(Spacing.lg))
         title?.let {
             Text(it, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(Spacing.sm))
         }
         Text(
             desc,
@@ -69,7 +69,7 @@ fun EmptyState(
             textAlign = TextAlign.Center
         )
         if (actionLabel != null && onAction != null) {
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(Spacing.xxl))
             Button(shapes = ButtonDefaults.shapes(), onClick = onAction) { Text(actionLabel) }
         }
     }

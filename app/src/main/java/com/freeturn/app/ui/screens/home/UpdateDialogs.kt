@@ -18,11 +18,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.freeturn.app.R
 import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.domain.UpdateState
 import com.freeturn.app.ui.components.BusyProgressIndicator
+import com.freeturn.app.ui.theme.Spacing
 
 /**
  * Диалоги цикла обновления приложения: доступно -> качается -> готово к установке.
@@ -69,7 +69,7 @@ internal fun UpdateDialogs(
                 text = {
                     Column {
                         Text(stringResource(R.string.update_downloading, state.progress))
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(Spacing.md))
                         BusyProgressIndicator(progress = { state.progress / 100f })
                     }
                 },

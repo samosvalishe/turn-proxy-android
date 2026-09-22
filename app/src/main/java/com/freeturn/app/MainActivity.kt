@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
             FreeTurnTheme(dynamicColor = dynamicTheme) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                    color = MaterialTheme.colorScheme.surface
                 ) {
                     AppNavigation()
                 }

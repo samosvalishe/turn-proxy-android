@@ -39,12 +39,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.freeturn.app.R
 import com.freeturn.app.data.config.Provider
 import com.freeturn.app.ui.util.HapticUtil
 import com.freeturn.app.domain.SshConnectionState
+import com.freeturn.app.ui.components.FabClearance
 import com.freeturn.app.ui.components.SectionLabel
 import com.freeturn.app.ui.components.SettingsBackButton
 import com.freeturn.app.ui.components.SettingsCard
@@ -296,7 +296,7 @@ fun ServerDetailScreen(
                     }
                 }
 
-                Spacer(Modifier.height(88.dp))
+                Spacer(Modifier.height(FabClearance))
             }
         }
     }
