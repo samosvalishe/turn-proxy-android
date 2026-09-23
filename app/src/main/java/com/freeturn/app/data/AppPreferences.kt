@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
+import com.freeturn.app.BuildConfig
 import com.freeturn.app.R
 import com.freeturn.app.data.backup.BackupData
 import com.freeturn.app.data.config.ClientConfig
@@ -39,6 +40,9 @@ class AppPreferences(context: Context) {
     private val context = context.applicationContext
 
     companion object {
+        // 5.0.0 по схеме versionCode (M*10000+m*100+p).
+        private const val V5_VERSION_CODE = 50000
+        private val V5_SETUP_NOTICE_PENDING = booleanPreferencesKey("v5_setup_notice_pending")
         val DYNAMIC_THEME = booleanPreferencesKey("dynamic_theme")
         val NERD_MODE = booleanPreferencesKey("nerd_mode")
         val PRIVACY_MODE = booleanPreferencesKey("privacy_mode")
@@ -74,6 +78,28 @@ class AppPreferences(context: Context) {
             prefs[CLEAN_EXIT] = true
         }
         unclean
+    }
+
+    suspend fun v5SetupNoticePending(): Boolean {
+        if (BuildConfig.VERSION_CODE < V5_VERSION_CODE) return false
+        var pending = false
+        context.dataStore.edit { prefs ->
+            pending = prefs[V5_SETUP_NOTICE_PENDING]
+                ?: ServerJson.decodeList(prefs[SERVERS_JSON]).isNotEmpty()
+            prefs[V5_SETUP_NOTICE_PENDING] = pending
+        }
+        return pending
+    }
+
+    suspend fun acknowledgeV5SetupNotice() {
+        context.dataStore.edit { it[V5_SETUP_NOTICE_PENDING] = false }
+    }
+
+    private fun MutablePreferences.clearProfile() {
+        val noticePending = this[V5_SETUP_NOTICE_PENDING]
+        clear()
+        // Сброс профиля и импорт бэкапа не повторяют уведомление об обновлении.
+        noticePending?.let { this[V5_SETUP_NOTICE_PENDING] = it }
     }
 
     suspend fun previousSessionUnclean(): Boolean = previousUncleanExit.await()
@@ -345,7 +371,7 @@ class AppPreferences(context: Context) {
     }
 
     suspend fun resetAll() {
-        context.dataStore.edit { it.clear() }
+        context.dataStore.edit { it.clearProfile() }
     }
 
     suspend fun exportData(): BackupData {
@@ -377,7 +403,7 @@ class AppPreferences(context: Context) {
      */
     suspend fun restoreBackup(data: BackupData): Int {
         context.dataStore.edit { prefs ->
-            prefs.clear()
+            prefs.clearProfile()
             prefs[SERVERS_JSON] = ServerJson.encodeList(data.servers)
             val active = data.activeId?.takeIf { id -> data.servers.any { it.id == id } }
                 ?: data.servers.firstOrNull()?.id

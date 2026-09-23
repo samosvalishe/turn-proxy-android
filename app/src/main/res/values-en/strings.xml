@@ -550,4 +550,7 @@
     <string name="settings_about_desc">Version, description and links</string>
     <string name="about_description">Free Turn proxies WireGuard and Xray traffic through public TURN servers. Open source and no telemetry: all settings are stored only on your device.</string>
     <string name="about_links">Links</string>
+    <string name="v5_setup_notice_title">Upgrading to FreeTurn 5</string>
+    <string name="v5_setup_notice_message">Version 5 is not compatible with your previous setup: the servers and connection profiles you added will not work and have to be set up from scratch.\n\nAdd your server again or import a new connection link in the Connection (+) tab, then review your VPN and split tunneling settings.\n\nThis message is shown once.</string>
+    <string name="v5_setup_notice_confirm">Got it</string>
 </resources>

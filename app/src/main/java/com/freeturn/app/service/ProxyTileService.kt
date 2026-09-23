@@ -75,7 +75,7 @@ class ProxyTileService : TileService(), KoinComponent {
         tile.state = if (running) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
         tile.label = getString(R.string.tile_service_label)
         tile.contentDescription = tile.label
-        tile.icon = Icon.createWithResource(this, R.drawable.ic_qs_tile_nearby)
+        tile.icon = Icon.createWithResource(this, R.drawable.ic_freeturn)
         tile.updateTile()
     }
 }

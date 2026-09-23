@@ -118,7 +118,7 @@
         <service
             android:name=".service.ProxyTileService"
             android:exported="true"
-            android:icon="@drawable/ic_qs_tile_nearby"
+            android:icon="@drawable/ic_freeturn"
             android:label="@string/tile_service_label"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>

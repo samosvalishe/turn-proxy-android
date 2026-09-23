@@ -107,7 +107,7 @@ class ProxyNotifier(private val service: Service) {
         return NotificationCompat.Builder(service, CHANNEL_PROXY)
             .setContentTitle(title)
             .setContentText(details)
-            .setSmallIcon(R.drawable.ic_qs_tile_nearby)
+            .setSmallIcon(R.drawable.ic_freeturn)
             .setOngoing(true)
             .setContentIntent(openApp)
             .addAction(0, service.getString(R.string.notif_proxy_stop_action), stopAction)

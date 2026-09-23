@@ -75,6 +75,12 @@ fun AppNavigation(
     // дефолтный tgSubscribeShown=false и диалог мигнёт у тех, кто его уже закрыл.
     if (!isInitialized) return
 
+    val showV5SetupNotice by settingsViewModel.showV5SetupNotice.collectAsStateWithLifecycle()
+    if (showV5SetupNotice) {
+        V5SetupNoticeDialog(onConfirm = settingsViewModel::acknowledgeV5SetupNotice)
+        return
+    }
+
     val status by proxyViewModel.status.collectAsStateWithLifecycle()
     val initialTgSubscribeShown by settingsViewModel.initialTgSubscribeShown.collectAsStateWithLifecycle()
     val initialSuppressTgPrompt by settingsViewModel.initialSuppressTgPrompt.collectAsStateWithLifecycle()

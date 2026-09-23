@@ -581,4 +581,7 @@
     <string name="settings_about_desc">Версия, описание и ссылки</string>
     <string name="about_description">Free Turn проксирует WireGuard и Xray-трафик через публичные TURN-сервера. Открытый исходный код и никакой телеметрии: все настройки хранятся только на вашем устройстве.</string>
     <string name="about_links">Ссылки</string>
+    <string name="v5_setup_notice_title">Переход на FreeTurn 5</string>
+    <string name="v5_setup_notice_message">Версия 5 несовместима с прежними настройками: добавленные серверы и профили подключения работать не будут, их придётся настроить с нуля.\n\nЗаново добавьте сервер или импортируйте новую ссылку подключения на вкладке \"Соединение\" (+), затем проверьте параметры VPN и раздельного туннелирования.\n\nЭто сообщение показывается один раз.</string>
+    <string name="v5_setup_notice_confirm">Понятно</string>
 </resources>

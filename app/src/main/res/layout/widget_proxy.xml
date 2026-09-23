@@ -14,7 +14,7 @@
         android:id="@+id/widget_status_icon"
         android:layout_width="36dp"
         android:layout_height="36dp"
-        android:src="@drawable/ic_qs_tile_nearby"
+        android:src="@drawable/ic_freeturn"
         android:contentDescription="@null" />
 
     <LinearLayout

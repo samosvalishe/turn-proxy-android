@@ -142,7 +142,7 @@ private fun AboutHero(appVersion: String) {
         ) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                 Icon(
-                    painterResource(R.drawable.logo_diamond_24px),
+                    painterResource(R.drawable.ic_freeturn),
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.size(52.dp)

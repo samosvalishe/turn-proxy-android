@@ -95,7 +95,7 @@ class ProxyWidgetProvider : AppWidgetProvider(), KoinComponent {
             ).joinToString(" · ")
             views.setTextViewText(R.id.widget_server_name, subtitle)
 
-            // nearby-иконка кодирует статус тоном динамической палитры.
+            // Цвет знака отражает статус и следует динамической палитре.
             val statusColor = when {
                 !running -> R.color.widget_outline
                 connecting -> R.color.widget_tertiary

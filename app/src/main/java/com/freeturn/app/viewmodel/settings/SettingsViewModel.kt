@@ -40,6 +40,16 @@ class SettingsViewModel(
 
     val updateState: StateFlow<UpdateState> = appUpdater.state
 
+    private val _showV5SetupNotice = MutableStateFlow(false)
+    val showV5SetupNotice: StateFlow<Boolean> = _showV5SetupNotice.asStateFlow()
+
+    fun acknowledgeV5SetupNotice() {
+        viewModelScope.launch {
+            prefs.acknowledgeV5SetupNotice()
+            _showV5SetupNotice.value = false
+        }
+    }
+
     private val _isInitialized = MutableStateFlow(false)
     val isInitialized: StateFlow<Boolean> = _isInitialized.asStateFlow()
 
@@ -57,6 +67,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             _initialTgSubscribeShown.value = prefs.tgSubscribeShownFlow.first()
             _initialSuppressTgPrompt.value = prefs.suppressTgPromptFlow.first()
+            _showV5SetupNotice.value = prefs.v5SetupNoticePending()
             _isInitialized.value = true
         }
         viewModelScope.launch {
