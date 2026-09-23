@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.0.1](https://github.com/samosvalishe/turn-proxy-android/compare/v5.0.0...v5.0.1) (2026-09-23)
+
+
+### Fixes
+
+* proguard-rules.pro ([f3acd78](https://github.com/samosvalishe/turn-proxy-android/commit/f3acd7812b40148e3f03b813cbf3e731806f269d))
+
 ## [5.0.0](https://github.com/samosvalishe/turn-proxy-android/compare/v4.2.0...v5.0.0) (2026-09-23)
 
 
