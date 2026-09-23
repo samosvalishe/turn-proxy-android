@@ -1,5 +1,83 @@
 # Changelog
 
+## [5.0.0](https://github.com/samosvalishe/turn-proxy-android/compare/v4.2.0...v5.0.0) (2026-09-23)
+
+
+### ⚠ BREAKING CHANGES
+
+* bump aar
+
+### Features
+
+* bump aar ([cfb5d27](https://github.com/samosvalishe/turn-proxy-android/commit/cfb5d273db1f06f5c9f0151fcbc19153850396d8))
+* bump aar ([082251b](https://github.com/samosvalishe/turn-proxy-android/commit/082251bd63154d2d213b40358457096ff3773e84))
+* **diagnostics:** отмечать процесс и сессию в событиях сервиса ([82d3fb8](https://github.com/samosvalishe/turn-proxy-android/commit/82d3fb8c734814f8c5080f962711c11ec40e967c))
+* **i18n:** английская локаль и выбор языка в настройках ([e747be0](https://github.com/samosvalishe/turn-proxy-android/commit/e747be0807c464553ac58726c6e2080b5e48072b))
+* **notify:** провайдер в уведомлении, без счётчика потоков в direct ([1d73a97](https://github.com/samosvalishe/turn-proxy-android/commit/1d73a976721d113aca1a9e9688f732435f87bcd8))
+* **proxy:** освобождать аллокации до потери сети ([d9af18a](https://github.com/samosvalishe/turn-proxy-android/commit/d9af18ab7a282915ae1e1d3c31b14cd4c71bbb75))
+* **proxy:** переподключение вместо перезапуска ядра при смене сети ([e070d12](https://github.com/samosvalishe/turn-proxy-android/commit/e070d121e3351b82d3ceed6893f7bac2f733e856))
+* **proxy:** провайдер Relay/Direct в листе серверов, без упоминаний зла ([0d0be57](https://github.com/samosvalishe/turn-proxy-android/commit/0d0be5704474182729d969a7527f846c4ed3fca2))
+* **proxy:** режим проброса tcp с настраиваемым ARQ ([e7425a5](https://github.com/samosvalishe/turn-proxy-android/commit/e7425a5ab8df6731c2761684647ce1e26736f235))
+* rebranding ([5d3db4d](https://github.com/samosvalishe/turn-proxy-android/commit/5d3db4d3a43f32c348cc61bea992dc9ed6e45584))
+* **server:** install.sh из релиза ядра, apply вместо install/start (RPC proto 3) ([4304162](https://github.com/samosvalishe/turn-proxy-android/commit/430416251ce58a57f803a0db0393fa554a7ba320))
+* **server:** настройка пейсинга обфускации ([d16772d](https://github.com/samosvalishe/turn-proxy-android/commit/d16772da88e19df670974c3ee889c20871eccf9f))
+* **service:** история завершений процесса в логе, ошибки старта в ресурсах ([a9489c4](https://github.com/samosvalishe/turn-proxy-android/commit/a9489c40d206a91652ad0c14acb712f2a2889577))
+* **settings:** тумблер сезонного декора ([bb0a40b](https://github.com/samosvalishe/turn-proxy-android/commit/bb0a40ba9b678fe5679a7bb0f4f3311cae28a4a3))
+* **share:** доступы из client-list вместо WG-пиров ([0350afa](https://github.com/samosvalishe/turn-proxy-android/commit/0350afaa411bcdacdcd1becc8482830ad104fd21))
+* **share:** опциональная ссылка на звонок в freeturn:// ([0f8dc7c](https://github.com/samosvalishe/turn-proxy-android/commit/0f8dc7cf1e521debd63aed54617693c386822654))
+* **tcp:** вернуть настройку bond ([6e8cbc9](https://github.com/samosvalishe/turn-proxy-android/commit/6e8cbc952f76bf8d809f137774157598717dcd62))
+* **ui:** M3 Expressive - connected button group, меню с выбором, морф кнопок и иконок ([deb37d6](https://github.com/samosvalishe/turn-proxy-android/commit/deb37d6c2b20d05dbe9042798e3f28d97f1085ac))
+* **ui:** осенний декор кнопки-героя ([f430dea](https://github.com/samosvalishe/turn-proxy-android/commit/f430dea774889fc4a4e0c6a92c79c623760c3c07))
+* **ui:** тактильный тик при вращении листа ([bba32ea](https://github.com/samosvalishe/turn-proxy-android/commit/bba32ea0511b915a4b2ceb719a557bf95a1df44e))
+
+
+### Fixes
+
+* autoConnect в бэкапе, destroy webview капчи, иконка уведомления ([df4c5d9](https://github.com/samosvalishe/turn-proxy-android/commit/df4c5d9af14beff442c9cc83c23ab8d75da91399))
+* **data:** дефолты потоков при разборе серверов из ClientConfig ([30d1dc1](https://github.com/samosvalishe/turn-proxy-android/commit/30d1dc1be0d0e4c1f3a96e111fe42910cf1463e6))
+* **data:** не затирать серверы битым JSON и не глушить битую обфускацию ([0f75931](https://github.com/samosvalishe/turn-proxy-android/commit/0f75931ca67b402db76e9aecfcf198a7cff562e6))
+* **data:** не показывать успех, когда сервер не сохранился ([66513a2](https://github.com/samosvalishe/turn-proxy-android/commit/66513a243b95f7eb64659d701a33e0bc33bad3ff))
+* **i18n:** метки выбора бэкенда различают наш ft-wg0 и VPN пользователя ([ead15bc](https://github.com/samosvalishe/turn-proxy-android/commit/ead15bceda2942de1b725d93ff413a8b83eef0be))
+* **log:** ограниченная очередь лога, экспорт через неё же ([5db1bf4](https://github.com/samosvalishe/turn-proxy-android/commit/5db1bf47127ffadb5ab5cda30335ec7d14cdef4d))
+* **network:** смена сети при том же интерфейсе, dns без рецикла ([87e90db](https://github.com/samosvalishe/turn-proxy-android/commit/87e90db2dff5fe4beddcf5047c2932d37ff1b4ac))
+* **privacy:** маскировать -links в логе и не бэкапить логи сессии ([8691c76](https://github.com/samosvalishe/turn-proxy-android/commit/8691c7685bec0b62ed661b9f551dba72160ff2b6))
+* **proxy:** гасить ошибку ядра по таймеру и выключить его буфер логов ([00af5a9](https://github.com/samosvalishe/turn-proxy-android/commit/00af5a902a4e7c2376d790df7fada3d110e9b182))
+* **proxy:** сохранять ручной DNS при смене сети и чинить SOCKS5-раздачу ([88dc0d1](https://github.com/samosvalishe/turn-proxy-android/commit/88dc0d10380fc1628ed90a35aacd2beb2be1d709))
+* **proxy:** учитывать актуальность сессии при запуске и восстановлении ([53941bd](https://github.com/samosvalishe/turn-proxy-android/commit/53941bdf6dc4b684febef8ef1e2aced1d6184a1e))
+* **security:** закрыть трамплин прокси и ограничить итерации pbkdf2 ([8d07f6d](https://github.com/samosvalishe/turn-proxy-android/commit/8d07f6d1ab8f6f5b0fb22f2f9d0693fdaec3a73e))
+* **service:** запрос VPN-разрешения при старте из виджета и тайла ([29dc9a1](https://github.com/samosvalishe/turn-proxy-android/commit/29dc9a199979f8cb5a3206288dd24fe744574daa))
+* **service:** команды запуска одной очередью, рестарт не перетирает стоп ([428c84e](https://github.com/samosvalishe/turn-proxy-android/commit/428c84e9ad2e294e3e4e0eb35f097bea8619efbe))
+* **service:** конфиг старта одним снимком профиля ([2305ae0](https://github.com/samosvalishe/turn-proxy-android/commit/2305ae01277eca8996390aa4ee6506d9cc235578))
+* **service:** события ядра и сети адресованы своей сессии ([28506b0](https://github.com/samosvalishe/turn-proxy-android/commit/28506b0263ab14e375cbd7c6858dcb5a302f8c20))
+* **settings:** не терять правки и рестарт пары при уходе с экрана ([a6caf4e](https://github.com/samosvalishe/turn-proxy-android/commit/a6caf4e8f45ae729ce9442c58bee381763d92293))
+* **settings:** убрать моргание статуса обновления ([92c1afc](https://github.com/samosvalishe/turn-proxy-android/commit/92c1afcfb0489851ef925ae99e679de90b0bca19))
+* **share:** импорт полей ядра и пейсинг обфускации в ссылке ([0d88536](https://github.com/samosvalishe/turn-proxy-android/commit/0d88536933b6cc13829021be0d0f51cc5a1419ef))
+* **socks5:** предел клиентов, сброс при отказе protect ([4a7952b](https://github.com/samosvalishe/turn-proxy-android/commit/4a7952b7ef95172b2b6f38fa261f3ba1ab95d9cf))
+* **tunnel:** сохранять параметры amneziawg и показывать протокол доступа ([315f07f](https://github.com/samosvalishe/turn-proxy-android/commit/315f07ff534cd357b4f54b6daefcef1673be1d4d))
+* **ui:** отступы пунктов в дропдаунах, короткие режимы split-tunnel ([49784b6](https://github.com/samosvalishe/turn-proxy-android/commit/49784b61f97ac4ba88614b90f68fc8ce32a6d0ef))
+* **vpn:** не отзывать чужой VPN при открытии приложения ([a380d2c](https://github.com/samosvalishe/turn-proxy-android/commit/a380d2cfa4c1a170a232b24695925364683cac39))
+* **vpn:** пустой include-список больше не заворачивает весь трафик ([9627f2a](https://github.com/samosvalishe/turn-proxy-android/commit/9627f2a3c9b2cb153bd370d7ab2966f7f8a832c7))
+
+
+### Performance
+
+* **prefs:** разбор серверов только при их изменении ([017876d](https://github.com/samosvalishe/turn-proxy-android/commit/017876d62eba93ae41f3fc129d8db94660694e12))
+* **proxy:** снять старт сервиса с главного потока ([392e8be](https://github.com/samosvalishe/turn-proxy-android/commit/392e8bed69a8d3dae4791c69d5cb77a2e026c485))
+* **proxy:** убрать опрос метрик ядра ([f68b526](https://github.com/samosvalishe/turn-proxy-android/commit/f68b526a26af2955620c23bab73d4daccebd88a1))
+* **service:** сравнивать нотификацию по полям вместо списка-снимка ([cc54b28](https://github.com/samosvalishe/turn-proxy-android/commit/cc54b2892fbb355c4e1277db020732935fbf887e))
+* **ui:** не рекомпозировать всю кнопку героя на каждом кадре морфа ([03ec6b0](https://github.com/samosvalishe/turn-proxy-android/commit/03ec6b0eb54381bbde3f396d7102fdbcf99628ea))
+
+
+### Refactoring
+
+* **data:** общий ByteArray.toHex вместо трёх копий форматирования ([80ed5dc](https://github.com/samosvalishe/turn-proxy-android/commit/80ed5dcb1a6e5c6db905add99080d18efd9d3925))
+* **proxy:** развалить глобальный ProxyStore на Koin-синглтоны состояния и лога ([13380fc](https://github.com/samosvalishe/turn-proxy-android/commit/13380fca7e99a6a8d0bd31f385f8ec99d73b94d7))
+* **service:** один флаг остановки сессии ([47a5650](https://github.com/samosvalishe/turn-proxy-android/commit/47a5650e84bcef9765413a049331cda1c6f947c7))
+* **ssh:** типизированный результат вместо строк ERROR ([2cfa906](https://github.com/samosvalishe/turn-proxy-android/commit/2cfa906606233ebf36e5c705328c1bd83dd253df))
+* **ui:** отступы через Spacing, доп. цвета сводятся к тону схемы ([f6257cb](https://github.com/samosvalishe/turn-proxy-android/commit/f6257cb14193b3205bd83ab87c1ab7989b0fc318))
+* **update:** типизированные ошибки обновления, тексты в ресурсах ([66fb675](https://github.com/samosvalishe/turn-proxy-android/commit/66fb675bd2c49a327a3b9101a0875d5954f80b47))
+* **viewmodel:** разнести SettingsViewModel и увести вибрацию за интерфейс ([377e0f7](https://github.com/samosvalishe/turn-proxy-android/commit/377e0f74ce30e90a5093abac3465fe213403c0dc))
+
 ## [4.2.0](https://github.com/samosvalishe/turn-proxy-android/compare/v4.1.0...v4.2.0) (2026-08-19)
 
 
