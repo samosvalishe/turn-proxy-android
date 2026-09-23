@@ -4,24 +4,8 @@
 -renamesourcefileattribute SourceFile
 
 # ── JSch ──────────────────────────────────────────────────────────────────────
--keep class * implements com.jcraft.jsch.Cipher { <init>(); }
--keep class * implements com.jcraft.jsch.Compression { <init>(); }
--keep class * implements com.jcraft.jsch.DH { <init>(); }
--keep class * implements com.jcraft.jsch.ECDH { <init>(); }
--keep class * implements com.jcraft.jsch.GSSContext { <init>(); }
--keep class * implements com.jcraft.jsch.HASH { <init>(); }
--keep class * implements com.jcraft.jsch.KDF { <init>(); }
--keep class * implements com.jcraft.jsch.KEM { <init>(); }
--keep class * extends com.jcraft.jsch.KeyExchange { <init>(); }
--keep class * implements com.jcraft.jsch.KeyPairGenDSA { <init>(); }
--keep class * implements com.jcraft.jsch.KeyPairGenECDSA { <init>(); }
--keep class * implements com.jcraft.jsch.KeyPairGenEdDSA { <init>(); }
--keep class * implements com.jcraft.jsch.KeyPairGenRSA { <init>(); }
--keep class * implements com.jcraft.jsch.MAC { <init>(); }
--keep class * implements com.jcraft.jsch.Random { <init>(); }
--keep class * implements com.jcraft.jsch.Signature { <init>(); }
--keep class * extends com.jcraft.jsch.UserAuth { <init>(); }
--keep class * implements com.jcraft.jsch.XDH { <init>(); }
+# Reflection создаёт package-private классы JSch: вызывающий код должен оставаться в том же пакете.
+-keep class com.jcraft.jsch.** { *; }
 -dontwarn com.jcraft.jsch.**
 
 # ── Bouncy Castle ─────────────────────────────────────────────────────────────
