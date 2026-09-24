@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.0.2](https://github.com/samosvalishe/turn-proxy-android/compare/v5.0.1...v5.0.2) (2026-09-24)
+
+
+### Fixes
+
+* bump ([9e3e753](https://github.com/samosvalishe/turn-proxy-android/commit/9e3e753bbbd8eea0bfa60496827b17579058f3b0))
+
 ## [5.0.1](https://github.com/samosvalishe/turn-proxy-android/compare/v5.0.0...v5.0.1) (2026-09-23)
 
 
